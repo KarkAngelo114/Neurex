@@ -101,7 +101,7 @@ model.modelSummary();
 
 ## Training
 
-If you're ready to train your model, you can use the tain() to start the training process. For this demo, before we train our model, we configure it first via configure()
+If you're ready to train your model, you can use the train() to start the training process. For this demo, before we train our model, we configure it first via configure()
 
 ```Javascript
 
