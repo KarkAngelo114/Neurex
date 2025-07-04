@@ -1,0 +1,29 @@
+{
+  "name": "neurex",
+  "version": "0.0.1",
+  "description": "A trainable neural network in NodeJS. Designed for ease of implementation and ANN modelling",
+  "keywords": [
+    "Neural-networks",
+    "ANN",
+    "machine-learning",
+    "modelling",
+    "trainable",
+    "network",
+    "neural",
+    "deep-learning"
+  ],
+  "homepage": "https://github.com/KarkAngelo114/Neurex#readme",
+  "bugs": {
+    "url": "https://github.com/KarkAngelo114/Neurex/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KarkAngelo114/Neurex.git"
+  },
+  "license": "MIT",
+  "author": "Kark Angelo",
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
