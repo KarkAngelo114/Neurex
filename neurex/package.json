@@ -1,6 +1,6 @@
 {
   "name": "neurex",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A trainable neural network in NodeJS. Designed for ease of implementation and ANN modelling",
   "keywords": [
     "Neural-networks",
