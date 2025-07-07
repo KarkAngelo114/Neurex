@@ -170,6 +170,8 @@ model.construct_layer('linear', 1);
 model.configure({
     learning_rate: 0.001,
     optimizer: 'sgd'
+    // randMin: -0.1, // minimum range for initializing weights and biases
+    // randMax: 0.1 // maximum range for initializing weights and biases
 });
 
 model.train(X_train, Y_train, "mse", 50000, 10);
@@ -238,7 +240,86 @@ When loading your model, ensure that is not modified and it is in the same locat
 
 Experiment with your own dataset using Neurex!
 
+## Update
 
+NEW - the csv_loader module allows you to load your dataset in a CSV (comma separated values)
+
+
+Here's how to use it:
+
+1. Import the module:
+```Javascript
+
+const csv_loader = require('neurex/preprocessor/csv_loader');
+
+```
+
+2. Create a new variable instance:
+```Javascript
+
+const reader = new csv_loader();
+
+```
+
+3. Extract data using read_csv(). Passing a boolean value allows you to remove the rows of column names. This is because when you extract the data in a CSV file, all are converted into rows. Row1 (indexed as 0 in the array) are the column names. Row2 onwards are the data under those column names. Try logging the returned result without passing first a boolean value and then pass the boolean value to see the difference.
+
+```Javascript
+
+const dataset = reader.read_csv('awesome-neurex.csv', true);
+
+```
+
+4. The csv_loader module also offers different tools to use to manipulate your structure data like:
+
+        - RowsToInt() -> You can convert data on every rows into numerical data using RowsToInt(). Ensure that there are no values that cannot be converted to numbers (non-numeric values).
+
+        ```Javascript
+        const data = reader.RowsToInt(dataset);
+
+        ```
+
+        - removeColumn() -> allows you to remove an entire column and it's data by specifying the column name. You would need to pass the    extracted data from your CSV. Note that when using this function, this will alter your extracted dataset.
+
+        ```Javascript
+        const modifiedDataset = reader.removeColumn("column_name", data);
+        ```
+
+        - getRowElements() ->  get all elements on all rows. Passing a numerical value sets a range to select elements within a row. This won't alter the original structure of your extracted dataset
+
+        ```Javascript
+        /*
+            Example:
+            [
+                [1, 2, 3, 4, 5, 6, 7, ...],
+                [1, 2, 3, 4, 5, 6, 7, ...],
+                [1, 2, 3, 4, 5, 6, 7, ...],
+                [1, 2, 3, 4, 5, 6, 7, ...],
+                ...
+            ]
+        */
+        
+        const returnedRows = reader.getRowElements(5, modifiedDataset);
+
+        /*Output:
+            [
+                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5],
+                [1, 2, 3, 4, 5],
+                ...
+            ]
+        
+        */
+
+        ```
+
+        - extractColumn() -> select all data under the specified column. This alters your extracted dataset. Returns a 1D array
+
+        ```Javascript
+        const columnData = reader.extractColumn("column_name", modifiedDataset);
+        ```
+
+When using csv_loader and it's tools in manipulating extracted data, it is a good practice to always do logging to keep track what has been change and the updated structured of your extracted data.
 
 ## Notes
 
@@ -249,8 +330,6 @@ This libarary is:
 - this trainable neural network library doesn't rely on any dependencies.
 
 - doesn't have any other dependencies to install along with Neurex
-
-- Neurex doesn't have any other utilities, especially when extracting data to use for training. You would need to do it manually before feeding it to the network.
 
 - when saving models, it is in the form of JSON file. You can view the contents of your actual model, and though it is in human-readable form, it should not be modified. Attempting to do so will cause consequences (eg: incorrect predictions, shape-related erros, etc.).
 

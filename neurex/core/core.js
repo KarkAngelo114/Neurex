@@ -298,7 +298,7 @@ class Neurex {
         for (let i = 0; i < this.num_layers; i++) {
             let generated_biases = [];
             for (let j = 0; j < this.number_of_neurons[i]; j++) {
-                generated_biases.push(Math.random() * 2 - 1);
+                generated_biases.push(Math.random() * (this.randMax - this.randMin) + this.randMin);
             }
             this.biases.push(generated_biases);
         }
@@ -310,7 +310,7 @@ class Neurex {
             for (let r = 0; r < prev_size; r++) {
                 let row = [];
                 for (let c = 0; c < layer_size; c++) {
-                    row.push(Math.random() * 2 - 1);
+                    row.push(Math.random() * (this.randMax - this.randMin) + this.randMin);
                 }
                 layerWeights.push(row);
             }
