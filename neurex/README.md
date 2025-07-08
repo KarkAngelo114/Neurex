@@ -240,86 +240,68 @@ When loading your model, ensure that is not modified and it is in the same locat
 
 Experiment with your own dataset using Neurex!
 
+
+
+
 ## Update
 
-NEW - the csv_loader module allows you to load your dataset in a CSV (comma separated values)
+A new module has been added allowing you to work with your dataset in CSV format. Using CsvDataHandler, you can manipulate your dataset with ease for data preprocessing and cleaning.
 
+Here's an example how to do it:
 
-Here's how to use it:
-
-1. Import the module:
-```Javascript
-
-const csv_loader = require('neurex/preprocessor/csv_loader');
-
-```
-
-2. Create a new variable instance:
-```Javascript
-
-const reader = new csv_loader();
-
-```
-
-3. Extract data using read_csv(). Passing a boolean value allows you to remove the rows of column names. This is because when you extract the data in a CSV file, all are converted into rows. Row1 (indexed as 0 in the array) are the column names. Row2 onwards are the data under those column names. Try logging the returned result without passing first a boolean value and then pass the boolean value to see the difference.
+Import CsvDataHandler module and create an instance:
 
 ```Javascript
+const CsvDataHandler = require('neurex/preprocessor/CsvDataHandler');
 
-const dataset = reader.read_csv('awesome-neurex.csv', true);
-
+const csv = new CsvDataHandler();
 ```
 
-4. The csv_loader module also offers different tools to use to manipulate your structure data like:
+Load your CSV file on read_csv() method:
 
-        - RowsToInt() -> You can convert data on every rows into numerical data using RowsToInt(). Ensure that there are no values that cannot be converted to numbers (non-numeric values).
+```Javascript
+const dataset = csv.read_csv('my-awesome-dataset.csv');
+```
 
-        ```Javascript
-        const data = reader.RowsToInt(dataset);
+You can view your loaded dataset in a tabularized format using tabularize() and simply passing a data to view. This is very useful especially if you want to keep track what is the current structure of your dataset along the process.
 
-        ```
+```Javascript
+const dataset = csv.read_csv('my-awesome-dataset.csv');
+csv.tabularize(dataset);
+```
 
-        - removeColumn() -> allows you to remove an entire column and it's data by specifying the column name. You would need to pass the    extracted data from your CSV. Note that when using this function, this will alter your extracted dataset.
+If your working with numerical data, consider using rowsToInt() method. This is because when you loaded your CSV dataset, all cell elements on all rows are strings. You can view the changes by logging the first result of the process and after converting all rows to Numbers. Ensure that all rows contains elements that can be converted to numerical data, othewise, elements that cannot be converted to int (like words) will be represented as NaN.
 
-        ```Javascript
-        const modifiedDataset = reader.removeColumn("column_name", data);
-        ```
+```Javascript
+const formatted_dataset = csv.rowsToInt(dataset);
+csv.tabularize(formatted_dataset); // or to view the changes, use console.log();
+```
 
-        - getRowElements() ->  get all elements on all rows. Passing a numerical value sets a range to select elements within a row. This won't alter the original structure of your extracted dataset
+You may have unwanted columns in your current dataset (or columns that contains NaN values), considering dropping them using removeColumns() method. When removing columns, this will alter the structure of your dataset.
 
-        ```Javascript
-        /*
-            Example:
-            [
-                [1, 2, 3, 4, 5, 6, 7, ...],
-                [1, 2, 3, 4, 5, 6, 7, ...],
-                [1, 2, 3, 4, 5, 6, 7, ...],
-                [1, 2, 3, 4, 5, 6, 7, ...],
-                ...
-            ]
-        */
-        
-        const returnedRows = reader.getRowElements(5, modifiedDataset);
+```Javascript
+const cleaned_dataset = csv.removeColumns(["column_1", "column_2", "column_3"], formatted_dataset);
+csv.tabularize(cleaned_dataset);
+```
 
-        /*Output:
-            [
-                [1, 2, 3, 4, 5],
-                [1, 2, 3, 4, 5],
-                [1, 2, 3, 4, 5],
-                [1, 2, 3, 4, 5],
-                ...
-            ]
-        
-        */
+If you're going to feed your dataset to your model, consider normalizing your dataset first. Your dataset must not contain NaNs and all rows are already formatted to numbers. You can do this using normalize() method. As for now, the only available normalization method is MinMax, which normalize all values between 0 to 1.
 
-        ```
+```Javascript
+const normalized_dataset = csv.normalize("MinMax",cleaned_dataset);
+csv.tabularize(normalized_dataset);
+```
 
-        - extractColumn() -> select all data under the specified column. This alters your extracted dataset. Returns a 1D array
+If you want to extract data under the column, use extractColumn(). Note that this will alter the structure of your dataset.
 
-        ```Javascript
-        const columnData = reader.extractColumn("column_name", modifiedDataset);
-        ```
+```Javascript
+const extracted_column = csv.extractColumn("column_1", cleaned_dataset);
+csv.tabularize(extracted_column);
+```
 
-When using csv_loader and it's tools in manipulating extracted data, it is a good practice to always do logging to keep track what has been change and the updated structured of your extracted data.
+
+
+
+
 
 ## Notes
 

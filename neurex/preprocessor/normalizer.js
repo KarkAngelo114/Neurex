@@ -1,40 +1,4 @@
-// /**
-//  * @method minMaxZeroOne
-//  * Scales input array to [0, 1]
-//  */
-// const MinMaxScaler = (inputArr) => {
-//     let normalized_array = [];
-//     inputArr.forEach(inputArr => {
-//         const min = Math.min(...inputArr);
-//         const max = Math.max(...inputArr);
-//         normalized_array.push(inputArr.map(x => (x - min) / (max - min)));
-//     });
-//     return normalized_array;
-// };
 
-// /**
-//  * @method minMaxCustomRange
-//  * Scales input array to [a, b]
-//  */
-// const minMaxCustomRange = (inputArr, a, b) => {
-//     const min = Math.min(...inputArr);
-//     const max = Math.max(...inputArr);
-//     return inputArr.map(x => ((x - min) / (max - min)) * (b - a) + a);
-// };
-
-// /**
-//  * @method minMaxManual
-//  * Scales input array using provided min and max
-//  */
-// const minMaxManual = (inputArr, min, max) => {
-//     return inputArr.map(x => (x - min) / (max - min));
-// };
-
-// module.exports = {
-//     MinMaxScaler,
-//     minMaxCustomRange,
-//     minMaxManual
-// };
 
 
 
