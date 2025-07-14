@@ -1,6 +1,6 @@
 {
   "name": "neurex",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "A trainable neural network in NodeJS. Designed for ease of implementation and ANN modelling",
   "keywords": [
     "Neural-networks",
@@ -23,6 +23,7 @@
   "license": "MIT",
   "author": "Kark Angelo",
   "type": "commonjs",
+  "main":"./index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   }
