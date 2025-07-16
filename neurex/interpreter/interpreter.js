@@ -11,6 +11,13 @@ const activation = require('../activations');
 const fs = require('fs');
 const path = require('path');
 
+
+
+/**
+ * This class allows you to run inference predictions on your applications. You can load your trained model and run predictions
+ *
+ * @class
+ */
 class Interpreter {
     constructor () {
         this.weights = []; // weights for calculating the dot product of each nueron

@@ -9,7 +9,7 @@ const path = require('path');
 const {MinMaxScaler} = require('./normalizer');
 
 /**
- * CsvDataHandler is a utility tool for Neurex that allows you to extract and manipulate data from your .csv dataset.
+ * CsvDataHandler is a utility tool for that allows you to extract and manipulate data from your .csv dataset.
  *
  * @class
  */
