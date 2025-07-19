@@ -13,6 +13,7 @@ const Interpreter = require('./interpreter');
 const CsvDataHandler = require('./preprocessor/CsvDataHandler');
 const {MinMaxScaler} = require('./preprocessor/normalizer');
 const split_dataset = require('./preprocessor/split');
+const RegressionMetrics = require('./metrics/regression_metrics');
 
 module.exports= {
     Neurex,
@@ -20,4 +21,5 @@ module.exports= {
     CsvDataHandler,
     MinMaxScaler,
     split_dataset,
+    RegressionMetrics
 }

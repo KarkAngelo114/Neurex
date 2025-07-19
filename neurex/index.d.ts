@@ -1,6 +1,6 @@
 
 /**
- * Neurex - Feedforward Neural Network NodeJS library | Author: Kark Angelo V. Pada
+ * Neurex - a Trainable Neural Network Library for NodeJS | Author: Kark Angelo V. Pada
  * 
  * Copyright (c) all rights reserved
  * 
@@ -155,6 +155,17 @@ declare module 'neurex' {
         * // Bob     24
         */
         tabularize(data: any[][]): void;
+
+        /**
+        * 
+        * 
+        * Export the loaded data to CSV.
+        * @param {String} file_Name - name of your CSV file
+        * @param {Array<Array<any>>} data
+        *
+        * 
+        */
+        exportCSV(file_Name: string, data: [][]): void;
     }
 
     /**
@@ -376,4 +387,14 @@ declare module 'neurex' {
     * @returns {object} {X_train, Y_train, X_test, Y_test}
     */
     export function split_dataset(X: number[][], Y: number[], split_ratio: number): object;
+
+    /**
+    * Computes evaluation metrics for regression tasks given test features and labels.
+    *
+    * @function
+    * @param {Array<Array<number>>} predictions - The input features for the test set.
+    * @param {Array<number>} testY - The true target values for the test set.
+    * @throws {Error} when textX and testY are not provided
+    */
+    export function RegressionMetrics(predictions: number[][], testY: number[]): void;
 }

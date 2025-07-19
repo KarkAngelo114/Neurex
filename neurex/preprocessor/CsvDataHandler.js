@@ -354,8 +354,35 @@ class CsvDataHandler {
                 console.log(i+1,'.',row);
             });
         }
+    }
 
-        
+    /**
+     * 
+     * @param {String} file_Name - name of your CSV file
+     * @param {Array<Array<any>>} data
+     *
+     * Export the loaded data to CSV.
+     */
+    exportCSV(file_Name, data) {
+        const columnNames = this.columnNames;
+        const dir = path.dirname(require.main.filename);
+        const escape = (value) => {
+            if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+            return `"${value.replace(/"/g, '""')}"`; // escape double quotes
+            }
+            return value;
+        };
+
+        const headers = columnNames.join(',');
+        const NewData = data.map(row => row.map(escape).join(',')).join('\n');
+
+        const csv = `${headers}\n${NewData}`;
+
+        const file = path.join(dir, `${file_Name}.csv`);
+        fs.writeFileSync(file, csv);
+
+        console.log(`[SUCCESS]------- Exported file exported as ${file_Name}.csv`);
+
     }
 }
 
