@@ -7,7 +7,9 @@
  */
 
 
-const activation = require('../activations');
+const activation = require('../gpu/kernels/activations');
+const detect = require('../gpu/detectGPU');
+const { computeForward } = require('../gpu/kernels/matrixMultiplication');
 const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +29,7 @@ class Interpreter {
         this.activation_functions = []; // activation functions for each layer
         this.number_of_neurons = []; // the number of neurons on each layer. Stored in array
         this.input_size = 0; // the size of the input layer, basically the number of input neurons.
+        this.onGPU = false;
     }
 
     /**
@@ -85,6 +88,7 @@ class Interpreter {
             this.number_of_neurons = modelData.number_of_neurons;
             this.weights = modelData.weights;
             this.biases = modelData.biases;
+            this.onGPU = modelData.onGPU;
 
             console.log(`[SUCCESS]------- Model ${model} successfully loaded`);
         } catch (error) {
@@ -130,6 +134,16 @@ class Interpreter {
                 throw new Error(`\n[ERROR]-------Shape Mismatch | Input shape length: ${input[0].length} | Expecting ${this.input_size}`);
             }
 
+            const {gpu, backend, isGPUAvailable, isSoftwareGPU} = detect();
+
+            if (!isGPUAvailable || isSoftwareGPU) {
+                console.log(`[INFO]------- Falling back to CPU mode (no GPU acceleration)`);
+                this.onGPU = false;
+            } else {
+                console.log(`[INFO]-------- Backend Detected: ${backend}. Using ${gpu}`);
+                this.onGPU = true;
+            }
+
             let outputs = [];
             for (let sample_index = 0; sample_index < input.length; sample_index++) {
                 /**
@@ -148,21 +162,21 @@ class Interpreter {
         }
     }
 
+    // forward propagation
     #Feedforward(input) {
         let current_input = input
         let all_layer_outputs = [input];
         let zs = [];
 
         
-        // first outer loop: getting the layers of the network
         /**
-            when calling construct_layer(), the this.num_layers adds up.
+        when calling construct_layer(), the this.num_layers adds up.
 
-            assume we have contructed only 2 layers (1 hidden layer and 1 output layer)
-            therefore this for loop will interate 2 times to perform operations inside
-            and the value of "layer" will specify what index in the this.weights and this.biases array going to use
-            and also the number of neurons stored in the this.number_of_neurons array
-         */
+        assume we have contructed only 2 layers (1 hidden layer and 1 output layer)
+        therefore this for loop will interate 2 times to perform operations inside
+        and the value of "layer" will specify what index in the this.weights and this.biases array going to use
+        and also the number of neurons stored in the this.number_of_neurons array
+        */
         for (let layer = 0; layer < this.num_layers; layer++) {
             /** get the array of biases from the array of arrays of biases 
 
@@ -233,7 +247,7 @@ class Interpreter {
                         ....
                 ]
              */
-            const num_neurons = this.number_of_neurons[layer]; 
+            //const num_neurons = this.number_of_neurons[layer]; the number of biases in a layer can be use to determine how many neurons are there in a layer
 
             /**
              * in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
@@ -262,69 +276,24 @@ class Interpreter {
             */
             const activation_function = this.activation_functions[layer];
 
-            let outputs = [];
-            let z_values = [];
+            // compute dot-product for all neurons at once
+            const z_values = computeForward(this.onGPU, current_input, layer_weights, layer_biases);
 
-            // main loop: loop over neurons in the layer
-            /**
-                calculates the dot product for each current input
-                the outer loop is the neuron itself. If there are 7 neurons in this current layer, 
-                it will loop 7 times and the innermost for loop is the calculation of dot product
-
-             */
-            for (let neuron = 0; neuron < num_neurons; neuron++) {
-                let dot_product_output = 0; // the dot product after the innermost for loop is done calculating the datapoints inside the current_input array
-
-                /**
-                    assumes:
-                        let i = 0
-                            current_input = [
-                                [x1, x2, x3, ...], <- index 0
-                                ....
-                            ]
-                        then:
-                            current_input = [x1, x2, x3, ...] <- each feature will be calculated inside this neuron using a dot-product
-                            solution:
-                                x = (x1 * 0weights1) + (x2* 0weights2) + (x3 * 0weights3) .... 
-                    
-                 */
-                for (let i = 0; i < current_input.length; i++) {
-                    dot_product_output += current_input[i] * layer_weights[i][neuron];
-                }
-                /**
-                
-                    Once we get the dot-product, we apply the bias for this neuron
-                    Assume:
-                        let layer = 0;
-                        let neuron = 0;
-
-                    then:
-                        biases : [
-                            [
-                                0b1, <- index 0 - this is the bias we get for this neuron
-    These are the biases        0b2, 
-        for this layer          0b3, 
-                                ...
-                            ], 
-                            [
-                                1b1, 
-                                1b2, 
-                                1b3, 
-                                ...
-                            ], 
-                            ....
-                        ]
-                 */
-                z_values.push(dot_product_output + layer_biases[neuron]); // Store z-value
-            }
+            let outputs;
 
             // After computing all z_values for the current layer
             if (activation_function.name === "softmax") {
-                outputs = activation_function(z_values); // Apply softmax to all z_values
+                outputs = activation_function(z_values, this.onGPU); // Apply softmax to all z_values
             } else {
                 // For other activations, apply individually
-                for (let j = 0; j < num_neurons; j++) {
-                    outputs.push(activation_function(z_values[j]));
+                if (!this.onGPU) {
+                    outputs = [];
+                    for (let i= 0; i < layer_biases.length; i++) {
+                        outputs.push(activation_function(z_values[i]));
+                    }
+                }
+                else {
+                    outputs = activation_function(z_values, this.onGPU);
                 }
             }
                 

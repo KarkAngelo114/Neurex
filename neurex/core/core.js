@@ -13,9 +13,13 @@ import necessary modules
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
-const activation = require('../activations');
+const activation = require('../gpu/kernels/activations');
+const detect = require('../gpu/detectGPU');
+const { computeWeightGradients, scaleGradients} = require('../gpu/kernels/gradientKernels');
+const { computeForward, computeBackprop } = require('../gpu/kernels/matrixMultiplication');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
+
 
 
 /**
@@ -64,6 +68,8 @@ class Neurex {
             weights: [], // Array of state objects for each layer's weights
             biases: []   // Array of state objects for each layer's biases
         };
+
+        this.onGPU = false;
     }
 
     /**
@@ -242,7 +248,7 @@ class Neurex {
             "number_of_neurons":this.number_of_neurons,
             "weights":this.weights,
             "biases":this.biases,
-            
+            "onGPU":this.onGPU
         };
 
         const metadata = [
@@ -332,6 +338,16 @@ class Neurex {
 
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size) {
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero");
+            }
+
+            const {gpu, backend, isGPUAvailable, isSoftwareGPU} = detect();
+
+            if (!isGPUAvailable || isSoftwareGPU) {
+                console.log(`[INFO]------- Falling back to CPU mode (no GPU acceleration)`);
+                this.onGPU = false;
+            } else {
+                console.log(`[INFO]-------- Backend Detected: ${backend}. Using ${gpu}`);
+                this.onGPU = true;
             }
 
             this.loss_function = loss.toLowerCase();
@@ -454,34 +470,35 @@ class Neurex {
                         // backpropagate to the hidden layers (except input layer)
 
                         for (let layer = this.num_layers - 2; layer >= 0; layer--) {
-                            let current_delta = [];
-                            const weights_next = this.weights[layer+1];
-                            const next_delta = deltas[layer+1];
-
-                            for (let neuron = 0; neuron < this.number_of_neurons[layer]; neuron++) {
-                                let sum = 0;
-                                for (let i = 0; i < this.number_of_neurons[layer+1]; i++) {
-                                    sum += weights_next[neuron][i] * next_delta[i];
-                                }
-                                const derivative_activation = this.derivative_functions[layer](zs[layer][neuron]);
-
-                                current_delta.push(sum * derivative_activation);
+                            const next_weights = this.weights[layer + 1];
+                            const next_delta = deltas[layer + 1];
+                            if (!Array.isArray(next_delta)) {
+                                throw new Error(`deltaNext at layer ${layer + 1} is undefined`);
                             }
+
+                            const weighted_delta = computeBackprop(this.onGPU, next_weights, next_delta);
+
+                            const current_delta = weighted_delta.map((value, i) =>
+                                value * this.derivative_functions[layer](zs[layer][i])
+                            );
+
                             deltas[layer] = current_delta;
                         }
+
 
                         // === STEP 3: Accumulate Gradients === //
                         for (let l = 0; l < this.num_layers; l++) {
                             const delta = deltas[l];
-                            const a_prev = activations[l]; 
-                            // Accumulate weight gradients
-                            for (let i = 0; i < this.weights[l].length; i++) {
-                                for (let j = 0; j < this.weights[l][i].length; j++) {
-                                    weightGrads[l][i][j] += a_prev[i] * delta[j];
-                                }
-                            }
-                            // Accumulate bias gradients
-                            for (let j = 0; j < this.biases[l].length; j++) {
+                            const a_prev = activations[l];
+
+                            // GPU-accelerated weight gradient (outer product)
+                            const weightGrad = computeWeightGradients(this.onGPU, a_prev, delta);
+                            weightGrads[l] = weightGrads[l].map((row, i) =>
+                                row.map((val, j) => val + weightGrad[i][j])
+                            );
+
+                            // Accumulate bias gradients (still CPU for now)
+                            for (let j = 0; j < biasGrads[l].length; j++) {
                                 biasGrads[l][j] += delta[j];
                             }
                         }
@@ -493,18 +510,16 @@ class Neurex {
                     // Divide accumulated gradients by the actual batch size
                     for (let l = 0; l < this.num_layers; l++) {
                         for (let i = 0; i < weightGrads[l].length; i++) {
-                            for (let j = 0; j < weightGrads[l][i].length; j++) {
-                                weightGrads[l][i][j] /= actualBatchSize;
-                            }
+                            weightGrads[l][i] = scaleGradients(this.onGPU, weightGrads[l][i], actualBatchSize);
                         }
-                        for (let i = 0; i < biasGrads[l].length; i++) {
-                            biasGrads[l][i] /= actualBatchSize;
-                        }
+                        biasGrads[l] = scaleGradients(this.onGPU, biasGrads[l], actualBatchSize);
                     }
+
 
                     for (let l = 0; l < this.num_layers; l++) {
                         // Update weights
                         this.optimizerStates.weights[l] = optimizerFn(
+                            this.onGPU,
                             this.weights[l],
                             weightGrads[l],
                             this.optimizerStates.weights[l],
@@ -512,6 +527,7 @@ class Neurex {
                         );
                         // Update biases
                         this.optimizerStates.biases[l] = optimizerFn(
+                            this.onGPU,
                             this.biases[l],
                             biasGrads[l],
                             this.optimizerStates.biases[l],
@@ -583,15 +599,14 @@ class Neurex {
         let zs = [];
 
         
-        // first outer loop: getting the layers of the network
         /**
-            when calling construct_layer(), the this.num_layers adds up.
+        when calling construct_layer(), the this.num_layers adds up.
 
-            assume we have contructed only 2 layers (1 hidden layer and 1 output layer)
-            therefore this for loop will interate 2 times to perform operations inside
-            and the value of "layer" will specify what index in the this.weights and this.biases array going to use
-            and also the number of neurons stored in the this.number_of_neurons array
-         */
+        assume we have contructed only 2 layers (1 hidden layer and 1 output layer)
+        therefore this for loop will interate 2 times to perform operations inside
+        and the value of "layer" will specify what index in the this.weights and this.biases array going to use
+        and also the number of neurons stored in the this.number_of_neurons array
+        */
         for (let layer = 0; layer < this.num_layers; layer++) {
             /** get the array of biases from the array of arrays of biases 
 
@@ -662,7 +677,7 @@ class Neurex {
                         ....
                 ]
              */
-            const num_neurons = this.number_of_neurons[layer]; 
+            //const num_neurons = this.number_of_neurons[layer]; the number of biases in a layer can be use to determine how many neurons are there in a layer
 
             /**
              * in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
@@ -691,69 +706,24 @@ class Neurex {
             */
             const activation_function = this.activation_functions[layer];
 
-            let outputs = [];
-            let z_values = [];
+            // compute dot-product for all neurons at once
+            const z_values = computeForward(this.onGPU, current_input, layer_weights, layer_biases);
 
-            // main loop: loop over neurons in the layer
-            /**
-                calculates the dot product for each current input
-                the outer loop is the neuron itself. If there are 7 neurons in this current layer, 
-                it will loop 7 times and the innermost for loop is the calculation of dot product
-
-             */
-            for (let neuron = 0; neuron < num_neurons; neuron++) {
-                let dot_product_output = 0; // the dot product after the innermost for loop is done calculating the datapoints inside the current_input array
-
-                /**
-                    assumes:
-                        let i = 0
-                            current_input = [
-                                [x1, x2, x3, ...], <- index 0
-                                ....
-                            ]
-                        then:
-                            current_input = [x1, x2, x3, ...] <- each feature will be calculated inside this neuron using a dot-product
-                            solution:
-                                x = (x1 * 0weights1) + (x2* 0weights2) + (x3 * 0weights3) .... 
-                    
-                 */
-                for (let i = 0; i < current_input.length; i++) {
-                    dot_product_output += current_input[i] * layer_weights[i][neuron];
-                }
-                /**
-                
-                    Once we get the dot-product, we apply the bias for this neuron
-                    Assume:
-                        let layer = 0;
-                        let neuron = 0;
-
-                    then:
-                        biases : [
-                            [
-                                0b1, <- index 0 - this is the bias we get for this neuron
-    These are the biases        0b2, 
-        for this layer          0b3, 
-                                ...
-                            ], 
-                            [
-                                1b1, 
-                                1b2, 
-                                1b3, 
-                                ...
-                            ], 
-                            ....
-                        ]
-                 */
-                z_values.push(dot_product_output + layer_biases[neuron]); // Store z-value
-            }
+            let outputs;
 
             // After computing all z_values for the current layer
             if (activation_function.name === "softmax") {
                 outputs = activation_function(z_values); // Apply softmax to all z_values
             } else {
                 // For other activations, apply individually
-                for (let j = 0; j < num_neurons; j++) {
-                    outputs.push(activation_function(z_values[j]));
+                if (!this.onGPU) {
+                    outputs = [];
+                    for (let i= 0; i < layer_biases.length; i++) {
+                        outputs.push(activation_function(z_values[i]));
+                    }
+                }
+                else {
+                    outputs = activation_function(z_values, this.onGPU);
                 }
             }
                 
