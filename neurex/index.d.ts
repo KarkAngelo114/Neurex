@@ -176,9 +176,9 @@ declare module 'neurex' {
     export class Interpreter {
         /**
         * @method loadSavedModel()
-        * @param {string} model - the trained model
+        * @param {*} model - the trained model
 
-        Thw loadSavedModel() method allows you to load the trained model. The model is typically in a JSON file format which contains the
+        The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
 
         */
         loadSavedModel(model: string): void;
@@ -331,10 +331,10 @@ declare module 'neurex' {
         /**
         * 
         @method saveModel()
-        @param {string} modelName - the filename of your model
+        @param {string} modelName - the filename of your model. If not provided, the filename of the model is date today.
 
-        saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters in a .json file. Once called after training,
-        it will generate two .json files - the metadata.json and the actual model (YourModelName.json or if name not specified, it will be Model_date_today.json).
+        saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+        as a .nrx (neurex) model and a metadata.json will be generated along with the model file.
         
         */
         saveModel(modelName: string): void;
@@ -342,8 +342,6 @@ declare module 'neurex' {
         /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
-        * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
-        * computes the loss, backpropagates the error, and updates the weights and biases using gradient descent.
         *
         * @method train()
         * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
@@ -357,13 +355,13 @@ declare module 'neurex' {
         * 
         * @example
         * // Example usage:
-        * const nn = new core1();
+        * const nn = new Neurex();
         * nn.inputShape(trainX); // Set input shape based on your data
         * nn.construct_layer('relu', 8); // Add a hidden layer with 8 neurons and ReLU activation
         * nn.construct_layer('linear', 1); // Add an output layer with 1 neuron and linear activation
-        * nn.train(trainX, trainY, 'mse', 100, 4); // Train for 100 epochs with learning rate 0.01 a loss function of 'mse' and a batch size of 4
+        * nn.train(X_train, Y_train, 'mse', 100, 4); // Train for 100 epochs and a loss function of 'mse' and a batch size of 4
         * 
-        * After training, you can use the network for predictions
+        * 
         */
         train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number): void;
 
@@ -393,8 +391,45 @@ declare module 'neurex' {
     *
     * @function
     * @param {Array<Array<number>>} predictions - The input features for the test set.
-    * @param {Array<number>} testY - The true target values for the test set.
+    * @param {Array<number>} actuals - The true target values for the test set.
     * @throws {Error} when textX and testY are not provided
     */
-    export function RegressionMetrics(predictions: number[][], testY: number[]): void;
+    export function RegressionMetrics(predictions: number[][], actuals: number[]): void;
+
+    /**
+    *
+    * Computes evaluation metrics for classification tasks given predicted values and true labels.
+    *
+    * @function ClassificationMetrics
+    * @param {Array<Array<number>>} predictions - The predicted class labels or probabilities for the test set.
+    * @param {Array<Array<number>>} actuals - The true target class labels for the test set.
+    * @param {string} classificationType - binary, categorical, or sparse_categorical
+    * @param {Array<any>} labels - (Optional) - add labels that represents a class
+    */
+    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[]): void;
+
+    /**
+    * Converts a column of categorical labels into one-hot encoded vectors.
+    *
+    * @param {Array<Array<any>>} data - An array where each inner array represents a row and contains a single categorical label.
+    * @returns {Array<Array<Number>>} Returns One-hot encoded labels, suitable for categorical classification.
+    * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
+ */
+    export function OneHotEncoded(data: any[][]): number[][];
+
+    /**
+    * Converts labels that cannot be converted to interger labels (example: words). If your labels already integer-labeled (ex: 0, 1, 2, 3, ...), no need to use this function
+    * @param {Array<Array<any>>} data - column of your dataset that can be use as categorical labeling 
+    * @returns {Array<Array<Number>>} returns Intger-encoded labels. Which can be use for categorical classification, particularly when calculating sparse_categorical_cross_entropy
+    * @throws {Error} - when no data is provided
+    */
+    export function IntegerLabeling(data: any[][]): number[][];
+
+    /**
+    * Converts labels that cannot be converted to binary labels (example: words). If your labels already 0s and 1s, no need to use this function
+    * @param {Array<Array<any>>} data - column of your dataset that can be use as binary labeling (0 or 1)
+    * @returns {Array<Array<Number>>} returns labels which contains 1 vector labels of 1s and 0s. Can be use for Binary classifcation
+    * @throws {Error} - when no data is provided or there are more than two classes
+    */
+    export function BinaryLabeling(data: any[][]): number[][];
 }

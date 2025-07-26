@@ -234,7 +234,7 @@ class CsvDataHandler {
         const extractedValues = data.map(row => {
             const value = row[index];
             row.splice(index, 1); // Mutate the row to remove the value
-            return value;
+            return [value];
         });
 
         return extractedValues;

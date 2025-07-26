@@ -32,7 +32,7 @@ const sigmoid = (dot_product_output) => {
     
      */
 
-    return 1 / (1 + Math.exp(dot_product_output));
+    return 1 / (1 + Math.exp(-dot_product_output));
 };
 
 const dsigmoid = (x) => {
@@ -45,15 +45,15 @@ const dsigmoid = (x) => {
 
 const tanh = (dot_product_output) => {
     /**
-                e^(x) - e^(-x)
-        F(x) = ________________
-                e^(x) + e^(-x)
+            e^(x) - e^(-x)
+     F(x) = ________________
+            e^(x) + e^(-x)
 
-        where:
-            e - is the Euler's number (2.718)
-            x - is the input
-            F(x) - is the output activation function
-     */
+     where:
+        e - is the Euler's number (2.718)
+        x - is the input
+        F(x) - is the output activation function
+    */
     return Math.tanh(dot_product_output);
 }
 

@@ -8,6 +8,7 @@
 
 
 const activation = require('../activations');
+const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
@@ -29,46 +30,66 @@ class Interpreter {
     }
 
     /**
-     * @method loadSavedModel()
-     * @param {*} model - the trained model
+    * @method loadSavedModel()
+    * @param {*} model - the trained model
 
-     Thw loadSavedModel() method allows you to load the trained model. The model is typically in a JSON file format which contains the
+    The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
 
-     */
+    */
     loadSavedModel(model) {
         try {
             if (!model) {
                 throw new Error("No model provided");
             }
+
             const dir = path.dirname(require.main.filename);
-            const model_file = path.join(dir,`${model}`);
-            const content = fs.readFileSync(model_file, 'utf-8');
-            const params = JSON.parse(content);
+            const model_file = path.join(dir, `${model}`);
 
-            // mapping back the stored activation functions
-            this.activation_functions = params.activation_functions.map(name => activation[name.toLowerCase()]);
+            // Check extension
+            if (path.extname(model_file) !== '.nrx') {
+                throw new Error("Invalid file type. Only .nrx model files are supported.");
+            }
 
-            // storing the weights
-            this.weights = params.weights;
+            // Read file
+            const rawBuffer = fs.readFileSync(model_file);
 
-            // storing the biases
-            this.biases = params.biases;
+            // Validate magic header
+            const header = rawBuffer.slice(0, 4).toString('utf-8');
+            if (header !== 'NRX1') {
+                throw new Error("Invalid file format. Not a valid NRX model.");
+            }
 
-            // getting the networks number of layers
-            this.num_layers = params.num_layers;
+            // Check version
+            const version = rawBuffer[4];
+            if (version !== 0x01) {
+                throw new Error(`Unsupported NRX version: ${version}`);
+            }
 
-            // get the neurons per layers. It is stored in array to easily map in what layer has this number of nuerons
-            this.number_of_neurons = params.number_of_neurons;
+            // Decompress and parse
+            const compressedData = rawBuffer.slice(5);
+            const jsonString = zlib.inflateSync(compressedData).toString('utf-8');
+            const modelData = JSON.parse(jsonString);
 
-            // get the input size
-            this.input_size = params.input_size;
+            // Assign properties
+            this.task = modelData.task;
+            this.loss_function = modelData.loss_function;
+            this.epoch_count = modelData.epoch;
+            this.batch_size = modelData.batch_size;
+            this.optimizer = modelData.optimizer;
+            this.learning_rate = modelData.learning_rate;
+            this.activation_functions = modelData.activation_functions.map(name => activation[name.toLowerCase()]);
+            this.derivative_functions = modelData.derivative_functions.map(name => activation.derivatives[name.toLowerCase()]);
+            this.input_size = modelData.input_size;
+            this.output_size = modelData.output_size;
+            this.num_layers = modelData.num_layers;
+            this.number_of_neurons = modelData.number_of_neurons;
+            this.weights = modelData.weights;
+            this.biases = modelData.biases;
 
-            console.log("Using:",model);
+            console.log(`[SUCCESS]------- Model ${model} successfully loaded`);
+        } catch (error) {
+            console.log(error.message);
         }
-        catch (error) {
-            console.log(error);
-        }
-
     }
 
     /**
@@ -117,8 +138,8 @@ class Interpreter {
                  */
                 const array_of_features = input[sample_index];
                 // perform feedforward, similar when training but only outputs predictions. No updating of weights and biases.
-                const {predictions} = this.#FeedForward(array_of_features);
-                outputs.push(predictions[0]);
+                const {predictions} = this.#Feedforward(array_of_features);
+                outputs.push(predictions);
             }
             return outputs;
         }
@@ -127,17 +148,23 @@ class Interpreter {
         }
     }
 
-    #FeedForward(input) {
-        let current_input = input;
+    #Feedforward(input) {
+        let current_input = input
+        let all_layer_outputs = [input];
+        let zs = [];
 
-        /**
         
-            Looping through the layers. The value of layer(int) will be use to index which biases, weights, and activations functions
-            to use in this layer.
-         */
+        // first outer loop: getting the layers of the network
+        /**
+            when calling construct_layer(), the this.num_layers adds up.
 
-        for (let layer = 0; layer.num_layers; layer++) {
-            /**  get the array of biases from the array of arrays of biases 
+            assume we have contructed only 2 layers (1 hidden layer and 1 output layer)
+            therefore this for loop will interate 2 times to perform operations inside
+            and the value of "layer" will specify what index in the this.weights and this.biases array going to use
+            and also the number of neurons stored in the this.number_of_neurons array
+         */
+        for (let layer = 0; layer < this.num_layers; layer++) {
+            /** get the array of biases from the array of arrays of biases 
 
                 biases : [
                     [0b1, 0b2, 0b3, ...], <- index 0
@@ -160,7 +187,8 @@ class Interpreter {
                     ]
             */
             const layer_biases = this.biases[layer];
-             /**  get the array of weights from the array of arrays of weights 
+
+            /** get the array of weights from the array of arrays of weights 
 
                 weights : [
                     [[0weights1],[0weights2],[0weights3], ...], <- index 0
@@ -181,10 +209,9 @@ class Interpreter {
                     ]
             */
             const layer_weights = this.weights[layer];
-            /**
-             * 
 
-            in the constructor, we have "this.number_of_neurons" which is an array. This is because when constructing the network using 
+            /**
+             * in the constructor, we have "this.number_of_neurons" which is an array. This is because when constructing the network using 
             construct_layer(activation_func, layer_size), the layer_size is appended to the "this.number_of_neurons". And since we are in 
             the for-loop for layer, we can access how many neurons that this layer composes and we can get it in the array.
 
@@ -206,10 +233,10 @@ class Interpreter {
                         ....
                 ]
              */
-            const num_neurons = this.number_of_neurons[layer];
+            const num_neurons = this.number_of_neurons[layer]; 
+
             /**
-             * 
-             in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
+             * in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
             construct_layer(activation_func, layer_size), the activation_func is appended to the this.activation_functions.
             And since we are in the for-loop for layers, we can use the layer(int) value to index what activation function is
             assigned for this layer.
@@ -223,21 +250,30 @@ class Interpreter {
 
             assumes:
                 let layer = 0
-
+                        
                 then: 
 
                     activation_functions = [
-                        "relu", <- index 0 - this is the activation function to be use in this layer and will be use by all neurons for this layer
+                        "relu", <- index 0 - this is the activation function going to be use by all neurons in this layer
                         "relu", 
                         "linear", 
                         ....
                     ]
             */
             const activation_function = this.activation_functions[layer];
-            let outputs = [];
 
-            for (let neuron = 0; neuron < num_neurons; neuron++ ) {
-                let dot_product_output = 0;
+            let outputs = [];
+            let z_values = [];
+
+            // main loop: loop over neurons in the layer
+            /**
+                calculates the dot product for each current input
+                the outer loop is the neuron itself. If there are 7 neurons in this current layer, 
+                it will loop 7 times and the innermost for loop is the calculation of dot product
+
+             */
+            for (let neuron = 0; neuron < num_neurons; neuron++) {
+                let dot_product_output = 0; // the dot product after the innermost for loop is done calculating the datapoints inside the current_input array
 
                 /**
                     assumes:
@@ -279,29 +315,28 @@ class Interpreter {
                             ....
                         ]
                  */
-                dot_product_output += layer_biases[neuron];
-                /**
-                
-                    Once we get the dot-product, we apply the activation function for this layer
-                    Assume:
-                        let layer = 0;
-
-                    then:
-                        activation_functions = [
-                            "relu", <- index 0 - this is the activation function going to be use by all neurons in this layer
-                            "relu", 
-                            "linear", 
-                            ....
-                        ]
-                 */
-                outputs.push(activation_function(dot_product_output));
+                z_values.push(dot_product_output + layer_biases[neuron]); // Store z-value
             }
-            // the outputs of the this layer will be the inputs for the next layer (repeat until all the last layer which is the output layer)
-            current_input = outputs; 
+
+            // After computing all z_values for the current layer
+            if (activation_function.name === "softmax") {
+                outputs = activation_function(z_values); // Apply softmax to all z_values
+            } else {
+                // For other activations, apply individually
+                for (let j = 0; j < num_neurons; j++) {
+                    outputs.push(activation_function(z_values[j]));
+                }
+            }
+                
+            zs.push(z_values);
+            current_input = outputs; // the outputs of the this layer will be the inputs for the next layer (repeat until all the last layer which is the output layer)
+            all_layer_outputs.push(current_input); // Push the actual activations
         }
         // after all the layers gives off their outputs, return final array of current_input as the predictions
         return {
-            predictions : current_input
+            predictions: current_input, 
+            activations : all_layer_outputs,
+            zs: zs
         };
     }
 }

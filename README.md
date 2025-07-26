@@ -298,23 +298,8 @@ const extracted_column = csv.extractColumn("column_1", cleaned_dataset);
 csv.tabularize(extracted_column);
 ```
 
-
-
-
-
+### To Do
+- now working to support training on GPU.
 
 ## Notes
-
-This libarary is:
-
-- open source
-
-- this trainable neural network library doesn't rely on any dependencies.
-
-- doesn't have any other dependencies to install along with Neurex
-
-- when saving models, it is in the form of JSON file. You can view the contents of your actual model, and though it is in human-readable form, it should not be modified. Attempting to do so will cause consequences (eg: incorrect predictions, shape-related erros, etc.).
-
-- saved models can "only be use in Neurex" library. Saved models cannot be loaded using any other frameworks/libraries in "any" other programming languages (except the library itself and the language used to build the library) to do inference predictions or retraining your model.
-
->> Currently, this trainable neural network can only do regression tasks. But soon, I will extend it's capabilities.
+ - New version (version 0.0.6) is underway.

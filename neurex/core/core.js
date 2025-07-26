@@ -1,19 +1,17 @@
 /**
  * Neurex - Feedforward Neural Network NodeJS library
  * Author: Kark Angelo V. Pada
- * 
- * Copyright (c) all rights reserved
- * 
- * Licensed under the MIT License.
+ * * Copyright (c) all rights reserved
+ * * Licensed under the MIT License.
  * See LICENSE file in the project root for full license information.
- * 
- */
+ * */
 
 /**
 import necessary modules
  */
 
 const fs = require('fs');
+const zlib = require('zlib');
 const path = require('path');
 const activation = require('../activations');
 const optimizers = require('../optimizers')
@@ -22,14 +20,11 @@ const lossFunctions = require('../loss_functions');
 
 /**
  * Neurex is a configurable feedforward artificial neural network.
- * 
- * This class allows you to define the architecture of a neural network by specifying the number of layers,
+ * * This class allows you to define the architecture of a neural network by specifying the number of layers,
  * neurons per layer, and activation functions. It supports training with various optimizers, saving
  * model state, and provides utility methods for inspecting the model structure.
- * 
- * @class
- * 
- * @property {Array<Array<Array<number>>>} weights - The weights for each layer, organized as 3D array [layer][input][output].
+ * * @class
+ * * @property {Array<Array<Array<number>>>} weights - The weights for each layer, organized as 3D array [layer][input][output].
  * @property {Array<Array<number>>} biases - The biases for each layer, organized as 2D array [layer][neuron].
  * @property {number} learning_rate - The learning rate used during training.
  * @property {number} num_layers - The total number of layers in the network.
@@ -40,8 +35,7 @@ const lossFunctions = require('../loss_functions');
  * @property {number} epoch_count - The number of epochs the model has been trained for.
  * @property {string} optimizer - The name of the optimizer used for training.
  * @property {Object} optimizerStates - Internal state for optimizers, storing per-layer weight and bias states.
- * 
- */
+ * */
 
 class Neurex {
     constructor () {
@@ -88,10 +82,10 @@ class Neurex {
     * You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
     *
     * Default configurations:
-    *   learning_rate: 0.001
-    *   optimizer: 'adam'
-    *   randMin: -1
-    *   randMax: 1
+    * learning_rate: 0.001
+    * optimizer: 'adam'
+    * randMin: -1
+    * randMax: 1
     */
     configure(configs) {
         if (configs.learning_rate !== undefined) this.learning_rate = configs.learning_rate;
@@ -129,8 +123,7 @@ class Neurex {
     }
 
     /**
-     * 
-     *
+     * *
     @method flatten()  
     @param {Array} input - dataset
     @returns - a flattened array of dataset
@@ -169,8 +162,7 @@ class Neurex {
     }
 
     /**
-     * 
-    @method modelSummary()
+     * @method modelSummary()
 
     Shows the model architecture
      */
@@ -186,9 +178,7 @@ class Neurex {
     }
 
     /**
-     * 
-
-     @method construct_layer()
+     * @method construct_layer()
      @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tahn, linear)
      @param {Number} layer_size specify the number of neuron for this layer.
 
@@ -222,14 +212,14 @@ class Neurex {
     }
 
     /**
-     * 
-    @method saveModel()
-    @param {string} modelName - the filename of your model
+    * 
+     @method saveModel()
+     @param {string} modelName - the filename of your model
 
-    saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters in a .json file. Once called after training,
-    it will generate two .json files - the metadata.json and the actual model (YourModelName.json or if name not specified, it will be Model_date_today.json).
-    
-     */
+     saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+     as a .nrx (neurex) model and a metadata.json will be generated along with the model file.
+        
+    */
     saveModel(modelName = null) {
         console.log("\n[TASK]------- Saving model's architecture...");
         let fileName = modelName;
@@ -267,8 +257,7 @@ class Neurex {
 
     /**
     * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
-    * 
-    * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
+    * * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
     * computes the loss, backpropagates the error, and updates the weights and biases using gradient descent.
     *
     * @method train()
@@ -277,19 +266,16 @@ class Neurex {
     * @param {string} loss - loss function to use (Accuracy: MSE, MAE, binary_crossentropy, categorical_crossentropy)
     * @param {Number} epoch - the number of training iteration
     * @param {Number} batch_size - mini batch sizing
-    * 
-    * @throws {Error} Throws an error if any required parameter is missing.
+    * * @throws {Error} Throws an error if any required parameter is missing.
     * @returns Progress of every epoch can be print in the console.
-    * 
-    * @example
+    * * @example
     * // Example usage:
-    * const nn = new core1();
+    * const nn = new Neurex();
     * nn.inputShape(trainX); // Set input shape based on your data
     * nn.construct_layer('relu', 8); // Add a hidden layer with 8 neurons and ReLU activation
     * nn.construct_layer('linear', 1); // Add an output layer with 1 neuron and linear activation
-    * nn.train(trainX, trainY, 'mse', 100, 4); // Train for 100 epochs with learning rate 0.01 a loss function of 'mse' and a batch size of 4
-    * 
-    * After training, you can use the network for predictions
+    * nn.train(X_train, Y_train, 'mse', 100, 4); // Train for 100 epochs with learning rate 0.01 a loss function of 'mse' and a batch size of 4
+    * * After training, you can use the network for predictions
     */
 
     train(trainX, trainY, loss, epoch, batch_size) { // since this is core 1, this will focus on single output regression task
@@ -319,8 +305,7 @@ class Neurex {
         }
 
         /**
-         * 
-         get the output size of neuron
+         * get the output size of neuron
 
          assume: 
             this.number_of_neurons = [6, 7, 1];
@@ -362,9 +347,35 @@ class Neurex {
             const lastLayerActivation = this.activation_functions[this.activation_functions.length - 1].name;
             const lossLower = loss.toLowerCase();
             
-            // Regression: output_size == 1, activation linear, loss mse/mae
-            if (this.output_size == 1 && lastLayerActivation === 'linear' && (lossLower === 'mse' || lossLower === 'mae')) {
+            // Regression: output_size == X, activation linear, loss mse/mae
+            if (lastLayerActivation === 'linear' && (lossLower === 'mse' || lossLower === 'mae')) {
                 this.task = 'regression';
+            }
+            // binary classification task: activation in output layer = sigmoid, loss = binary_cross_entropy
+            else if (lastLayerActivation === "sigmoid" && lossLower === 'binary_cross_entropy') {
+                this.task = 'binary_classification';
+            }
+            // multi-class classification task: activation in output layer = softmax, loss = categorical_cross_entropy (labels must be one-hot encoding)
+            else if (lastLayerActivation === 'softmax' && lossLower === 'categorical_cross_entropy') {
+                // do a loop if any of the rows of trainY is not
+                trainY.forEach(row => {
+                    if (this.output_size != row.length) {
+                        throw new Error(`[ERROR]------- Output shape mismatch. The size of the output layer must be the same number of classes`);
+                    }
+                });
+
+                // check if the Y_train is not one-hot encoded
+                const isOneHotEncoded = this.#ifOneHotEndcoded(trainY);
+                if (isOneHotEncoded) {
+                    this.task = 'multi_class_classification';
+                }
+                else {
+                    throw new Error("[ERROR]------- Y_train must be one-hot encoded for the categorical_cross_entropy loss. Use 'sparse_categorical_cross_entropy' instead if the Y_train is interger-encoded labels.");
+                }
+                
+            }
+            else if (lastLayerActivation === 'softmax' && lossLower === 'sparse_categorical_cross_entropy') {
+                this.task = 'multi_class_classification';
             }
             else {
                 throw new Error(`[ERROR]------- Using ${lossLower} having output size of ${this.output_size} and a ${lastLayerActivation} function in the output layer is currently unavailable for this core's task.`);
@@ -376,9 +387,11 @@ class Neurex {
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
                 let totalepochLoss = 0;
+                let numBatches = 0; // Added to count batches
 
                 // batch size
                 for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
+                    numBatches++; // Increment batch count
 
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
@@ -408,9 +421,32 @@ class Neurex {
 
                         
                         for (let j = 0; j < this.number_of_neurons[output_layer]; j++) {
-                            const error = predictions[j] - actual;
-                            const dAct = this.derivative_functions[output_layer](zs[output_layer][j]);
-                            dOutputlayer.push(error * dAct);
+                            if (this.task === "binary_classification") {
+                                // binary classification
+                                dOutputlayer.push(predictions[j] - actual[j]);
+                            }
+                            else if (this.task === "multi_class_classification") {
+                                if (lastLayerActivation === 'softmax' && lossLower === "categorical_cross_entropy") {
+                                    dOutputlayer.push(predictions[j] - actual[j]);
+                                }
+                                else if (lastLayerActivation === 'softmax' && lossLower === "sparse_categorical_cross_entropy") {
+                                    dOutputlayer = [...predictions];
+                                    // For sparse categorical cross-entropy, the error for the correct class
+                                    // is `p_k - 1` and for incorrect classes it's `p_j`
+                                    // where `p` is the probability from softmax.
+                                    // 'actual[0]' is the integer encoded label.
+                                    dOutputlayer[actual[0]] -= 1; 
+                                }
+                                else {
+                                    throw new Error(`[ERROR]------- Uknown loss function for multi-class classification loss. Loss: ${lossLower} is unknown.`)
+                                }
+                            }
+                            else {
+                                // regression tasks single or multi-output regression
+                                const error = predictions[j] - actual[j];
+                                const dAct = this.derivative_functions[output_layer](zs[output_layer][j]);
+                                dOutputlayer.push(error * dAct);
+                            }
                         }
 
                         deltas[output_layer] = dOutputlayer;
@@ -437,7 +473,7 @@ class Neurex {
                         // === STEP 3: Accumulate Gradients === //
                         for (let l = 0; l < this.num_layers; l++) {
                             const delta = deltas[l];
-                            const a_prev = activations[l];
+                            const a_prev = activations[l]; 
                             // Accumulate weight gradients
                             for (let i = 0; i < this.weights[l].length; i++) {
                                 for (let j = 0; j < this.weights[l][i].length; j++) {
@@ -485,11 +521,21 @@ class Neurex {
 
                 }
 
-            let AverageEpochLoss = totalepochLoss / batchSize;
-            console.log(`Epoch ${current_epoch+1}/${epoch} | Loss: ${AverageEpochLoss.toFixed(5)}`);
+                // Corrected average epoch loss calculation
+                let AverageEpochLoss = totalepochLoss / numBatches; 
+                let logMessage = `[Epoch] ${current_epoch+1}/${epoch} | [Loss]: ${AverageEpochLoss.toFixed(7)}`;
+
+                if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
+                    let epochPredictions = [];
+                    for (let i = 0; i < trainX.length; i++) {
+                        epochPredictions.push(this.#Feedforward(trainX[i]).predictions);
+                    }
+                    const accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, this.task);
+                    logMessage += ` | [Accuracy in Training]: ${accuracy.toFixed(2)}%`;
+                }
+                console.log(logMessage); // Log the combined message
             }
             
-
         }
         catch (error) {
             console.log(error);
@@ -497,8 +543,7 @@ class Neurex {
     }
 
     /**
-     * 
-     @method predict()
+     * @method predict()
      @param {Array} input - input data 
      @returns Array of predictions
      @throws Error when there's shape mismatch and no input data
@@ -520,7 +565,7 @@ class Neurex {
                 let input_data = input[sample_index];
 
                 const {predictions} = this.#Feedforward(input_data);
-                outputs.push(predictions[0]);
+                outputs.push(predictions);
             }
 
             return outputs;
@@ -548,7 +593,7 @@ class Neurex {
             and also the number of neurons stored in the this.number_of_neurons array
          */
         for (let layer = 0; layer < this.num_layers; layer++) {
-            /**  get the array of biases from the array of arrays of biases 
+            /** get the array of biases from the array of arrays of biases 
 
                 biases : [
                     [0b1, 0b2, 0b3, ...], <- index 0
@@ -572,7 +617,7 @@ class Neurex {
             */
             const layer_biases = this.biases[layer];
 
-            /**  get the array of weights from the array of arrays of weights 
+            /** get the array of weights from the array of arrays of weights 
 
                 weights : [
                     [[0weights1],[0weights2],[0weights3], ...], <- index 0
@@ -595,9 +640,7 @@ class Neurex {
             const layer_weights = this.weights[layer];
 
             /**
-             * 
-
-            in the constructor, we have "this.number_of_neurons" which is an array. This is because when constructing the network using 
+             * in the constructor, we have "this.number_of_neurons" which is an array. This is because when constructing the network using 
             construct_layer(activation_func, layer_size), the layer_size is appended to the "this.number_of_neurons". And since we are in 
             the for-loop for layer, we can access how many neurons that this layer composes and we can get it in the array.
 
@@ -622,8 +665,7 @@ class Neurex {
             const num_neurons = this.number_of_neurons[layer]; 
 
             /**
-             * 
-             in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
+             * in the cunstructor, we have "this.activation_functions". This is because when constructing the network using 
             construct_layer(activation_func, layer_size), the activation_func is appended to the this.activation_functions.
             And since we are in the for-loop for layers, we can use the layer(int) value to index what activation function is
             assigned for this layer.
@@ -637,11 +679,11 @@ class Neurex {
 
             assumes:
                 let layer = 0
-
+                        
                 then: 
 
                     activation_functions = [
-                        "relu", <- index 0 - this is the activation function to be use in this layer and will be use by all neurons for this layer
+                        "relu", <- index 0 - this is the activation function going to be use by all neurons in this layer
                         "relu", 
                         "linear", 
                         ....
@@ -702,33 +744,22 @@ class Neurex {
                             ....
                         ]
                  */
-                dot_product_output += layer_biases[neuron]; // adds the bias for this neuron
-                /**
-                
-                    Once we get the dot-product, we apply the activation function for this layer
-                    Assume:
-                        let layer = 0;
-
-                    then:
-                        activation_functions = [
-                            "relu", <- index 0 - this is the activation function going to be use by all neurons in this layer
-                            "relu", 
-                            "linear", 
-                            ....
-                        ]
-                 */
-                z_values.push(dot_product_output);
-                if (activation_function.name === "softmax") {
-                    outputs = activation_function(z_values);
-                }
-                else {
-                    outputs.push(activation_function(dot_product_output)); // apply the activation function that is assigned for the layer where this neuron is and then push the results in the array of outputs;
-                }
-                
+                z_values.push(dot_product_output + layer_biases[neuron]); // Store z-value
             }
+
+            // After computing all z_values for the current layer
+            if (activation_function.name === "softmax") {
+                outputs = activation_function(z_values); // Apply softmax to all z_values
+            } else {
+                // For other activations, apply individually
+                for (let j = 0; j < num_neurons; j++) {
+                    outputs.push(activation_function(z_values[j]));
+                }
+            }
+                
             zs.push(z_values);
             current_input = outputs; // the outputs of the this layer will be the inputs for the next layer (repeat until all the last layer which is the output layer)
-            all_layer_outputs.push(outputs);
+            all_layer_outputs.push(current_input); // Push the actual activations
         }
         // after all the layers gives off their outputs, return final array of current_input as the predictions
         return {
@@ -741,24 +772,91 @@ class Neurex {
     //saving model
     #save(data, fileName, meta) {
         const dir = path.dirname(require.main.filename);
+
         const metadata = {
-            "Date Created":`${new Date().toISOString().replace(/[:.]/g, '-')}}`,
-            "Number of epoch to train":meta[0],
-            "Optimizer":meta[1],
-            "Loss function":meta[2],
-            "Task":meta[3],
-            "Trained using":"Neurex",
-            "Note":"This model can only be use on Neurex library. This cannot be use directly to other known machine-learning frameworks/libraries. DO NOT modify any of the parameters."
+            "Date Created": `${new Date().toISOString().replace(/[:.]/g, '-')}`,
+            "Number of epoch to train": meta[0],
+            "Optimizer": meta[1],
+            "Loss function": meta[2],
+            "Task": meta[3],
+            "Trained using": "Neurex",
+            "Note": "This model can only be used on Neurex library. This cannot be used directly in other ML frameworks. DO NOT modify any of the parameters."
+        };
+
+        // Serialize and compress the model data
+        const jsonString = JSON.stringify(data);
+        const compressedData = zlib.deflateSync(jsonString);
+
+        // Define file format:
+        // [HEADER (4 bytes)] + [VERSION (1 byte)] + [DATA (compressed)]
+        const header = Buffer.from("NRX1"); // Magic bytes
+        const version = Buffer.from([0x01]); // Version 1
+
+        // Combine all parts
+        const finalBuffer = Buffer.concat([header, version, compressedData]);
+
+        const nrxFilePath = path.join(dir, `${fileName}.nrx`);
+        const metadataFilePath = path.join(dir, `metadata.json`);
+
+        fs.writeFileSync(nrxFilePath, finalBuffer);
+        fs.writeFileSync(metadataFilePath, JSON.stringify(metadata, null, 2));
+
+        console.log(`[SUCCESS]------- Model is saved as ${fileName}.nrx`);
+    }
+
+    #calculateClassificationAccuracy(predictions, actuals, taskType) {
+        let correctPredictions = 0;
+        for (let i = 0; i < predictions.length; i++) {
+            let predictedLabel;
+            let actualLabel;
+
+            if (taskType === 'binary_classification') {
+                predictedLabel = predictions[i][0] >= 0.5 ? 1 : 0;
+                actualLabel = actuals[i][0]; // Assuming actuals are also arrays like [[0], [1]]
+            } else if (taskType === 'multi_class_classification') {
+                // Find the index of the maximum value in predictions for the predicted class
+                predictedLabel = predictions[i].indexOf(Math.max(...predictions[i]));
+                
+                // If actuals[i] is an array with a single element (e.g., [0], [1]), it's integer-encoded.
+                if (Array.isArray(actuals[i]) && actuals[i].length === 1) {
+                    actualLabel = actuals[i][0]; // Directly take the integer label
+                } else if (Array.isArray(actuals[i]) && actuals[i].length > 1) {
+                    // Otherwise, assume one-hot encoded if it's an array with multiple elements (e.g., [1,0,0])
+                    actualLabel = actuals[i].indexOf(1); 
+                } else {
+                    // Fallback for direct integer label if actuals[i] is not an array (e.g., 0, 1, 2 directly)
+                    // This case might not be hit if Y_train is always provided as arrays of arrays.
+                    actualLabel = actuals[i]; 
+                }
+            }
+
+            if (predictedLabel === actualLabel) {
+                correctPredictions++;
+            }
         }
+        return (correctPredictions / predictions.length) * 100;
+    }
 
-        const path_to_file = path.join(dir,`${fileName}.json`);
-        const path_to_file_metadata = path.join(dir,`metadata.json`);
-        const content = JSON.stringify(data, null, 2);
-        const metadataContent = JSON.stringify(metadata, null, 2);
-        fs.writeFileSync(path_to_file, content);
-        fs.writeFileSync(path_to_file_metadata, metadataContent);
+    #ifOneHotEndcoded(Y_train) {
+        /**
+        Checks if all rows in Y_train are one-hot encoded.
+        Each row must:
+        - Contain only 0s and 1s
+        - Have exactly one "1"
+        */
+        for (let i = 0; i < Y_train.length; i++) {
+            const row = Y_train[i];
+            if (!Array.isArray(row)) return false;
 
-        console.log("[SUCCESS]------- Model is save as "+fileName+".json");
+            let onesCount = 0;
+            for (let j = 0; j < row.length; j++) {
+                if (row[j] !== 0 && row[j] !== 1) return false;
+                if (row[j] === 1) onesCount++;
+            }
+
+            if (onesCount !== 1) return false;
+        }
+        return true;
     }
 }
 
