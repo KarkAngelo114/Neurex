@@ -69,7 +69,7 @@ class Neurex {
             biases: []   // Array of state objects for each layer's biases
         };
 
-        this.onGPU = false;
+        this.onGPU = true;
     }
 
     /**
@@ -248,7 +248,6 @@ class Neurex {
             "number_of_neurons":this.number_of_neurons,
             "weights":this.weights,
             "biases":this.biases,
-            "onGPU":this.onGPU
         };
 
         const metadata = [
@@ -269,7 +268,7 @@ class Neurex {
     * @method train()
     * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
     * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
-    * @param {string} loss - loss function to use (Accuracy: MSE, MAE, binary_crossentropy, categorical_crossentropy)
+    * @param {string} loss - loss function to use: MSE, MAE, binary_crossentropy, categorical_crossentropy, sparse_categorical_cross_entropy
     * @param {Number} epoch - the number of training iteration
     * @param {Number} batch_size - mini batch sizing
     * * @throws {Error} Throws an error if any required parameter is missing.
@@ -284,7 +283,7 @@ class Neurex {
     * * After training, you can use the network for predictions
     */
 
-    train(trainX, trainY, loss, epoch, batch_size) { // since this is core 1, this will focus on single output regression task
+    train(trainX, trainY, loss, epoch, batch_size) {
         // initialize biases
         let prev_size = this.input_size;
         for (let i = 0; i < this.num_layers; i++) {

@@ -29,7 +29,7 @@ class Interpreter {
         this.activation_functions = []; // activation functions for each layer
         this.number_of_neurons = []; // the number of neurons on each layer. Stored in array
         this.input_size = 0; // the size of the input layer, basically the number of input neurons.
-        this.onGPU = false;
+        this.onGPU = true;
     }
 
     /**
@@ -88,7 +88,6 @@ class Interpreter {
             this.number_of_neurons = modelData.number_of_neurons;
             this.weights = modelData.weights;
             this.biases = modelData.biases;
-            this.onGPU = modelData.onGPU;
 
             console.log(`[SUCCESS]------- Model ${model} successfully loaded`);
         } catch (error) {

@@ -1,5 +1,5 @@
 const { GPU } = require('gpu.js');
-const gpu = new GPU();
+const gpu = new GPU({mode:'gpu'});
 
 /**
  * Outer product kernel: ∇W = a_prev ⊗ delta

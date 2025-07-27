@@ -346,7 +346,7 @@ declare module 'neurex' {
         * @method train()
         * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
         * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
-        * @param {string} loss - loss function to use (Accuracy: MSE, MAE, binary_crossentropy, categorical_crossentropy)
+        * @param {string} loss - loss function to use: MSE, MAE, binary_crossentropy, categorical_crossentropy, sparse_categorical_cross_entropy
         * @param {Number} epoch - the number of training iteration
         * @param {Number} batch_size - mini batch sizing
         * 
