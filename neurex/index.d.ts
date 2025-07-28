@@ -278,26 +278,6 @@ declare module 'neurex' {
 
         /**
         * 
-        *
-        @method flatten()  
-        @param {Array} input - dataset
-        @returns - a flattened array of dataset
-        @throws if the required input is not present or it is not an array
-
-        flattens an array of arrays (matrices) into 1D array
-        Example:
-
-        first row:
-            [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
-
-        flattened:
-
-        [x1, x2, x3, x4, x5, x6, ....]
-        */
-        flatten(input: number[][]): number[];
-
-        /**
-        * 
         @method modelSummary()
 
         Shows the model architecture
@@ -452,7 +432,7 @@ declare module 'neurex' {
         This will tell the network that your input layer has this X number of input neuron.
         Ensure that your dataset has no missing values, otherwise perform data cleaning.
         */
-        inputShape(data: number[][]): any;
+        inputShape(data: number[][]): object;
 
         /**
         * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
@@ -461,6 +441,23 @@ declare module 'neurex' {
         * @param {Number} layer_size specify the number of neuron for this layer.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
         */
-        connectedLayer(activation: string, layer_size: number): any;
+        connectedLayer(activation: string, layer_size: number): object;
+        
+        /**
+        * 
+        *
+        @method flatten()  
+
+        flattens a 2D matrix into 1D array
+        Example:
+
+        first row:
+        [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
+
+        flattened:
+
+        [x1, x2, x3, x4, x5, x6, ....]
+        */
+        flatten(): object;
     }
 }

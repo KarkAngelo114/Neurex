@@ -103,44 +103,6 @@ class Neurex {
     }
 
     /**
-    @method flatten()  
-    @param {Array} input - dataset
-    @returns - a flattened array of dataset
-    @throws if the required input is not present or it is not an array
-
-    flattens an array of arrays (matrices) into 1D array
-    Example:
-
-    first row:
-        [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
-
-    flattened:
-
-    [x1, x2, x3, x4, x5, x6, ....]
-     */
-    flatten(input) {
-        let flattened_array = [];
-        try {
-            if (!Array.isArray(input)) {
-                throw new Error("[ERROR]------- The input is not an array");
-            }
-            if (!input) {
-                throw new Error("[ERROR]------- No input to flatten");
-            }
-
-            for (let i = 0; i < input.length; i++) {
-                flattened_array.push(input[i].flat(Infinity));
-            }
-            
-            return flattened_array;
-        }
-        catch (error) {
-            console.error(error);
-        }
-        
-    }
-
-    /**
      * @method modelSummary()
 
     Shows the model architecture
@@ -301,11 +263,20 @@ class Neurex {
     * @returns Progress of every epoch can be print in the console.
     * * @example
     * // Example usage:
-    * const nn = new Neurex();
-    * nn.inputShape(trainX); // Set input shape based on your data
-    * nn.construct_layer('relu', 8); // Add a hidden layer with 8 neurons and ReLU activation
-    * nn.construct_layer('linear', 1); // Add an output layer with 1 neuron and linear activation
-    * nn.train(X_train, Y_train, 'mse', 100, 4); // Train for 100 epochs with learning rate 0.01 a loss function of 'mse' and a batch size of 4
+        * 
+        * const {Neurex, Layers} = require('neurex');
+        * const model = new Neurex();
+        * const layer = new Layers();
+        *
+        * model.sequentialBuild([
+        *    layer.inputShape(X_train),
+        *    layer.connectedLayer("relu", 3),
+        *    layer.connectedLayer("relu", 3),
+        *    layer.connectedLayer("softmax", 2)
+        * ]);
+        * model.build();
+        *
+        * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
     * * After training, you can use the network for predictions
     */
 
@@ -631,6 +602,17 @@ class Neurex {
                 zs.push(z_values);
                 current_input = outputs; // the outputs of the this layer will be the inputs for the next layer (repeat until all the last layer which is the output layer)
                 all_layer_outputs.push(current_input); // Push the actual activations
+            }
+            else if (current_layer_config.layer_name === "flatten_layer") {
+                // this layer only "flattens" the output of the previous layer
+                const flattened_output = current_input.flat(Infinity);
+                z_values = flattened_output;
+                
+                activated_outputs = flattened_output;
+                
+                zs.push(z_values);
+                current_input = activated_outputs;
+                all_layer_outputs.push(current_input);
             }
             else {
                 // for other layers  . . .

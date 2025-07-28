@@ -40,6 +40,25 @@ class Layers {
         }
     }
 
+    /**
+    * 
+    *
+    @method flatten()  
+
+    flattens a 2D matrix into 1D array
+    Example:
+
+    first row:
+    [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
+
+    flattened:
+
+    [x1, x2, x3, x4, x5, x6, ....]
+    */
+    flatten() {
+        return {"layer_name":"flatten_layer"}
+    }
+
 
     /**
      * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
