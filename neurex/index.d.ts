@@ -277,16 +277,6 @@ declare module 'neurex' {
         configure(configs: object): void;
 
         /**
-        * @method inputShape()
-        * @param {Array} data - the dataset
-
-        the inputShape() method allows you to get the shape of your input.
-        This will tell the network that your input layer has this X number of input neuron.
-        Ensure that your dataset has no missing values, otherwise perform data cleaning.
-        */
-        inputShape(data: any[][]): void;
-
-        /**
         * 
         *
         @method flatten()  
@@ -313,21 +303,7 @@ declare module 'neurex' {
         Shows the model architecture
         */
         modelSummary(): void;
-
-        /**
-        * 
-
-        @method construct_layer()
-        @param {String} activation_func specify the activation function for this layer (Available: sigmoid, relu, tahn, linear)
-        @param {Number} layer_size specify the number of neuron for this layer.
-
-        The construct_layer() method allows you to create layers of your network. 
-        Each layer has its own number of neurons and all uses the same activation function
-        to output new features before passing to the next layer.
-
-        */
-        construct_layer(activation_func: string, layer_size: number): void;
-
+        
         /**
         * 
         @method saveModel()
@@ -338,6 +314,21 @@ declare module 'neurex' {
         
         */
         saveModel(modelName: string): void;
+
+        /**
+        * 
+        * @method sequentialBuild
+        * 
+        * interface to stack layer types. No weights and biases initialization here
+        * @param {Object} layer_data
+        */
+        sequentialBuild(layer_data: any[]): object;
+
+        /**
+        * 
+        * Initiate weights and biases for the layers. Need to build layers first using sequentialBuild() API
+        */
+        build(): void;
 
         /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
@@ -355,11 +346,20 @@ declare module 'neurex' {
         * 
         * @example
         * // Example usage:
-        * const nn = new Neurex();
-        * nn.inputShape(trainX); // Set input shape based on your data
-        * nn.construct_layer('relu', 8); // Add a hidden layer with 8 neurons and ReLU activation
-        * nn.construct_layer('linear', 1); // Add an output layer with 1 neuron and linear activation
-        * nn.train(X_train, Y_train, 'mse', 100, 4); // Train for 100 epochs and a loss function of 'mse' and a batch size of 4
+        * 
+        * const {Neurex, Layers} = require('neurex');
+        * const model = new Neurex();
+        * const layer = new Layers();
+        *
+        * model.sequentialBuild([
+        *    layer.inputShape(X_train),
+        *    layer.connectedLayer("relu", 3),
+        *    layer.connectedLayer("relu", 3),
+        *    layer.connectedLayer("softmax", 2)
+        * ]);
+        * model.build();
+        *
+        * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
         * 
         * 
         */
@@ -432,4 +432,35 @@ declare module 'neurex' {
     * @throws {Error} - when no data is provided or there are more than two classes
     */
     export function BinaryLabeling(data: any[][]): number[][];
+
+
+    /**
+    * 
+    * @class
+    *
+    * Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
+    * available layers:
+    * inputShape() - This will tell the network that your input layer has this X number of input neuron.
+    * connectedLayer() - to build fully connected layers.
+    */
+    export class Layers {
+        /**
+        * @method inputShape
+        * @param {Array} data - the dataset
+
+        the inputShape() method allows you to get the shape of your input.
+        This will tell the network that your input layer has this X number of input neuron.
+        Ensure that your dataset has no missing values, otherwise perform data cleaning.
+        */
+        inputShape(data: number[][]): any;
+
+        /**
+        * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
+        * build connected layers or multilayer perceptron
+        * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
+        * @param {Number} layer_size specify the number of neuron for this layer.
+        * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
+        */
+        connectedLayer(activation: string, layer_size: number): any;
+    }
 }

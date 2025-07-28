@@ -12,6 +12,7 @@ const Neurex = require('./core');
 const Interpreter = require('./interpreter');
 const CsvDataHandler = require('./preprocessor/CsvDataHandler');
 const {MinMaxScaler} = require('./preprocessor/normalizer');
+const Layers = require('./layers');
 const {OneHotEncoded, IntegerLabeling, BinaryLabeling} = require('./preprocessor/label_encoder');
 const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
@@ -22,6 +23,7 @@ module.exports= {
     Interpreter,
     CsvDataHandler,
     MinMaxScaler,
+    Layers,
     OneHotEncoded,
     IntegerLabeling,
     BinaryLabeling,
