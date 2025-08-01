@@ -23,8 +23,7 @@ Checkout the documentation how to get started [here](https://neurex-documentatio
 ## Repository
 Checkout for release notes [here](https://github.com/KarkAngelo114/Neurex).
 
-> [!Note]
+> [Note]
 > - can only do ANN modelling.
 > - Falls back to pure Javascript operations if GPU is not available.
 > - exported models (.nrx) are exclusive only in Neurex. Trained models cannot be loaded to other libraries or frameworks.
-> - Starting on July 29, 2025, older versions will be deprecated.

@@ -231,7 +231,7 @@ declare module 'neurex' {
     }
 
     /**
-    * Neurex is a configurable feedforward artificial neural network.
+    * Neurex is a configurable feedforward neural network.
     * 
     * This class allows you to define the architecture of a neural network by specifying the number of layers,
     * neurons per layer, and activation functions. It supports training with various optimizers, saving
@@ -302,7 +302,7 @@ declare module 'neurex' {
         * interface to stack layer types. No weights and biases initialization here
         * @param {Object} layer_data
         */
-        sequentialBuild(layer_data: any[]): object;
+        sequentialBuild(layer_data: any[]): void;
 
         /**
         * 
@@ -332,7 +332,7 @@ declare module 'neurex' {
         * const layer = new Layers();
         *
         * model.sequentialBuild([
-        *    layer.inputShape(X_train),
+        *    layer.inputShape({features: 4}),
         *    layer.connectedLayer("relu", 3),
         *    layer.connectedLayer("relu", 3),
         *    layer.connectedLayer("softmax", 2)
@@ -426,13 +426,16 @@ declare module 'neurex' {
     export class Layers {
         /**
         * @method inputShape
-        * @param {Array} data - the dataset
+        * @param {object} shapeConfig - specify the number of features
+        * @example
+        * model.sequentialBuild([
+            layer.inputShape({features: 4}),
+            // other added layers
+        ]);
 
         the inputShape() method allows you to get the shape of your input.
-        This will tell the network that your input layer has this X number of input neuron.
-        Ensure that your dataset has no missing values, otherwise perform data cleaning.
         */
-        inputShape(data: number[][]): object;
+        inputShape(shapeConfig: Object): object;
 
         /**
         * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will

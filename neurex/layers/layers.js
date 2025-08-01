@@ -1,5 +1,7 @@
 
+const activations = require('../gpu/kernels/activations');
 const activation = require('../gpu/kernels/activations');
+const {computeForward, computeBackprop} = require('../gpu/kernels/matrixMultiplication');
 
 /**
  * 
@@ -13,30 +15,38 @@ const activation = require('../gpu/kernels/activations');
 class Layers {
     /**
      * @method inputShape
-     * @param {Array} data - the dataset
+     * @param {object} shapeConfig - specify the number of features
+     * @example
+     * model.sequentialBuild([
+        layer.inputShape({features: 4}),
+        layer.connectedLayer("relu", 5),
+        layer.connectedLayer("softmax", 3);
+     ]);
 
      the inputShape() method allows you to get the shape of your input.
-     This will tell the network that your input layer has this X number of input neuron.
-     Ensure that your dataset has no missing values, otherwise perform data cleaning.
      */
-    inputShape(data){
-        let size = data[0].length;
-        // this refers to the first array of features and the number of features is the number of input neurons in the input layer
-        // and assumes that the subsequent data has the same number of features
-        // this is why it is important to perform data preprocessing at first before feeding to avoid having problems.
-
-        // do a loop to all the rows to check for shape inconsistencies
+    inputShape(shapeConfig) {
         try {
-            data.forEach((rows, i) => {
-                if (rows.length != size) {
-                    throw new Error(`[ERROR]------- Shape mismatch on row${i}. Ensure that all shapes has the same shape.\nExpected shape: ${size}. Row${i} has ${rows.length}.`);
-                }
-            });
-
-            return {"layer_name":"input_layer", "layer_size":size};
-        }
-        catch (error) {
-            console.log(error);
+            if (shapeConfig.features) {
+                const features = shapeConfig.features;
+                this.input_shape = null;
+                return {
+                    layer_name: "input_layer",
+                    layer_size: features,
+                    input_shape: null
+                };
+            } else if (shapeConfig.height && shapeConfig.width && shapeConfig.depth) {
+                const { height, width, depth } = shapeConfig;
+                return {
+                    layer_name: "input_layer",
+                    layer_size: height * width * depth,
+                    input_shape: [height, width, depth]
+                };
+            } else {
+                throw new Error(`[ERROR]------- Invalid input shape config`);
+            }
+        } catch (error) {
+            console.error(error.message);
         }
     }
 
@@ -80,7 +90,42 @@ class Layers {
                 throw new Error(`Activation function '${funcName}' or its derivative not found`);
             }
 
-            return {"layer_name":"connected_layer", "activation_function":activation[function_name], "derivative_activation_function":activation.derivatives[function_name],"layer_size":layer_size};
+            return {
+                "layer_name":"connected_layer", 
+                "activation_function":activation[function_name], 
+                "derivative_activation_function":activation.derivatives[function_name],
+                "layer_size":layer_size,
+                feedforward: (onGPU, input, weights, biases) => {
+                    // All the logic for matrix multiplication and activation
+                    const z_values = computeForward(onGPU, input, weights, biases);
+                    const activation_function = activation[function_name];
+                    let outputs;
+
+                    if (activation_function.name === "softmax") {
+                        outputs = activation_function(z_values); // Apply softmax to all z_values
+                    } else {
+                        // If GPU not available, then perform neuron-by-neuron for getting the activated output
+                        if (!this.onGPU) {
+                            outputs = [];
+                            for (let i= 0; i < biases.length; i++) {
+                                outputs.push(activation_function(z_values[i]));
+                            }
+                        }
+                        else {
+                            // if GPU available, shove the dot products (z-values or pre-activated outputs) to compute the activated outputs for every neurons
+                            outputs = activation_function(z_values, this.onGPU);
+                        }
+                    }
+                    return { outputs, z_values };
+                },
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index) => {
+                    const weighted_delta = computeBackprop(onGPU, next_weights, next_delta);
+                    const current_delta = weighted_delta.map((value, i) =>
+                        value * activation.derivatives[function_name](zs[layer_index][i])
+                    );
+                    return current_delta;
+                }
+            };
         }
         catch (error) {
             console.log(error.message);

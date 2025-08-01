@@ -21,22 +21,14 @@ npm install neurex
 Checkout the documentation how to get started [here](https://neurex-documentation.vercel.app/).
 
 ## Release Notes
-### GPU Acceleration Powered by gpu.js
-This release introduces a substantial performance boost by enabling GPU acceleration for core neural network operations. [gpu.js](https://github.com/gpujs/gpu.js) is integrated to transparently transpile computationally intensive JavaScript functions (such as matrix multiplications, backpropagation delta calculations, activation functions, and optimizer updates) into optimized code that runs directly on your Graphics Processing Unit (GPU). This significantly reduces training times and enhances overall efficiency.
-
-### What to expect next update?
-Currently now working on a new interface that can be use in building layers. Introducing the new `sequentialBuild()` and `build()` APIs.
-These methods belongs to the `Neurex` class. A new `Layers` class is also added to extend Neurex's capabilities to not only able to build
-ANNs, but maybe other types of neural networks, making Neurex a flexible library for training neural network models.
-
-Below is the sample code snippet how the two methods and the new class can be use:
+Building layers can now be done using `sequentialBuild()` and it can be implemented as below:
 ```Javascript
 const {Neurex, Layers} = require('neurex');
 const model = new Neurex();
 const layer = new Layers();
 
 model.sequentialBuild([
-    layer.inputShape(X_train),
+    layer.inputShape({features: 2}),
     layer.connectedLayer("relu", 3),
     layer.connectedLayer("relu", 3),
     layer.connectedLayer("softmax", 2)
@@ -53,4 +45,3 @@ After building your network, you might need to use `build()` method.
 > - can only do ANN modelling.
 > - Falls back to pure Javascript operations if GPU is not available.
 > - exported models (.nrx) are exclusive only in Neurex. Trained models cannot be loaded to other libraries or frameworks.
-> - Starting on July 29, 2025, older versions will be deprecated.

@@ -1,6 +1,6 @@
 {
   "name": "neurex",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "A trainable neural network in NodeJS. Designed for ease of implementation and ANN modelling",
   "keywords": [
     "Neural-networks",
@@ -10,7 +10,10 @@
     "trainable",
     "network",
     "neural",
-    "deep-learning"
+    "deep-learning",
+    "Neurex",
+    "NeurexJS",
+    "neurex"
   ],
   "homepage": "https://github.com/KarkAngelo114/Neurex#readme",
   "bugs": {

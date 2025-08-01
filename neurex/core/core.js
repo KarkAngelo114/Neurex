@@ -16,7 +16,6 @@ const path = require('path');
 const activation = require('../gpu/kernels/activations');
 const detect = require('../gpu/detectGPU');
 const { computeWeightGradients, scaleGradients} = require('../gpu/kernels/gradientKernels');
-const { computeForward, computeBackprop } = require('../gpu/kernels/matrixMultiplication');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 
@@ -27,8 +26,8 @@ const lossFunctions = require('../loss_functions');
  * * This class allows you to define the architecture of a neural network by specifying the number of layers,
  * neurons per layer, and activation functions. It supports training with various optimizers, saving
  * model state, and provides utility methods for inspecting the model structure.
- * * @class
- * * @property {Array<Array<Array<number>>>} weights - The weights for each layer, organized as 3D array [layer][input][output].
+ * @class
+ * @property {Array<Array<Array<number>>>} weights - The weights for each layer, organized as 3D array [layer][input][output].
  * @property {Array<Array<number>>} biases - The biases for each layer, organized as 2D array [layer][neuron].
  * @property {number} learning_rate - The learning rate used during training.
  * @property {number} num_layers - The total number of layers in the network.
@@ -107,15 +106,42 @@ class Neurex {
 
     Shows the model architecture
      */
+    /**
+     * @method modelSummary()
+     * Shows the model architecture
+     */
     modelSummary() {
+        console.log("_______________________________________________________________");
+        console.log("                        Model Summary                          ");
+        console.log("_______________________________________________________________");
         console.log(`Input size: ${this.input_size}`);
         console.log(`Number of layers: ${this.num_layers}`);
-        console.log('Layer\tNeurons\tActivation');
-        for (let i = 0; i < this.num_layers; i++) {
-            const actFn = this.activation_functions[i];
-            const actName = actFn && actFn.name ? actFn.name : (typeof actFn === 'string' ? actFn : 'custom');
-            console.log(`${i + 1}\t${this.number_of_neurons[i]}\t${actName}`);
-        }
+        console.log("---------------------------------------------------------------");
+        console.log("Layer (type)              Output Shape          Activation     ");
+        console.log("===============================================================");
+        
+        // This will be the shape for the next layer. It starts with the input size.
+        let currentOutputShape = this.input_size;
+
+        this.layers.forEach((layer, i) => {
+            const layerName = layer.layer_name === "connected_layer" ? "Connected Layer" : layer.layer_name;
+            const activationName = layer.activation_function ? layer.activation_function.name : 'None';
+            const outputShape = layer.layer_size;
+
+            console.log(
+                `Connected Layer           (None, ${outputShape})        ${activationName.padEnd(10, ' ')}`
+            );
+            
+            // Update the output shape for the next iteration
+            currentOutputShape = outputShape;
+        });
+        const total_weights = this.weights.flat(Infinity).length
+        const total_biases = this.biases.flat(Infinity).length
+        console.log("===============================================================");
+        console.log("Total layers: " + this.num_layers);
+        console.log("Total Learnable parameters:",parseInt(total_weights+total_biases));
+        console.log("===============================================================");
+        
     }
 
     /**
@@ -145,7 +171,9 @@ class Neurex {
                 layer_name: layer.layer_name,
                 activation_function_name: layer.activation_function ? layer.activation_function.name : null,
                 derivative_activation_function_name: layer.derivative_activation_function ? layer.derivative_activation_function.name : null,
-                layer_size: layer.layer_size || null
+                layer_size: layer.layer_size || null,
+                feedforward: layer.feedforward,
+                backpropagate: layer.backpropagate
             })),
             "input_size":this.input_size,
             "output_size":this.output_size,
@@ -438,28 +466,14 @@ class Neurex {
                         }
 
                         deltas[output_layer_index] = dOutputlayer;
-                        
-                        // backpropagate to the hidden layers (except input layer)
 
-                        for (let layer = this.num_layers - 2; layer >= 0; layer--) {
-                            const next_weights = this.weights[layer + 1];
-                            const next_delta = deltas[layer + 1];
-                            if (!Array.isArray(next_delta)) {
-                                throw new Error(`deltaNext at layer ${layer + 1} is undefined`);
-                            }
-
-                            const weighted_delta = computeBackprop(this.onGPU, next_weights, next_delta);
-                            const currentLayer = this.layers[layer];
-                            const current_delta = weighted_delta.map((value, i) =>
-                                value * currentLayer.derivative_activation_function(zs[layer][i])
-                            );
-                            deltas[layer] = current_delta;
-                        }
+                        // backpropagation loop
+                        const allDeltas = this.#backpropagation(activations, zs, deltas);
 
 
                         // === STEP 3: Accumulate Gradients === //
                         for (let l = 0; l < this.num_layers; l++) {
-                            const delta = deltas[l];
+                            const delta = allDeltas[l];
                             const a_prev = activations[l];
 
                             // GPU-accelerated weight gradient (outer product)
@@ -562,63 +576,49 @@ class Neurex {
     }
 
     // ========= Private methods =======
+
+    // backpropagation
+    #backpropagation(activations, zs, deltas) {
+        // The loop should iterate from the second-to-last layer (this.num_layers - 2) down to the first layer (0).
+        for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
+            const next_weights = this.weights[layer_index + 1];
+            const next_delta = deltas[layer_index + 1];
+
+            if (!Array.isArray(next_delta)) {
+                throw new Error(`deltaNext at layer ${layer_index + 1} is undefined`);
+            }
+            
+            // Get the current layer object, which now holds its backpropagation logic
+            const currentLayer = this.layers[layer_index];
+            
+            // Call the layer's specific backpropagation method
+            const current_delta = currentLayer.backpropagate(this.onGPU, next_weights, next_delta, zs, layer_index);
+            
+            deltas[layer_index] = current_delta;
+        }
+
+        return deltas;
+    }
+
     // forward propagation
     #Feedforward(input) {
         let current_input = input
         let all_layer_outputs = [input];
         let zs = [];
 
-        for (let layer = 0; layer < this.num_layers; layer++) {
-            const current_layer = this.layers[layer];
-            // all operations inside a connected layer
-            if (current_layer.layer_name === "connected_layer") {
-                const layer_biases = this.biases[layer];
-                const layer_weights = this.weights[layer];
-                //const num_neurons = this.number_of_neurons[layer]; the number of biases in a layer can be use to determine how many neurons are there in a connected layer, so this no longer can be use any more
-                const activation_function = current_layer.activation_function;
-
-                // compute dot-product for all neurons at once
-                const z_values = computeForward(this.onGPU, current_input, layer_weights, layer_biases);
-
-                let outputs;
-
-                // After computing all z_values for the current layer
-                if (activation_function.name === "softmax") {
-                    outputs = activation_function(z_values); // Apply softmax to all z_values
-                } else {
-                    // If GPU not available, then perform neuron-by-neuron for getting the activated output
-                    if (!this.onGPU) {
-                        outputs = [];
-                        for (let i= 0; i < layer_biases.length; i++) {
-                            outputs.push(activation_function(z_values[i]));
-                        }
-                    }
-                    else {
-                        // if GPU available, shove the dot products (z-values or pre-activated outputs) to compute the activated outputs for every neurons
-                        outputs = activation_function(z_values, this.onGPU);
-                    }
-                }
-                    
-                zs.push(z_values);
-                current_input = outputs; // the outputs of the this layer will be the inputs for the next layer (repeat until all the last layer which is the output layer)
-                all_layer_outputs.push(current_input); // Push the actual activations
-            }
-            else if (current_layer_config.layer_name === "flatten_layer") {
-                // this layer only "flattens" the output of the previous layer
-                const flattened_output = current_input.flat(Infinity);
-                z_values = flattened_output;
-                
-                activated_outputs = flattened_output;
-                
-                zs.push(z_values);
-                current_input = activated_outputs;
-                all_layer_outputs.push(current_input);
-            }
-            else {
-                // for other layers  . . .
-            }
+        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
+            const current_layer = this.layers[layer_index];
+            const layer_weights = this.weights[layer_index];
+            const layer_biases = this.biases[layer_index];
             
+            // Call the layer's specific feedforward method
+            const { outputs, z_values } = current_layer.feedforward(this.onGPU, current_input, layer_weights, layer_biases);
+
+            zs.push(z_values);
+            current_input = outputs;
+            all_layer_outputs.push(current_input);
         }
+
         // after all the layers gives off their outputs, return final array of current_input as the predictions
         return {
             predictions: current_input, 
