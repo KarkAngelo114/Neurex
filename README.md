@@ -1,7 +1,11 @@
 
 ![Alt text](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1751615537/NodeJS-neurex_dky5vh.png)
 
-## Neurex
+[![NPM](https://nodei.co/npm/neurex.svg)](https://nodei.co/npm/neurex/)
+[![NPM](https://nodei.co/npm/neurex.svg?style=shields&data=n,v)](https://nodei.co/npm/neurex/)
+
+# Neurex
+
 Neurex is a JavaScript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications.
 
 ## How to get started
