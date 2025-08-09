@@ -1,8 +1,7 @@
 /**
  * Matrix operations for dot products in Neurex
  */
-const { GPU } = require('gpu.js');
-const gpu = new GPU({mode:'gpu'});
+const {gpu} = require('../gpu-init');
 
 /**
  * Forward pass kernel: z = Wᵀ · input + b

@@ -2,7 +2,7 @@
 ![Alt text](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1751615537/NodeJS-neurex_dky5vh.png)
 
 [![NPM](https://nodei.co/npm/neurex.svg)](https://nodei.co/npm/neurex/)
-[![NPM](https://nodei.co/npm/neurex.svg?style=shields&data=n,v)](https://nodei.co/npm/neurex/)
+[![NPM](https://nodei.co/npm/neurex.svg?style=shields&data=n,v,u,d)](https://nodei.co/npm/neurex/)
 
 # Neurex
 

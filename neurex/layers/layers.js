@@ -1,7 +1,7 @@
 
-const activations = require('../gpu/kernels/activations');
 const activation = require('../gpu/kernels/activations');
 const {computeForward, computeBackprop} = require('../gpu/kernels/matrixMultiplication');
+const {convolve} = require('../gpu/kernels/convolutionalKernel');
 
 /**
  * 
@@ -54,19 +54,29 @@ class Layers {
     * 
     *
     @method flatten()  
-
-    flattens a 2D matrix into 1D array
-    Example:
-
-    first row:
-    [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
-
-    flattened:
-
-    [x1, x2, x3, x4, x5, x6, ....]
+    Flattens the output of the last convolutional layer into a 1D array. This layer is crucial before connecting to fully connected layers as
+    it bridges the gap between feature extraction part of your network and the connected layers.
     */
     flatten() {
-        return {"layer_name":"flatten_layer"}
+        return {
+            "layer_name":"flatten_layer",
+            feedforward: (onGPU, input, weights=null, bias = null) => {
+                
+                const flattened = input.flat(Infinity);
+
+                return {
+                    outputs: flattened,
+                    z_values: flattened,
+                    incrementor_value: 0
+                }
+            },
+            backpropagate: (onGPU) => {
+
+                return {
+                    decrementor_value: 0
+                }
+            }
+        }
     }
 
 
@@ -87,7 +97,7 @@ class Layers {
             let function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`Activation function '${funcName}' or its derivative not found`);
+                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
             }
 
             return {
@@ -116,19 +126,126 @@ class Layers {
                             outputs = activation_function(z_values, this.onGPU);
                         }
                     }
-                    return { outputs, z_values };
+                    return {
+                        outputs, 
+                        z_values,
+                        incrementor_value: 1
+                    };
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index) => {
                     const weighted_delta = computeBackprop(onGPU, next_weights, next_delta);
                     const current_delta = weighted_delta.map((value, i) =>
                         value * activation.derivatives[function_name](zs[layer_index][i])
                     );
-                    return current_delta;
+                    return {
+                        current_delta,
+                        decrementor_value: 1
+                    };
                 }
             };
         }
         catch (error) {
             console.log(error.message);
+        }
+    }
+
+    /**
+     * 
+     * Allows you to add convolutional layers in your model architecture in sequential building.
+     * @method convolutional2D
+     * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
+     * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
+     * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
+     * @param {String} activation_function - the activation function to be use for this layer
+     * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+     * @throws {Error} - if any of the parameters are invalid.
+     *
+     */
+    convolutional2D(filters, strides, kernel_size, activation_function, padding) {
+        try {
+            if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
+            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
+            if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
+            if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
+            if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
+
+            // check if the padding is valid
+            let paddings = ["same", "valid"];
+            if (!paddings.includes(padding.toLowerCase())) {
+                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+            }
+
+            // check if the activation function is valid
+            const function_name = activation_function.toLowerCase();
+
+            if (!activation[function_name] || !activation.derivatives[function_name]) {
+                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
+            }
+
+            return {
+                "layer_name":"convolutional2D",
+                "activation_function":activation[function_name],
+                "derivative_activation_function":activation.derivatives[function_name],
+                "kernel_size":kernel_size,
+                "filters":filters,
+                "padding":padding,
+                // kernels are also considered weights
+                feedforward: (onGPU, input, weights, biases) => {
+                    // Standard behavior: Combine all input feature maps into a single 3D tensor
+                    // This assumes the input is a batch of samples.
+                    // If input.length is 1, it's a single sample.
+                    let single_sample_input;
+                    if (input.length > 0 && input[0].length > 0 && input[0][0].length > 1) {
+                        // Input is already a multi-channel tensor, which is the expected case
+                        single_sample_input = input[0];
+                    } else {
+                        // Combine the array of feature maps into a single tensor with depth
+                        const height = input[0].length;
+                        const width = input[0][0].length;
+                        const depth = input.length;
+                        single_sample_input = new Array(height).fill(null).map(() =>
+                            new Array(width).fill(null).map(() => new Array(depth))
+                        );
+
+                        for (let d = 0; d < depth; d++) {
+                            for (let h = 0; h < height; h++) {
+                                for (let w = 0; w < width; w++) {
+                                    single_sample_input[h][w][d] = input[d][h][w][0];
+                                }
+                            }
+                        }
+                    }
+                    
+                    const new_feature_maps = convolve(onGPU, filters, strides, single_sample_input, weights, biases, padding);
+
+                    const outputs = [];
+                    const z_values = new_feature_maps; // z_values are the new feature maps before activation
+                    let activation_function = activation[function_name];
+
+                    new_feature_maps.forEach(featureMap => {
+                        const activatedMap = featureMap.map(row =>
+                            row.map(cell => [activation_function(cell[0], false)])
+                        );
+                        outputs.push(activatedMap);
+                    });
+
+                    return {
+                        outputs,
+                        z_values,
+                        incrementor_value: 1
+                    };
+                },
+
+                backpropagate: (onGPU) => {
+                    return {
+                        decrementor_value: 1
+                    }
+                }
+            }
+
+        }
+        catch (error) {
+            console.error(error);
         }
     }
 }

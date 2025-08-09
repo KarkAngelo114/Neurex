@@ -1,8 +1,7 @@
 /**
  * GPU-aware activation functions with caching and safe CPU fallback.
  */
-const { GPU } = require('gpu.js');
-const gpu = new GPU({mode:'gpu'});
+const {gpu} = require('../gpu-init');
 
 // Cache kernels by size to avoid re-creating them
 const kernelCache = {
@@ -106,5 +105,4 @@ module.exports = {
     linear: dlinear,
     softmax: dsoftmax
   },
-  gpuInstance: gpu
 };

@@ -1,5 +1,4 @@
-const { GPU } = require('gpu.js');
-const gpu = new GPU({mode:'gpu'});
+const {gpu} = require('../gpu-init');
 
 /**
  * Outer product kernel: ∇W = a_prev ⊗ delta
@@ -66,5 +65,4 @@ function scaleGradients(onGPU, grad, scalar) {
 module.exports = {
     computeWeightGradients,
     scaleGradients,
-    gpuInstance: gpu
 };

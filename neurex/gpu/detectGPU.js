@@ -1,5 +1,4 @@
-const { GPU } = require('gpu.js');
-const gpu = new GPU({mode:'gpu'});
+const {gpu} = require('./gpu-init');
 
 const detect = () => {
     let backend = "Unknown";

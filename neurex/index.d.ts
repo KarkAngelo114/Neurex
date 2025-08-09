@@ -438,28 +438,36 @@ declare module 'neurex' {
         inputShape(shapeConfig: Object): object;
 
         /**
+        *
         * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
         * build connected layers or multilayer perceptron
+        * @method connectedLayer
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
         * @param {Number} layer_size specify the number of neuron for this layer.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
         */
         connectedLayer(activation: string, layer_size: number): object;
+
+        /**
+         * 
+         * Allows you to add convolutional layers in your model architecture when sequential building.
+         * @method convolutional2D
+         * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
+         * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
+         * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
+         * @param {String} activation_function - the activation function to be use for this layer
+         * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+         * @throws {Error} - if any of the parameters are invalid.
+         *
+         */
+        convolutional2D(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
         
         /**
         * 
         *
         @method flatten()  
-
-        flattens a 2D matrix into 1D array
-        Example:
-
-        first row:
-        [[x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3], [x1, x2, x3]]
-
-        flattened:
-
-        [x1, x2, x3, x4, x5, x6, ....]
+        Flattens the output of the last convolutional layer into a 1D array. This layer is crucial before connecting to fully connected layers as
+        it bridges the gap between feature extraction part of your network and the connected layers.
         */
         flatten(): object;
     }

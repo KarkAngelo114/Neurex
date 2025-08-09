@@ -1,7 +1,5 @@
 
-
-const { GPU } = require('gpu.js');
-const gpu = new GPU({mode:'gpu'});
+const {gpu} = require('../gpu-init');
 
 const sgdKernel = (size) => gpu.createKernel(function (params, grads, lr) {
     return params[this.thread.x] - lr * grads[this.thread.x];
