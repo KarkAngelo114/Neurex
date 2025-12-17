@@ -1,8 +1,5 @@
 
-const {applySGD, applyAdam, applyRMSProp, applyAdaGrad, applyAdadelta} = require('../gpu/kernels/optimizerKernels');
-
 const SGD = (onGPU, params, grads, state, lr) => {
-    if (onGPU) return applySGD(params, grads, lr);
 
     if (Array.isArray(params[0])) {
         for (let i = 0; i < params.length; i++) {
@@ -19,7 +16,6 @@ const SGD = (onGPU, params, grads, state, lr) => {
 };
 
 const Adam = (onGPU, params, grads, state, lr, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8) => {
-    if (onGPU) return applyAdam(params, grads, state, lr, beta1, beta2, epsilon);
 
     if (!state.m) state.m = Array.isArray(params[0])
         ? params.map(row => Array(row.length).fill(0))
@@ -60,7 +56,6 @@ const Adam = (onGPU, params, grads, state, lr, beta1 = 0.9, beta2 = 0.999, epsil
 };
 
 const AdaGrad = (onGPU, params, grads, state, lr, epsilon = 1e-8) => {
-    if (onGPU) return applyAdaGrad(params, grads, state, lr, epsilon);
 
     if (!state.accum) state.accum = Array(params.length).fill(0);
     for (let i = 0; i < params.length; i++) {
@@ -71,7 +66,6 @@ const AdaGrad = (onGPU, params, grads, state, lr, epsilon = 1e-8) => {
 };
 
 const RMSprop = (onGPU, params, grads, state, lr, beta = 0.9, epsilon = 1e-8) => {
-    if (onGPU) return applyRMSProp(params, grads, state, lr, beta, epsilon);
 
     if (!state.accum) state.accum = Array(params.length).fill(0);
     for (let i = 0; i < params.length; i++) {
@@ -82,7 +76,6 @@ const RMSprop = (onGPU, params, grads, state, lr, beta = 0.9, epsilon = 1e-8) =>
 };
 
 const Adadelta = (onGPU, params, grads, state, rho = 0.95, epsilon = 1e-6) => {
-    if (onGPU) return applyAdadelta(params, grads, state, rho, epsilon);
 
     if (!state.Eg2) state.Eg2 = Array(params.length).fill(0);
     if (!state.Edx2) state.Edx2 = Array(params.length).fill(0);

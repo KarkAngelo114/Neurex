@@ -1,0 +1,9 @@
+{
+  "Date Created": "2025-12-16T15-21-19-634Z",
+  "Number of epoch to train": 5000,
+  "Optimizer": "adam",
+  "Loss function": "mse",
+  "Task": "regression",
+  "Trained using": "Neurex",
+  "Note": "This model can only be used on Neurex library. This cannot be used directly in other ML frameworks. DO NOT modify any of the parameters."
+}

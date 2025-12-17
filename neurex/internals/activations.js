@@ -1,7 +1,7 @@
 /**
  * GPU-aware activation functions with caching and safe CPU fallback.
  */
-const {gpu} = require('../gpu-init');
+const {gpu} = require('./gpu-init');
 
 // Cache kernels by size to avoid re-creating them
 const kernelCache = {

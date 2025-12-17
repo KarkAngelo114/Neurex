@@ -7,8 +7,6 @@
  */
 
 
-const activation = require('../gpu/kernels/activations');
-const detect = require('../gpu/detectGPU');
 const Layers = require('../layers');
 const zlib = require('zlib');
 const fs = require('fs');
@@ -167,16 +165,6 @@ class Interpreter {
 
             if (input[0].length != this.input_size) {
                 throw new Error(`\n[ERROR]-------Shape Mismatch | Input shape length: ${input[0].length} | Expecting ${this.input_size}`);
-            }
-
-            const {gpu, backend, isGPUAvailable, isSoftwareGPU} = detect();
-
-            if (!isGPUAvailable || isSoftwareGPU) {
-                console.log(`[INFO]------- Falling back to CPU mode (no GPU acceleration)`);
-                this.onGPU = false;
-            } else {
-                console.log(`[INFO]-------- Backend Detected: ${backend}. Using ${gpu}`);
-                this.onGPU = true;
             }
 
             let outputs = [];

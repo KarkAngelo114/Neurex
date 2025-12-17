@@ -45,6 +45,7 @@ model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
 `inputShape()` is now moved to the new `Layers` class as well as the `construct_layer()` but now renamed as `connectedLayer()`.
 After building your network, you might need to use `build()` method.
 
+
 > [!Note]
 > - can only do ANN modelling.
 > - Falls back to pure Javascript operations if GPU is not available.

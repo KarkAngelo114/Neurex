@@ -11,3 +11,6 @@ CNN.js
 *.xlsx
 *.zip
 *.nrx
+.env
+iris.js
+

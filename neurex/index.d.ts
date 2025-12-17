@@ -172,6 +172,12 @@ declare module 'neurex' {
     * This class allows you to run inference predictions on your applications. You can load your trained model and run predictions
     *
     * @class
+    * @deprecated this module might be removed soon
+    * please use the "neurex-runtime"
+    *
+    * ```bash
+    * npm install neurex-runtime
+    * ```
     */
     export class Interpreter {
         /**
@@ -470,5 +476,6 @@ declare module 'neurex' {
         it bridges the gap between feature extraction part of your network and the connected layers.
         */
         flatten(): object;
+        
     }
 }

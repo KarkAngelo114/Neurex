@@ -1,7 +1,6 @@
-
-const activation = require('../gpu/kernels/activations');
-const {computeForward, computeBackprop} = require('../gpu/kernels/matrixMultiplication');
-const {convolve} = require('../gpu/kernels/convolutionalKernel');
+const activation = require('../core/bindings');
+const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps} = require('../core/bindings');
+const {convolveDelta} = require('../internals/convolutionalKernel');
 
 /**
  * 
@@ -37,6 +36,7 @@ class Layers {
                 };
             } else if (shapeConfig.height && shapeConfig.width && shapeConfig.depth) {
                 const { height, width, depth } = shapeConfig;
+
                 return {
                     layer_name: "input_layer",
                     layer_size: height * width * depth,
@@ -60,9 +60,11 @@ class Layers {
     flatten() {
         return {
             "layer_name":"flatten_layer",
-            feedforward: (onGPU, input, weights=null, bias = null) => {
+            feedforward: (onGPU, input, weights=null, bias = null, current_layer) => {
                 
                 const flattened = input.flat(Infinity);
+
+                //console.log('forward Flattened:',flattened)
 
                 return {
                     outputs: flattened,
@@ -70,12 +72,92 @@ class Layers {
                     incrementor_value: 0
                 }
             },
-            backpropagate: (onGPU) => {
+            backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
+                // Get the feature maps output from the previous convolutional layer
+
+                // console.log('Weights',next_weights)
+                const feature_maps = zs[layer_index - 1];
+                const filters = feature_maps.length;
+                const [H, W, D] = [
+                    feature_maps[0].length,
+                    feature_maps[0][0].length,
+                    feature_maps[0][0][0].length
+                ];
+
+                // STEP 1: Compute the delta for the flatten layer (pre-flattened form)
+                // multiply next_weights * next_delta
+                // let flatten_delta = new Array(next_weights.length).fill(0);
+                // for (let i = 0; i < next_weights.length; i++) {
+                //     let sum = 0;
+                //     for (let j = 0; j < next_weights[i].length; j++) {
+                //         sum += next_weights[i][j] * next_delta[j];
+                //     }
+                //     flatten_delta[i] = sum;
+                // }
+
+                const flatten_delta = DeltaMatMul(next_weights, next_delta);
+                // console.log('What the flatten layer receive during backprop',flatten_delta);
+
+                // STEP 2: Reshape flatten_delta back to convolutional feature maps
+                const reshapeFeatureMaps = [];
+                let idx = 0;
+                for (let f = 0; f < filters; f++) {
+                    const feature_map = [];
+                    for (let h = 0; h < H; h++) {
+                        let row = [];
+                        for (let w = 0; w < W; w++) {
+                            let depthArr = [];
+                            for (let d = 0; d < D; d++) {
+                                depthArr.push(flatten_delta[idx++]);
+                            }
+                            row.push(depthArr);
+                        }
+                        feature_map.push(row);
+                    }
+                    reshapeFeatureMaps.push(feature_map);
+                }
+                const delta = StackFeatureMaps(reshapeFeatureMaps);
+                // reshapeFeatureMaps.forEach(map=>console.log('Reshaped maps:', map))
 
                 return {
+                    current_delta: delta,
                     decrementor_value: 0
-                }
+                };
             }
+            // backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
+            //     // next_delta is already δ_flat
+
+            //     // console.log('what the flatten received',next_delta)
+            //     const flatten_delta = next_delta;
+
+            //     const [F, H, W, D] = currentLayer.input_shape;
+
+            //     const reshapeFeatureMaps = [];
+            //     let idx = 0;
+
+            //     for (let f = 0; f < F; f++) {
+            //         const feature_map = [];
+            //         for (let h = 0; h < H; h++) {
+            //             const row = [];
+            //             for (let w = 0; w < W; w++) {
+            //                 const depthArr = [];
+            //                 for (let d = 0; d < D; d++) {
+            //                     depthArr.push(flatten_delta[idx++]);
+            //                 }
+            //                 row.push(depthArr);
+            //             }
+            //             feature_map.push(row);
+            //         }
+            //         reshapeFeatureMaps.push(feature_map);
+            //     }
+
+            //     return {
+            //         current_delta: reshapeFeatureMaps,
+            //         decrementor_value: 0
+            //     };
+            // }
+
+
         }
     }
 
@@ -105,38 +187,29 @@ class Layers {
                 "activation_function":activation[function_name], 
                 "derivative_activation_function":activation.derivatives[function_name],
                 "layer_size":layer_size,
-                feedforward: (onGPU, input, weights, biases) => {
-                    // All the logic for matrix multiplication and activation
-                    const z_values = computeForward(onGPU, input, weights, biases);
-                    const activation_function = activation[function_name];
-                    let outputs;
+                feedforward: (onGPU, input, weights, biases, current_layer) => {
 
-                    if (activation_function.name === "softmax") {
-                        outputs = activation_function(z_values); // Apply softmax to all z_values
-                    } else {
-                        // If GPU not available, then perform neuron-by-neuron for getting the activated output
-                        if (!this.onGPU) {
-                            outputs = [];
-                            for (let i= 0; i < biases.length; i++) {
-                                outputs.push(activation_function(z_values[i]));
-                            }
-                        }
-                        else {
-                            // if GPU available, shove the dot products (z-values or pre-activated outputs) to compute the activated outputs for every neurons
-                            outputs = activation_function(z_values, this.onGPU);
-                        }
-                    }
+                    //console.log('connected layer',input)
+                    const z_values = MatMul(input, weights, biases);
+                    const activation_function = activation[function_name];
+
+                    let outputs;
+                    outputs = activation_function(z_values);
+                    
                     return {
                         outputs, 
                         z_values,
                         incrementor_value: 1
                     };
                 },
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index) => {
-                    const weighted_delta = computeBackprop(onGPU, next_weights, next_delta);
-                    const current_delta = weighted_delta.map((value, i) =>
-                        value * activation.derivatives[function_name](zs[layer_index][i])
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
+                    // console.log('backpropagation connected layer', next_delta);
+                    const current_delta = DeltaMatMul(next_weights, next_delta).map((value, i) =>
+                        value * activation.derivatives[function_name]([zs[layer_index][i]])
                     );
+
+                    
+
                     return {
                         current_delta,
                         decrementor_value: 1
@@ -189,45 +262,23 @@ class Layers {
                 "kernel_size":kernel_size,
                 "filters":filters,
                 "padding":padding,
+                "strides":strides,
                 // kernels are also considered weights
-                feedforward: (onGPU, input, weights, biases) => {
-                    // Standard behavior: Combine all input feature maps into a single 3D tensor
-                    // This assumes the input is a batch of samples.
-                    // If input.length is 1, it's a single sample.
-                    let single_sample_input;
-                    if (input.length > 0 && input[0].length > 0 && input[0][0].length > 1) {
-                        // Input is already a multi-channel tensor, which is the expected case
-                        single_sample_input = input[0];
-                    } else {
-                        // Combine the array of feature maps into a single tensor with depth
-                        const height = input[0].length;
-                        const width = input[0][0].length;
-                        const depth = input.length;
-                        single_sample_input = new Array(height).fill(null).map(() =>
-                            new Array(width).fill(null).map(() => new Array(depth))
-                        );
+                feedforward: (onGPU, input, weights, biases, current_layer) => {
+                    const new_feature_maps = Convolve(strides, input, weights, biases, padding);
 
-                        for (let d = 0; d < depth; d++) {
-                            for (let h = 0; h < height; h++) {
-                                for (let w = 0; w < width; w++) {
-                                    single_sample_input[h][w][d] = input[d][h][w][0];
-                                }
-                            }
-                        }
-                    }
+                    const stacked = StackFeatureMaps(new_feature_maps);
                     
-                    const new_feature_maps = convolve(onGPU, filters, strides, single_sample_input, weights, biases, padding);
-
-                    const outputs = [];
                     const z_values = new_feature_maps; // z_values are the new feature maps before activation
-                    let activation_function = activation[function_name];
 
-                    new_feature_maps.forEach(featureMap => {
-                        const activatedMap = featureMap.map(row =>
-                            row.map(cell => [activation_function(cell[0], false)])
-                        );
-                        outputs.push(activatedMap);
+                    // activate each depth input using the given activation function
+                    const activation_function = activation[function_name];
+                    const outputs = [];
+                    stacked.forEach((row, i) => {
+                        const innerRow = row.map(cell => activation_function(cell));
+                        outputs.push(innerRow);
                     });
+
 
                     return {
                         outputs,
@@ -236,10 +287,18 @@ class Layers {
                     };
                 },
 
-                backpropagate: (onGPU) => {
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {                    
+                    
+                    const output = convolveDelta(onGPU, next_delta, next_weights, currentLayer.padding, currentLayer.strides);
+
+                    // apply derivative activation for each input depth
+                    const activation_function = activation[function_name];
+                    const outputDelta = output.map((row) => row.map(cell => activation_function(cell)));
+
                     return {
+                        current_delta: outputDelta,
                         decrementor_value: 1
-                    }
+                    };
                 }
             }
 
