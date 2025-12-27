@@ -13,10 +13,12 @@ import necessary modules
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
-const { computeWeightGradients, scaleGradients} = require('../internals/gradientKernels');
+const { scaleGradients} = require('../internals/gradientKernels');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
+const { computeWeightGradients } = require('../core/bindings');
+const { getShape, flattenAll, calculateTensorShape } = require('../utils');
 
 
 
@@ -72,6 +74,10 @@ class Neurex {
 
         this.onGPU = false;
         this.isfailed = false;
+        this.paramRegistry = [];
+        this.totalParams = 0;
+        this.weightGrads = [];
+        this.biasGrads = [];
     }
 
     /**
@@ -274,6 +280,11 @@ class Neurex {
 
             let prev_size = this.input_size;
             let prevDepth = this.depth; // input layer depth
+            let offset = 0;
+
+            let input_Height = this.input_shape[0] || 0;
+            let input_Width = this.input_shape[1] || 0;
+
             // initialized weights and biases
             this.layers.forEach((layer_data, idx) => {
                 if (layer_data.layer_name === "connected_layer") {
@@ -286,6 +297,13 @@ class Neurex {
                     }
                     this.biases.push(generated_biases);
 
+                    // initialized bias grads;
+                    let initiatedBiasGrads = [];
+                    for (let j = 0; j < layer_size; j++) {
+                        initiatedBiasGrads.push(0);
+                    }
+                    this.biasGrads.push(initiatedBiasGrads);
+
                     // initialize weights
                     let layerWeights = [];
                     for (let r = 0; r < prev_size * this.filters; r++) {
@@ -296,12 +314,27 @@ class Neurex {
                         layerWeights.push(row);
                     }
                     this.weights.push(layerWeights);
+
+                    // initialized weight grads
+                    let initiated_weightGrads = [];
+                    for (let r = 0; r < prev_size * this.filters; r++) {
+                        let row = [];
+                        for (let c = 0; c < layer_size; c++) {
+                            row.push(0);
+                        }
+                        initiated_weightGrads.push(row);
+                    }
+                    this.weightGrads.push(initiated_weightGrads);
+
+
                     this.filters = 1; // we reset it to 1 so that the value of this.filters is only used by the first connected layer only after flatten
                     prev_size = layer_size;
                 }
                 else if (layer_data.layer_name === "convolutional2D") {
                     const filters = layer_data.filters;
                     const [kernelHeight, kernelWidth] = layer_data.kernel_size;
+                    const stride = layer_data.strides || 1;
+                    const padding = layer_data.padding || "same";
 
                     const depth = prevDepth;
 
@@ -325,6 +358,25 @@ class Neurex {
                     }
                     this.weights.push(kernels);
 
+                    // initialize kernels grads
+                    let kernelsGrads = [];
+                    for (let numFilters = 0; numFilters < filters; numFilters++) {
+                        let rows = [];
+                        for (let height = 0; height < kernelHeight; height++) {
+                            let row_element = [];
+                            for (let width = 0; width < kernelWidth; width++) {
+                                let depth_elements = [];
+                                for (let num_depth_elements = 0; num_depth_elements < depth; num_depth_elements++) {
+                                    depth_elements.push(0);
+                                }
+                                row_element.push(depth_elements);
+                            }
+                            rows.push(row_element);
+                        }
+                        kernelsGrads.push(rows);
+                    }
+                    this.weightGrads.push(kernelsGrads);
+
                     // initialize bias for each kernel
                     let biases = [];
                     for (let numFilters = 0; numFilters < filters; numFilters++) {
@@ -332,26 +384,66 @@ class Neurex {
                     }
                     this.biases.push(biases);
 
+                    // initialized bias grads for kernels
+                    let biasesKernelGrads = [];
+                    for (let numFilters = 0; numFilters < filters; numFilters++) {
+                        biasesKernelGrads.push(0);
+                    }
+                    this.biasGrads.push(biasesKernelGrads);
                     prevDepth = filters;
+                    
+                    const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(input_Height, input_Width, kernelHeight, kernelWidth, prevDepth, stride, padding);
+                    input_Height = OutputHeight;
+                    input_Width = OutputWidth;
+                    prev_size = CalculatedTensorShape;
+                    
                 }
-                else if (layer_data.layer_name === "flatten_layer") {
-                    // flatten layer supposedly has no weights and biases, but in order to mitigate mismatching, we initialized weights and biases but all are 0s;
-                    let weights = Array(this.input_size).fill([[0]]);
-                    let biases = Array(this.input_size).fill([0]);
-                    this.weights.push(weights);
-                    this.biases.push(biases);
-                    this.filters = this.layers[idx-1].filters;
-                }
-                else if (layer_data.layer_name === "flatten_layer") {
-                    // flatten has no weights
-                    // but it changes the dimensionality
-                    prev_size = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
-                    this.filters = 1;
-                }
+                // else if (layer_data.layer_name === "flatten_layer") {
+                //     // flatten layer supposedly has no weights and biases, but in order to mitigate mismatching, we initialized weights and biases but all are 0s;
+                //     let weights = Array(prev_size).fill(0);
+                //     let biases = Array(prev_size).fill(0);
+                //     this.weights.push(weights);
+                //     this.biases.push(biases);
+                //     this.weightGrads.push(weights);
+                //     this.biasGrads.push(biases);
+                //     this.filters = this.layers[idx-1].filters;
+                //     prev_size = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
+                // }
+                // else if (layer_data.layer_name === "flatten_layer") {
+                //     // flatten has no weights
+                //     // but it changes the dimensionality
+                //     prev_size = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
+                //     this.filters = 1;
+                // }
 
             });
 
             this.hasBuilt = true;
+
+            function registerParam(tensor, meta) {
+                const flatSize = tensor.flat(Infinity).length;
+                this.paramRegistry.push({
+                    offset,
+                    size: flatSize,
+                    shape: getShape(tensor),
+                    ...meta
+                });
+                offset += flatSize;
+            }
+
+            // register weights
+            this.weights.forEach((W, l) => {
+                if (this.layers[l].layer_name === 'flatten_layer') return;
+                registerParam.call(this, W, { layer: l, type: 'weights' });
+            });
+
+            // register biases
+            this.biases.forEach((B, l) => {
+                if (this.layers[l].layer_name === 'flatten_layer') return;
+                registerParam.call(this, B, { layer: l, type: 'biases' });
+            });
+
+            this.totalParams = offset;
 
         }
         catch (error) {
@@ -486,9 +578,22 @@ class Neurex {
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
 
-                    // Initialize accumulators for gradients    
-                    let weightGrads = this.weights.map(layer => layer.map(row => row.map(() => 0)));
-                    let biasGrads = this.biases.map(layer => layer.map(() => 0));
+                    // Initialize accumulators for gradients
+                    // function zerosLike(arr) {
+                    //     if (Array.isArray(arr)) {
+                    //         return arr.map(zerosLike);
+                    //     }
+                    //     return 0;
+                    // }
+
+                    // let weightGrads = this.weights.map(zerosLike);
+                    // let biasGrads = this.biases.map(zerosLike);
+                    
+                    // let weightGrads = this.weights.map(layer => layer.map(row => row.map(() => 0)));
+                    // let biasGrads = this.biases.map(layer => layer.map(() => 0));
+
+                    let weightGrads = this.weightGrads;
+                    let biasGrads = this.biasGrads;
 
 
                     let batchLoss = 0;
@@ -543,19 +648,19 @@ class Neurex {
                         // backpropagation loop
                         const allDeltas = this.#backpropagation(activations, zs, deltas);
 
-
                         // === STEP 3: Accumulate Gradients === //
                         for (let l = 0; l < this.num_layers; l++) {
                             const delta = allDeltas[l];
                             const a_prev = activations[l];
 
-                            // GPU-accelerated weight gradient (outer product)
-                            const weightGrad = computeWeightGradients(this.onGPU, a_prev, delta);
-                            weightGrads[l] = weightGrads[l].map((row, i) =>
-                                row.map((val, j) => val + weightGrad[i][j])
-                            );
+                            // console.log(`Delta for layer ${l}`,delta);
+                            // console.log(`Activated outputs for layer ${l}`, a_prev);
+                            // console.log(`Weight grads for layer ${l}`,weightGrads[l]);
 
-                            // Accumulate bias gradients (still CPU for now)
+                            // compute for weight gradients
+                            weightGrads[l] = computeWeightGradients(a_prev, delta, this.layers[l].layer_name, weightGrads[l], this.layers[l], allDeltas, l);
+
+                            // Accumulate bias gradients
                             for (let j = 0; j < biasGrads[l].length; j++) {
                                 biasGrads[l][j] += delta[j];
                             }
@@ -565,32 +670,46 @@ class Neurex {
                     batchLoss /= actualBatchSize;
                     totalepochLoss += batchLoss;
 
+                    const flattenWeightGrads = flattenAll(this.weightGrads);
+                    const flattenWeights = flattenAll(this.weights);
+
+                    // throw new Error('Stopping');
+
                     // Divide accumulated gradients by the actual batch size
                     for (let l = 0; l < this.num_layers; l++) {
-                        for (let i = 0; i < weightGrads[l].length; i++) {
-                            weightGrads[l][i] = scaleGradients(this.onGPU, weightGrads[l][i], actualBatchSize);
+
+                        if (this.layers[l].layer_name === "connected_layer") {
+
+                            for (let i = 0; i < weightGrads[l].length; i++) {
+                                weightGrads[l][i] = scaleGradients(this.onGPU, weightGrads[l][i], actualBatchSize);
+                            }
+                            biasGrads[l] = scaleGradients(this.onGPU, biasGrads[l], actualBatchSize);
                         }
-                        biasGrads[l] = scaleGradients(this.onGPU, biasGrads[l], actualBatchSize);
+                        
                     }
 
 
                     for (let l = 0; l < this.num_layers; l++) {
                         // Update weights
-                        this.optimizerStates.weights[l] = optimizerFn(
-                            this.onGPU,
-                            this.weights[l],
-                            weightGrads[l],
-                            this.optimizerStates.weights[l],
-                            this.learning_rate
-                        );
-                        // Update biases
-                        this.optimizerStates.biases[l] = optimizerFn(
-                            this.onGPU,
-                            this.biases[l],
-                            biasGrads[l],
-                            this.optimizerStates.biases[l],
-                            this.learning_rate
-                        );
+
+                        if (this.layers[l].layer_name === "connected_layer") {
+                            this.optimizerStates.weights[l] = optimizerFn(
+                                this.onGPU,
+                                this.weights[l],
+                                weightGrads[l],
+                                this.optimizerStates.weights[l],
+                                this.learning_rate
+                            );
+                            // Update biases
+                            this.optimizerStates.biases[l] = optimizerFn(
+                                this.onGPU,
+                                this.biases[l],
+                                biasGrads[l],
+                                this.optimizerStates.biases[l],
+                                this.learning_rate
+                            );
+                        }
+                        
                     }
 
                 }
@@ -678,17 +797,21 @@ class Neurex {
     // ========= Private methods =======
 
     // backpropagation
-    #backpropagation(activations, zs, deltas) {
+    #backpropagation(activations, zs, deltas_array) {
         // The loop should iterate from the second-to-last layer (this.num_layers - 2) down to the first layer (0).
 
+        let deltas = deltas_array;
         let delta_indexer = this.num_layers - 2;
         for (let layer_index = delta_indexer; layer_index >= 0; layer_index--) {
             // inline condition to check what layer need to get it's weights.
             // when initializing weights, flatten layer has initialized weights and biases, but all are 0s. So we neeed to skip it because if we
             // don't, the convolutional layer will get wrong kernels (weights)
             
-            const next_weights = this.weights[this.layers[layer_index].layer_name === "convolutional2D" ? delta_indexer : delta_indexer+1];
-            const next_delta = deltas[delta_indexer+1];
+            //const next_weights = this.weights[this.layers[layer_index].layer_name === "convolutional2D" ? delta_indexer : delta_indexer+1];
+            
+            const next_weights = this.weights[layer_index + 1]
+            const next_delta = deltas[layer_index + 1];
+            
 
             // console.log(
             //     "Backprop at layer:",
@@ -705,7 +828,7 @@ class Neurex {
             const currentLayer = this.layers[layer_index];
 
             // Call the layer's specific backpropagation method
-            const {current_delta, decrementor_value} = currentLayer.backpropagate(this.onGPU, next_weights, next_delta, zs, layer_index, currentLayer, activations);
+            const {current_delta, decrementor_value} = currentLayer.backpropagate(this.onGPU,next_weights, next_delta, zs, layer_index, currentLayer, this.weights);
             delta_indexer--;
             
             deltas[layer_index] = current_delta;
@@ -768,7 +891,6 @@ class Neurex {
             all_layer_outputs.push(current_input);
         }
 
-        // after all the layers gives off their outputs, return final array of current_input as the predictions
         return {
             predictions: current_input, 
             activations : all_layer_outputs,

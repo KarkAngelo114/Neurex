@@ -55,94 +55,110 @@ const convolve = (onGPU, filters, strides, input, kernels, biases, padding = "va
     }
 };
 
-const convolveDelta = (onGPU, delta_map, kernels, padding, strides) => {
-    // delta_map: H x W x F (height, width, filters)
-    // kernels: F x KH x KW x D (filters, kernel height, kernel width, depth)
-    const rotated_Kernels = rotateKernel(kernels);
-    const numFilters = kernels.length;
-    const kernelHeight = rotated_Kernels[0].length;
-    const kernelWidth = rotated_Kernels[0][0].length;
-    const inputDepth = rotated_Kernels[0][0][0].length;
-    const deltaHeight = delta_map.length;
-    const deltaWidth = delta_map[0].length;
+const convolveDelta = (delta_map, kernels) => {
+    // delta_map: H × W × F
+    // kernels:   F × KH × KW × D
 
-    // For 'full' padding, pad = kernel_size - 1
-    const padH = kernelHeight - 1;
-    const padW = kernelWidth - 1;
+    const H = delta_map.length;
+    const W = delta_map[0].length;
+    const F = delta_map[0][0].length;
 
-    // Output: height and width after full convolution
-    const outHeight = deltaHeight + 2 * padH - (kernelHeight - 1);
-    const outWidth = deltaWidth + 2 * padW - (kernelWidth - 1);
+    const KH = kernels[0].length;
+    const KW = kernels[0][0].length;
+    const D  = kernels[0][0][0].length;
 
-    // Output: H x W x D (match input to this conv layer)
-    let output = [];
-    for (let h = 0; h < deltaHeight + padH * 2 - (kernelHeight - 1); h++) {
-        let row = [];
-        for (let w = 0; w < deltaWidth + padW * 2 - (kernelWidth - 1); w++) {
-            let depthArr = [];
-            for (let d = 0; d < inputDepth; d++) {
-                // For each input channel, sum over all filters
-                let sum = 0;
-                for (let f = 0; f < numFilters; f++) {
-                    // Extract delta map for filter f (2D)
-                    let delta2d = [];
-                    for (let i = 0; i < deltaHeight; i++) {
-                        delta2d.push(delta_map[i].map(cell => cell[f]));
-                    }
-                    // Extract rotated kernel for filter f, channel d (2D)
-                    let kernel2d = [];
-                    for (let i = 0; i < kernelHeight; i++) {
-                        kernel2d.push([]);
-                        for (let j = 0; j < kernelWidth; j++) {
-                            kernel2d[i].push(rotated_Kernels[f][i][j][d]);
-                        }
-                    }
-                    // Pad delta2d for 'full' convolution
-                    let paddedDelta = applyPadding2D(delta2d, kernelHeight - 1, kernelWidth - 1);
-                    // Perform 2D convolution at (h, w)
-                    sum += conv2dAt(paddedDelta, kernel2d, h, w);
+    // Rotate kernels (180°)
+    const rotated = rotateKernel(kernels);
+
+    // Padding = kernel_size - 1
+    const padH = KH - 1;
+    const padW = KW - 1;
+
+    // Initialize δX
+    const deltaX = Array(H)
+        .fill(0)
+        .map(() =>
+            Array(W)
+                .fill(0)
+                .map(() => Array(D).fill(0))
+        );
+
+    // For each input depth
+    for (let d = 0; d < D; d++) {
+
+        // Accumulate over all filters
+        for (let f = 0; f < F; f++) {
+
+            // Extract δY[:,:,f]
+            const delta2D = delta_map.map(row => row.map(cell => cell[f]));
+
+            // Pad δY
+            const paddedDelta = pad2D(delta2D, padH, padW);
+
+            // Kernel slice: rotated[f][:,:,d]
+            const kernel2D = rotated[f].map(row =>
+                row.map(cell => cell[d])
+            );
+
+            // Convolution
+            const conv = conv2D(paddedDelta, kernel2D);
+
+            // Accumulate into δX[:,:,d]
+            for (let i = 0; i < H; i++) {
+                for (let j = 0; j < W; j++) {
+                    deltaX[i][j][d] += conv[i][j];
                 }
-                depthArr.push(sum);
             }
-            row.push(depthArr);
         }
-        output.push(row);
     }
-    return output;
+
+    return deltaX;
 };
 
-// Helper: 2D convolution at a single location (valid window)
-function conv2dAt(input, kernel, h, w) {
-    let kh = kernel.length;
-    let kw = kernel[0].length;
-    let sum = 0;
-    for (let i = 0; i < kh; i++) {
-        for (let j = 0; j < kw; j++) {
-            let inVal = input[h + i] && input[h + i][w + j] !== undefined ? input[h + i][w + j] : 0;
-            sum += inVal * kernel[i][j];
+function conv2D(input, kernel) {
+    const H = input.length;
+    const W = input[0].length;
+    const KH = kernel.length;
+    const KW = kernel[0].length;
+
+    const outH = H - KH + 1;
+    const outW = W - KW + 1;
+
+    const output = Array(outH)
+        .fill(0)
+        .map(() => Array(outW).fill(0));
+
+    for (let i = 0; i < outH; i++) {
+        for (let j = 0; j < outW; j++) {
+            let sum = 0;
+            for (let ki = 0; ki < KH; ki++) {
+                for (let kj = 0; kj < KW; kj++) {
+                    sum += input[i + ki][j + kj] * kernel[ki][kj];
+                }
+            }
+            output[i][j] = sum;
         }
     }
-    return sum;
+    return output;
 }
 
-// Helper: Pad a 2D array with zeros
-function applyPadding2D(input, padH, padW) {
-    const inH = input.length;
-    const inW = input[0].length;
-    const out = [];
-    for (let i = 0; i < inH + 2 * padH; i++) {
-        let row = [];
-        for (let j = 0; j < inW + 2 * padW; j++) {
-            if (i < padH || i >= inH + padH || j < padW || j >= inW + padW) {
-                row.push(0);
-            } else {
-                row.push(input[i - padH][j - padW]);
-            }
+
+function pad2D(mat, padH, padW) {
+    const H = mat.length;
+    const W = mat[0].length;
+
+    const padded = Array(H + 2 * padH)
+        .fill(0)
+        .map(() => Array(W + 2 * padW).fill(0));
+
+    for (let i = 0; i < H; i++) {
+        for (let j = 0; j < W; j++) {
+            padded[i + padH][j + padW] = mat[i][j];
         }
-        out.push(row);
     }
-    return out;
+    return padded;
 }
+
     
 
 const rotateKernel = (kernel) => {

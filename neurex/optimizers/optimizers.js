@@ -16,7 +16,6 @@ const SGD = (onGPU, params, grads, state, lr) => {
 };
 
 const Adam = (onGPU, params, grads, state, lr, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8) => {
-
     if (!state.m) state.m = Array.isArray(params[0])
         ? params.map(row => Array(row.length).fill(0))
         : Array(params.length).fill(0);

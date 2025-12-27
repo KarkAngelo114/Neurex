@@ -13,4 +13,6 @@ CNN.js
 *.nrx
 .env
 iris.js
+metadata.json
+
 
