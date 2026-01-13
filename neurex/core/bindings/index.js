@@ -118,15 +118,83 @@ const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth)
  */
 const StackFeatureMaps = (featureMaps) => addon.StackFeatureMaps(featureMaps);
 
+// Rotates each kernel by 180 degrees
+function rotateKernels(kernels) {
+    const F  = kernels.length;
+    const KH = kernels[0].length;
+    const KW = kernels[0][0].length;
+    const D  = kernels[0][0][0].length;
+
+    const rotated = Array.from({ length: F }, () =>
+        Array.from({ length: KH }, () =>
+            Array.from({ length: KW }, () =>
+                Array(D).fill(0)
+            )
+        )
+    );
+
+    for (let f = 0; f < F; f++) {
+        for (let kh = 0; kh < KH; kh++) {
+            for (let kw = 0; kw < KW; kw++) {
+                for (let d = 0; d < D; d++) {
+                    rotated[f][KH - 1 - kh][KW - 1 - kw][d] =
+                        kernels[f][kh][kw][d];
+                }
+            }
+        }
+    }
+    return rotated;
+}
+
 /**
- * 
- * @param {*} delta_feature_maps 
- * @param {*} kernels 
- * @param {*} padding 
- * @param {*} strides 
- * @returns 
+ * Performs backpropagation convolution to find the delta of the previous layer.
+ * @param {Array} padded_dilated_delta - The delta from the next layer, already dilated and padded.
+ * @param {Array} kernels - The kernels/weights of the current layer [Filters][Channels][Height][Width]
+ * @param {Number} inputH - The height of the input from the forward pass we are trying to reach.
+ * @param {Number} inputW - The width of the input from the forward pass we are trying to reach.
+ * @returns {Array} 3D Tensor [inputH][inputW][Channels]
  */
-const ConvolveDelta = (delta_feature_maps, kernels, padding, strides) => addon.ConvolveDelta(delta_feature_maps, kernels, padding, strides);
+function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW) {
+    const F  = kernels.length;
+    const KH = kernels[0].length;
+    const KW = kernels[0][0].length;
+    const D  = kernels[0][0][0].length;
+
+
+    const rotated = rotateKernels(kernels);
+
+    //console.log('Inside convolve delta');
+    //console.log('Padded dilated delta shape:', padded_dilated_delta.length, padded_dilated_delta[0].length, padded_dilated_delta[0][0].length);
+    //console.log('Kernel shape:', rotated.length, rotated[0].length, rotated[0][0].length, rotated[0][0][0].length);
+    //console.log('Expected output height and width:', inputH, inputW);    
+    // Initialize the output delta: [Height][Width][Depth/Channels]
+    const deltaX = Array.from({ length: inputH }, () =>
+        Array.from({ length: inputW }, () =>
+            Array(D).fill(0.0)
+        )
+    );
+
+    // Standard valid convolution:
+    // We slide over the padded_dilated_delta to produce an output of size [inputH][inputW]
+    for (let i = 0; i < inputH; i++) {
+        for (let j = 0; j < inputW; j++) {
+            for (let d = 0; d < D; d++) { // For each input channel
+                let sum = 0.0;
+                for (let f = 0; f < F; f++) { // Sum across all filters
+                    for (let kh = 0; kh < KH; kh++) {
+                        for (let kw = 0; kw < KW; kw++) {
+                            sum += padded_dilated_delta[i + kh][j + kw][f] * rotated[f][kh][kw][d];
+                        }
+                    }
+                }
+                deltaX[i][j][d] = sum;
+            }
+        }
+    }
+    return deltaX;
+}
+
+// const ConvolveDelta = (delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW) => addon.ConvolveDelta(delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW);
 
 /**
  * 
@@ -140,10 +208,13 @@ const ConvolveDelta = (delta_feature_maps, kernels, padding, strides) => addon.C
 const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrads, layer_data, allDeltas, layer_index) => {
     if (layer_name === "convolutional2D") {
     
-        const output = addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads, layer_data.strides);
-        return output
+        // const output = addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads, 1);
+        // return output
+
+        if (layer_index == 0) return weightGrads;
     
-        // return output = ComputeGradientForKernels(activated_outputs, delta, weightGrads);
+        return output = ComputeGradientForKernels(activated_outputs, delta, weightGrads);
+        // return weightGrads
     }
     else if (layer_name === "connected_layer") {
         let input = activated_outputs;
@@ -161,38 +232,36 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
 }
 
 // need to write a native binding for this
-const ComputeGradientForKernels = (
-        activated_outputs, // the activated outputs per convolutional layer assume are padded if the padding is "same") or not (the padding is "valid")
-        delta, // delta output per convolutional layer
-        weightGrads, // weight or (kernels)
-        stride = 1 // default strides unless a value is passed
-    ) => {
-
+const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, stride = 1) => {
     const filters = weightGrads.length;
-    const channels = weightGrads[0].length;
-    const kernel_height = weightGrads[0][0].length;
-    const kernel_width = weightGrads[0][0][0].length;
+    const kernel_height = weightGrads[0].length;
+    const kernel_width = weightGrads[0][0].length;
+    const channels = weightGrads[0][0][0].length;
 
-    // Loop over each filter
-    let output_grad = weightGrads;
+    // Create a zero-initialized gradient accumulator
+    let output_grad = weightGrads.map(f =>
+        f.map(kh =>
+            kh.map(kw =>
+                kw.slice()
+            )
+        )
+    );
+
     for (let f = 0; f < filters; f++) {
         for (let c = 0; c < channels; c++) {
             for (let kh = 0; kh < kernel_height; kh++) {
                 for (let kw = 0; kw < kernel_width; kw++) {
                     let grad = 0;
-                    // Slide kernel over activated_outputs
                     for (let i = 0; i <= activated_outputs.length - kernel_height; i += stride) {
                         for (let j = 0; j <= activated_outputs[0].length - kernel_width; j += stride) {
-                            // Multiply input patch by delta
                             grad += activated_outputs[i + kh][j + kw][c] * delta[i][j][f];
                         }
                     }
-                    output_grad[f][c][kh][kw] += grad;
+                    output_grad[f][kh][kw][c] += grad;
                 }
             }
         }
     }
-
     return output_grad;
 };
 

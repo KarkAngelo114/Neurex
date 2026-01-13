@@ -311,12 +311,6 @@ declare module 'neurex' {
         sequentialBuild(layer_data: any[]): void;
 
         /**
-        * 
-        * Initiate weights and biases for the layers. Need to build layers first using sequentialBuild() API
-        */
-        build(): void;
-
-        /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
         *
@@ -418,6 +412,19 @@ declare module 'neurex' {
     * @throws {Error} - when no data is provided or there are more than two classes
     */
     export function BinaryLabeling(data: any[][]): number[][];
+
+    /**
+     * 
+     *
+     * Used to rehape a 1D array into a tensor map using the given height, width, and depth values. If the length of the 1D array didn't match with the given H * W * D, it will be filled with 0s before reshaping
+     * @param {Array<Number>} input usually a 1D array 
+     * @param {Array<Number>} shape array containing values for HxWxD (Height, Width, Depth). Note: They must be arrange in correct order as [Height, Width, Depth]
+     * @returns {Array<Array<Array<Array<Number>>>>} a tensor map
+     * @throws {Error} - if there are missing parameters
+     * 
+     * 
+     */
+    export function toTensor(input: number[], shape: number[]): number[][][][];
 
 
     /**

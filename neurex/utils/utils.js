@@ -97,10 +97,41 @@ const getPaddingSizes = (inputH, inputW, kernelH, kernelW, stride, padding) => {
     };
 };
 
+/**
+ * 
+ * @param {Array<Array<Array<Number>>>} input - delta tensor map as input
+ * @param {Number} stride - strides given for how much the kernel moves across the input tensor 
+ * @returns Dilated output
+ */
+const DilateInput = (input, stride) => {
+    if (stride <= 1) return input;
+
+    const inputH = input.length;
+    const inputW = input[0].length;
+    const inputD = input[0][0].length;
+
+    
+
+    const newH = inputH + (inputH - 1) * (stride - 1);
+    const newW = inputW + (inputW - 1) * (stride  - 1);
+
+    const output = Array.from({length: newH},() => Array.from({length: newW}, () => Array.from({length: inputD}).fill(0)));
+
+    for (let i = 0; i < inputH; i++) {
+        for (let j = 0; j < inputW; j++) {
+            output[i * stride][j * stride] = input[i][j];
+        }
+    }
+
+    return output;
+
+}
+
 module.exports = {
     getShape,
     flattenAll,
     calculateTensorShape,
     applyPadding,
-    getPaddingSizes
+    getPaddingSizes,
+    DilateInput
 }

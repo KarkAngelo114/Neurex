@@ -17,6 +17,7 @@ const {OneHotEncoded, IntegerLabeling, BinaryLabeling} = require('./preprocessor
 const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
+const {toTensor} = require('./preprocessor/reshaper');
 
 module.exports= {
     Neurex,
@@ -29,5 +30,6 @@ module.exports= {
     BinaryLabeling,
     split_dataset,
     RegressionMetrics,
-    ClassificationMetrics
+    ClassificationMetrics,
+    toTensor
 }

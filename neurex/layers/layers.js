@@ -1,6 +1,7 @@
 const activation = require('../core/bindings');
 const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps, ConvolveDelta} = require('../core/bindings');
-const {calculateTensorShape, getPaddingSizes, applyPadding} = require('../utils');
+const {calculateTensorShape, getPaddingSizes, applyPadding, DilateInput} = require('../utils/utils');
+const { toTensor } = require('../preprocessor/reshaper')
 
 class Layers {
     constructor () {
@@ -267,7 +268,6 @@ class Layers {
                 "strides":strides,
                 // kernels are also considered weights
                 feedforward: (onGPU, input, weights, biases, current_layer) => {
-                    
                     // 1. compute expected output tensor shape
                     const { OutputHeight, OutputWidth } = calculateTensorShape(input.length, input[0].length, weights[0].length, weights[0][0].length, weights[0][0][0].length, current_layer.strides, current_layer.padding);
 
@@ -302,74 +302,90 @@ class Layers {
                     };
                 },
 
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights) => {
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations) => {
 
-                    let input = next_delta
+                    let input = next_delta;
                     let kernels = weights;
-
-                    if (!Array.isArray(input[0][0])) {
+                    
                         
+                        // If this is the input to the first convolutional layer, stop here
+                    if (layer_index == 0) {
+                        const current_Z = StackFeatureMaps(zs[layer_index]);
+                        const inputH = current_Z.length;
+                        const inputW = current_Z[0].length;
 
-                        const feature_maps = zs[layer_index];
+                        kernels = weights[layer_index];
+                        input = toTensor(input, [activations[layer_index].length, activations[layer_index][0].length, activations[layer_index][0][0].length]);
+                        const KH = kernels[0].length;
+                        const KW = kernels[0][0].length;
+                        // dilate the input
+                        const dilated_input = DilateInput(input, strides);
 
-                        const filters = feature_maps.length;
-                        const [H, W, D] = [
-                            feature_maps[0].length,
-                            feature_maps[0][0].length,
-                            feature_maps[0][0][0].length
-                        ];
+                        // apply padding
+                        const padH = KH - 1 + 1;
+                        const padW = KW - 1 + 1;
+                        const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        const flatten_delta = DeltaMatMul(next_weights, input);
-                        
-                        const reshapeFeatureMaps = [];
-                        let idx = 0;
-                        for (let f = 0; f < filters; f++) {
-                            const feature_map = [];
-                            for (let h = 0; h < H; h++) {
-                                let row = [];
-                                for (let w = 0; w < W; w++) {
-                                    let depthArr = [];
-                                    for (let d = 0; d < D; d++) {
-                                        depthArr.push(flatten_delta[idx++]);
-                                    }
-                                    row.push(depthArr);
-                                }
-                                feature_map.push(row);
-                            }
-                            reshapeFeatureMaps.push(feature_map);
-                        }
+                        // console.log(`Layer ${layer_index+1}`);
+                        // console.log('kernel shape', kernels.length, kernels[0].length, kernels[0][0].length, kernels[0][0][0].length);
+                        // console.log('Padded dilated delta shape', padded_dilated_input.length, padded_dilated_input[0].length, padded_dilated_input[0][0].length);
+                        // console.log(`Input Height: ${inputH}, Input width: ${inputW}, Input depth: ${input[0][0].length}`);
 
-                        input = StackFeatureMaps(reshapeFeatureMaps);
-                        kernels = weights[layer_index+1]
-                    }
-
-                    // If this is the input to the first convolutional layer, stop here
-                    if (layer_index === 0) {
-                        kernels = weights[layer_index]
-
-                        const output = ConvolveDelta(input, kernels);
-                        
-                        const deltaConv = StackFeatureMaps(output);
-                        
+                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
+                        //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, deltaConv.length, deltaConv[0].length, deltaConv[0][0].length, '\n');
+                    
                         return {
                             current_delta: deltaConv,
                             decrementor_value: 1
                         };
                     }
-                    
-                    kernels = weights[layer_index]
-                    const output = ConvolveDelta(input, kernels)
-                    const z = StackFeatureMaps(zs[layer_index]); // Z of this conv layer
-                    
+
+                    const current_Z = StackFeatureMaps(zs[layer_index-1]);
+
+                    if (!Array.isArray(input[0][0])) {
+
+                        const [H, W, D] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
+
+                        const flatten_delta = DeltaMatMul(next_weights, input);
+                        
+                        // reshape the flattened_Delta
+                        input = toTensor(flatten_delta, [H, W, D]);
+
+                    }
+
+                    const inputH = current_Z.length;
+                    const inputW = current_Z[0].length;
+
+                    kernels = weights[layer_index];
+
+                    const KH = kernels[0].length;
+                    const KW = kernels[0][0].length;
+                    // dilate the input
+                    const dilated_input = DilateInput(input, strides);
+
+                    // apply padding
+                    const padH = KH - 1 + 1;
+                    const padW = KW - 1 + 1;
+                    const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
+
+                    // console.log(`Layer ${layer_index+1}`);
+                    // console.log('kernel shape', kernels.length, kernels[0].length, kernels[0][0].length, kernels[0][0][0].length);
+                    // console.log('Padded dilated delta shape', padded_dilated_input.length, padded_dilated_input[0].length, padded_dilated_input[0][0].length);
+                    // console.log(`Input Height: ${inputH}, Input width: ${inputW}`);
+                
+                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
+
+                    const z = current_Z;
+
                     const dActivation = activation.derivatives[function_name];
 
                     // apply the derivative activation function for all zs
                     const dAct_Z = z.map(row => row.map(cell => dActivation(cell)));
-                    const deltaConv = StackFeatureMaps(output);
-
 
                     // multiply input x dAct_Z
                     const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
+
+                    //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, outputDelta.length, outputDelta[0].length, outputDelta[0][0].length, '\n');
 
                     return {
                         current_delta: outputDelta,
