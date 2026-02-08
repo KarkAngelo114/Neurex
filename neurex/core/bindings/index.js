@@ -154,44 +154,63 @@ function rotateKernels(kernels) {
  * @param {Number} inputW - The width of the input from the forward pass we are trying to reach.
  * @returns {Array} 3D Tensor [inputH][inputW][Channels]
  */
-function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW) {
+function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW, layerIdx) {
     const F  = kernels.length;
     const KH = kernels[0].length;
     const KW = kernels[0][0].length;
     const D  = kernels[0][0][0].length;
 
+    if (padded_dilated_delta.flat(Infinity).some(isNaN)) console.log(`layer ${layerIdx} has NaNs on it's padded_dilated_delta`)
+
 
     const rotated = rotateKernels(kernels);
 
-    //console.log('Inside convolve delta');
-    //console.log('Padded dilated delta shape:', padded_dilated_delta.length, padded_dilated_delta[0].length, padded_dilated_delta[0][0].length);
-    //console.log('Kernel shape:', rotated.length, rotated[0].length, rotated[0][0].length, rotated[0][0][0].length);
-    //console.log('Expected output height and width:', inputH, inputW);    
-    // Initialize the output delta: [Height][Width][Depth/Channels]
-    const deltaX = Array.from({ length: inputH }, () =>
+    let delta = Array.from({ length: inputH }, () =>
         Array.from({ length: inputW }, () =>
-            Array(D).fill(0.0)
+            Array(D).fill(0)
         )
     );
 
-    // Standard valid convolution:
-    // We slide over the padded_dilated_delta to produce an output of size [inputH][inputW]
-    for (let i = 0; i < inputH; i++) {
-        for (let j = 0; j < inputW; j++) {
-            for (let d = 0; d < D; d++) { // For each input channel
-                let sum = 0.0;
-                for (let f = 0; f < F; f++) { // Sum across all filters
+    // For each channel in input
+    for (let d = 0; d < D; d++) {
+        for (let h = 0; h < inputH; h++) {
+            for (let w = 0; w < inputW; w++) {
+                let sum = 0;
+                // For each filter
+                for (let f = 0; f < F; f++) {
+                    const kernel = rotated[f];
+                    // Convolve kernel with padded_dilated_delta
                     for (let kh = 0; kh < KH; kh++) {
                         for (let kw = 0; kw < KW; kw++) {
-                            sum += padded_dilated_delta[i + kh][j + kw][f] * rotated[f][kh][kw][d];
+                            // Calculate the position in padded_dilated_delta
+                            const ph = h + kh;
+                            const pw = w + kw;
+                            let a = 0;
+                            if (
+                                ph >= 0 && ph < padded_dilated_delta.length &&
+                                pw >= 0 && pw < padded_dilated_delta[0].length &&
+                                f >= 0 && f < padded_dilated_delta[0][0].length
+                            ) {
+                                a = padded_dilated_delta[ph][pw][f];
+                                if (a === undefined || isNaN(a)) {
+                                    a = 0;
+                                };
+                            }
+                            const b = kernel[kh][kw][d];
+                            if (b === undefined || isNaN(b)) {
+                                console.warn(`NaN or undefined detected in kernel: b=${b}, kh=${kh}, kw=${kw}, d=${d}`);
+                                continue;
+                            }
+                            sum += a * b;
                         }
                     }
                 }
-                deltaX[i][j][d] = sum;
+                delta[h][w][d] = sum;
             }
         }
     }
-    return deltaX;
+
+    return delta;
 }
 
 // const ConvolveDelta = (delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW) => addon.ConvolveDelta(delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW);
@@ -206,6 +225,11 @@ function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW) {
  * @returns 
  */
 const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrads, layer_data, allDeltas, layer_index) => {
+    if (activated_outputs.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "activated_outpus" has NaNs. If this error occured, please report this error`);
+    if (delta.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "delta" has NaNs. If this error occured, please report this error`); 
+    if (weightGrads.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "weightGrads" has NaNs. If this error occured, please report this error`); 
+
+
     if (layer_name === "convolutional2D") {
     
         // const output = addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads, 1);

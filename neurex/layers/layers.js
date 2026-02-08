@@ -303,7 +303,7 @@ class Layers {
                 },
 
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations) => {
-
+                
                     let input = next_delta;
                     let kernels = weights;
                     
@@ -332,6 +332,7 @@ class Layers {
                         // console.log(`Input Height: ${inputH}, Input width: ${inputW}, Input depth: ${input[0][0].length}`);
 
                         const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
+
                         //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, deltaConv.length, deltaConv[0].length, deltaConv[0][0].length, '\n');
                     
                         return {
@@ -361,6 +362,11 @@ class Layers {
                     const KH = kernels[0].length;
                     const KW = kernels[0][0].length;
                     // dilate the input
+
+                    // if (input.flat(Infinity).some(isNaN)) {
+                    //     console.log(`Input already has NaNs at layer ${layer_index+1}`);
+                    // }
+
                     const dilated_input = DilateInput(input, strides);
 
                     // apply padding
@@ -373,7 +379,19 @@ class Layers {
                     // console.log('Padded dilated delta shape', padded_dilated_input.length, padded_dilated_input[0].length, padded_dilated_input[0][0].length);
                     // console.log(`Input Height: ${inputH}, Input width: ${inputW}`);
                 
-                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
+                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1);
+                    // if (dilated_input.flat(Infinity).some(isNaN)) console.log(`dilated_input conv already has NaNs in layer ${layer_index+1}`);
+                    // if (padded_dilated_input.flat(Infinity).some(isNaN)) console.log(`padded_dilated_input already has NaNs in layer ${layer_index+1}`);
+                    // if (deltaConv.flat(Infinity).some(isNaN)) console.log(`output delta conv already has NaNs in layer ${layer_index+1}\n`);
+
+                    // const flattened = padded_dilated_input.flat(Infinity);
+
+                    // if (flattened.some(isNaN)) {
+                    //     console.log("There are NaN's in padded_dilated_input delta input after reshaping and convolving at",layer_index+1);
+                    //     throw new Error();
+                    // }
+
+                    if (deltaConv.flat(Infinity).some(isNaN)) throw new Error(`Layer ${layer_index+1} has NaNs after delta convolution`)
 
                     const z = current_Z;
 

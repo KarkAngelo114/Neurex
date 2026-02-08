@@ -179,6 +179,8 @@ class Neurex {
         console.log("Total layers: " + this.num_layers);
         console.log("Total Learnable parameters:",parseInt(total_weights+total_biases));
         console.log("===============================================================");
+
+        if (this.weightGrads.flat(Infinity).some(isNaN)) throw new Error('There are NaNs on weight grads');
         
     }
 
@@ -406,6 +408,7 @@ class Neurex {
                     // let biasGrads = this.biases.map(layer => layer.map(() => 0));
 
                     let weightGrads = this.weightGrads;
+
                     let biasGrads = this.biasGrads;
 
 
@@ -465,6 +468,15 @@ class Neurex {
                         for (let l = 0; l < this.num_layers; l++) {
                             const delta = allDeltas[l];
                             const a_prev = activations[l];
+
+                            if (weightGrads[l].flat(Infinity).some(isNaN)) {
+                                console.log(`Weight grads for layer ${l+1}`,weightGrads[l][0]);
+
+                                this.weightGrads[l].flat(Infinity).forEach(w => console.log(w))
+                                throw new Error(`Error occured when computing weight gradients on layer ${l+1}: "${this.layers[l].layer_name}". Reason: "weightGrads" has NaNs. If this error occured, please report this error`); 
+                            }
+
+                            throw new Error();
 
                             // console.log(`Delta for layer ${l}`,delta);
                             // console.log(`Activated outputs for layer ${l}`, a_prev);
@@ -693,23 +705,33 @@ class Neurex {
                     this.weights.push(kernels);
 
                     // initialize kernels grads
-                    let kernelsGrads = [];
-                    for (let numFilters = 0; numFilters < filters; numFilters++) {
-                        let rows = [];
-                        for (let height = 0; height < kernelHeight; height++) {
-                            let row_element = [];
-                            for (let width = 0; width < kernelWidth; width++) {
-                                let depth_elements = [];
-                                for (let num_depth_elements = 0; num_depth_elements < depth; num_depth_elements++) {
-                                    depth_elements.push(0);
-                                }
-                                row_element.push(depth_elements);
-                            }
-                            rows.push(row_element);
-                        }
-                        kernelsGrads.push(rows);
-                    }
-                    this.weightGrads.push(kernelsGrads);
+                    // let kernelsGrads = [];
+                    // for (let numFilters = 0; numFilters < filters; numFilters++) {
+                    //     let grad_rows = [];
+                    //     for (let height = 0; height < kernelHeight; height++) {
+                    //         let grad_row_element = [];
+                    //         for (let width = 0; width < kernelWidth; width++) {
+                    //             let grad_depth_elements = [];
+                    //             for (let num_depth_elements = 0; num_depth_elements < depth; num_depth_elements++) {
+                    //                 grad_depth_elements.push(0);
+                    //             }
+                    //             grad_row_element.push(grad_depth_elements);
+                    //         }
+                    //         grad_rows.push(grad_row_element);
+                    //     }
+                    //     kernelsGrads.push(grad_rows);
+                    // }
+                    // this.weightGrads.push(kernelsGrads);
+
+                    let kernelGrads = Array.from({length: filters}, 
+                        () => Array.from({length: kernelHeight},
+                            () => Array.from({length: kernelWidth}, 
+                                () => Array.from({length: depth}).fill(0)
+                            )
+                        )
+                    )
+
+                    this.weightGrads.push(kernelGrads)
 
                     // initialize bias for each kernel
                     let biases = [];
