@@ -8,6 +8,8 @@
  * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
  */
 const OneHotEncoded = (data) => {
+    console.log(data)
+
     if (!data) {
         throw new Error("[ERROR]------- No data is provided");
     }

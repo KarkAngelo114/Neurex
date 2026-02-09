@@ -426,6 +426,15 @@ declare module 'neurex' {
      */
     export function toTensor(input: number[], shape: number[]): number[][][][];
 
+    /**
+    * @function load_images_from_directory
+    * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+    * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
+    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @returns datasets and labels array that can be use to train
+    */
+    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String): object;
+
 
     /**
     * 
@@ -474,15 +483,6 @@ declare module 'neurex' {
          *
          */
         convolutional2D(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
-        
-        /**
-        * 
-        *
-        @method flatten()  
-        Flattens the output of the last convolutional layer into a 1D array. This layer is crucial before connecting to fully connected layers as
-        it bridges the gap between feature extraction part of your network and the connected layers.
-        */
-        flatten(): object;
         
     }
 }

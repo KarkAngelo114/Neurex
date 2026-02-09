@@ -18,6 +18,7 @@ const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
 const {toTensor} = require('./preprocessor/reshaper');
+const { load_images_from_directory } = require('./preprocessor/imagery');
 
 module.exports= {
     Neurex,
@@ -31,5 +32,6 @@ module.exports= {
     split_dataset,
     RegressionMetrics,
     ClassificationMetrics,
-    toTensor
+    toTensor,
+    load_images_from_directory
 }

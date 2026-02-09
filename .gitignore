@@ -13,6 +13,8 @@ CNN.js
 *.nrx
 .env
 iris.js
+mnist.js
 metadata.json
+test_dataset/
 
 
