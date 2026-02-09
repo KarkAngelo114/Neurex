@@ -110,7 +110,6 @@ const dlinear = (input) => addon.DLinear(input);
  * @returns array of 4D feature maps
  */
 const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth);
-
 /**
  * 
  * @param {Array<Array<Array<Array<Number>>>>} featureMaps 
@@ -118,6 +117,9 @@ const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth)
  */
 const StackFeatureMaps = (featureMaps) => addon.StackFeatureMaps(featureMaps);
 
+/// ======================================= ///
+
+// rotateKernels and ConvolveDelta() needs a native code with same functionality
 // Rotates each kernel by 180 degrees
 function rotateKernels(kernels) {
     const F  = kernels.length;
@@ -213,8 +215,6 @@ function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW, layerIdx) 
     return delta;
 }
 
-// const ConvolveDelta = (delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW) => addon.ConvolveDelta(delta_feature_maps, kernels, strides, top, bottom, left, right, inputH, inputW);
-
 /**
  * 
  * @param {*} activated_outputs 
@@ -231,23 +231,19 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
 
 
     if (layer_name === "convolutional2D") {
-    
-        // const output = addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads, 1);
-        // return output
 
         if (layer_index == 0) return weightGrads;
     
-        return output = ComputeGradientForKernels(activated_outputs, delta, weightGrads);
-        // return weightGrads
+        return ComputeGradientForKernels(activated_outputs, delta, weightGrads);
     }
     else if (layer_name === "connected_layer") {
         let input = activated_outputs;
         if (Array.isArray(activated_outputs[0] || Array.isArray(activated_outputs[0][0]))) {
             input = activated_outputs.flat(Infinity);
         }
-        //console.log(allDeltas[layer_index-1])
-        const output = addon.ComputeGradientForDenseWeights(input, delta, weightGrads);
-        return output
+
+        return addon.ComputeGradientForDenseWeights(input, delta, weightGrads);
+
     }
 
     else {
@@ -255,40 +251,107 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
     }
 }
 
-// need to write a native binding for this
-const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, stride = 1) => {
+/**
+ * 
+ * @param {*} biasGrads 
+ * @param {*} delta 
+ * @param {*} layer_name 
+ * @returns 
+ */
+const computeBiasGradients = (biasGrads, delta, layer_name) => {
+
+    if (layer_name === "connected_layer") {
+        return ComputeGradientsForDenseBiases(biasGrads, delta);
+    }
+    else if (layer_name === "convolutional2D") {
+        return ComputeGradientsForConvBiases(biasGrads, delta);
+    }
+}
+
+// need to write a native binding for this but for testing, we implement it for now in plain JS
+const ComputeGradientForKernels = (activated_outputs, delta, weightGrads) => {
     const filters = weightGrads.length;
     const kernel_height = weightGrads[0].length;
     const kernel_width = weightGrads[0][0].length;
     const channels = weightGrads[0][0][0].length;
 
-    // Create a zero-initialized gradient accumulator
-    let output_grad = weightGrads.map(f =>
-        f.map(kh =>
-            kh.map(kw =>
-                kw.slice()
+    // Output spatial dimensions
+    const out_height = delta.length;
+    const out_width = delta[0].length;
+
+    // Zero-initialized gradient accumulator
+    let output_grad = Array.from({ length: filters }, () =>
+        Array.from({ length: kernel_height }, () =>
+            Array.from({ length: kernel_width }, () =>
+                Array(channels).fill(0)
             )
         )
     );
 
+    // Accumulate gradients with robust checks
     for (let f = 0; f < filters; f++) {
-        for (let c = 0; c < channels; c++) {
-            for (let kh = 0; kh < kernel_height; kh++) {
-                for (let kw = 0; kw < kernel_width; kw++) {
+        for (let kh = 0; kh < kernel_height; kh++) {
+            for (let kw = 0; kw < kernel_width; kw++) {
+                for (let c = 0; c < channels; c++) {
                     let grad = 0;
-                    for (let i = 0; i <= activated_outputs.length - kernel_height; i += stride) {
-                        for (let j = 0; j <= activated_outputs[0].length - kernel_width; j += stride) {
-                            grad += activated_outputs[i + kh][j + kw][c] * delta[i][j][f];
+                    for (let i = 0; i < out_height; i++) {
+                        for (let j = 0; j < out_width; j++) {
+                            const input_i = i + kh;
+                            const input_j = j + kw;
+                            let a = 0, b = 0;
+                            if (
+                                input_i >= 0 && input_i < activated_outputs.length &&
+                                input_j >= 0 && input_j < activated_outputs[0].length
+                            ) {
+                                const valA = activated_outputs[input_i][input_j] && activated_outputs[input_i][input_j][c];
+                                a = (typeof valA === 'number' && !isNaN(valA)) ? valA : 0;
+                            }
+                            if (
+                                delta[i] && delta[i][j] && typeof delta[i][j][f] === 'number' && !isNaN(delta[i][j][f])
+                            ) {
+                                b = delta[i][j][f];
+                            }
+                            grad += a * b;
                         }
                     }
-                    output_grad[f][kh][kw][c] += grad;
+                    output_grad[f][kh][kw][c] = grad;
                 }
             }
         }
     }
+
+
+    if (output_grad.flat(Infinity).some(isNaN)) throw new Error('Error on gradient accumulator. Contains NaNs')
+
     return output_grad;
 };
 
+// need to write a native binding for this but for testing, we implement it for now in plain JS
+const ComputeGradientsForDenseBiases = (biasGrads, delta) => {
+
+    let output_grad = biasGrads;
+    for (let j = 0; j < biasGrads.length; j++) {
+        output_grad[j] += delta[j];
+    }
+
+    return output_grad;
+}
+
+const ComputeGradientsForConvBiases = (biasGrads, delta) => {
+
+    const output_grad = biasGrads;
+
+    for (let f = 0; f < biasGrads.length; f++) {
+        for (let h = 0; h < delta.length; h++) {
+            for (let w = 0; w < delta[0].length; w++) {
+                biasGrads[f] += delta[h][w][f];
+            }
+        }
+    }
+
+
+    return output_grad;
+}
 
 module.exports = {
     MatMul,
@@ -302,6 +365,7 @@ module.exports = {
     StackFeatureMaps,
     ConvolveDelta,
     computeWeightGradients,
+    computeBiasGradients,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

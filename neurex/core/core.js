@@ -17,7 +17,7 @@ const { scaleGradients} = require('../internals/gradientKernels');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
-const { computeWeightGradients } = require('../core/bindings');
+const { computeWeightGradients, computeBiasGradients } = require('../core/bindings');
 const { getShape, flattenAll, calculateTensorShape } = require('../utils');
 
 
@@ -469,26 +469,12 @@ class Neurex {
                             const delta = allDeltas[l];
                             const a_prev = activations[l];
 
-                            if (weightGrads[l].flat(Infinity).some(isNaN)) {
-                                console.log(`Weight grads for layer ${l+1}`,weightGrads[l][0]);
-
-                                this.weightGrads[l].flat(Infinity).forEach(w => console.log(w))
-                                throw new Error(`Error occured when computing weight gradients on layer ${l+1}: "${this.layers[l].layer_name}". Reason: "weightGrads" has NaNs. If this error occured, please report this error`); 
-                            }
-
-                            throw new Error();
-
-                            // console.log(`Delta for layer ${l}`,delta);
-                            // console.log(`Activated outputs for layer ${l}`, a_prev);
-                            // console.log(`Weight grads for layer ${l}`,weightGrads[l]);
-
-                            // compute for weight gradients
+                            // Accumulate weight gradients
                             weightGrads[l] = computeWeightGradients(a_prev, delta, this.layers[l].layer_name, weightGrads[l], this.layers[l], allDeltas, l);
 
                             // Accumulate bias gradients
-                            for (let j = 0; j < biasGrads[l].length; j++) {
-                                biasGrads[l][j] += delta[j];
-                            }
+                            biasGrads[l] = computeBiasGradients(biasGrads[l], delta, this.layers[l].layer_name);
+
                         }
                     }
 
@@ -497,8 +483,6 @@ class Neurex {
 
                     const flattenWeightGrads = flattenAll(this.weightGrads);
                     const flattenWeights = flattenAll(this.weights);
-
-                    // throw new Error('Stopping');
 
                     // Divide accumulated gradients by the actual batch size
                     for (let l = 0; l < this.num_layers; l++) {
@@ -525,15 +509,16 @@ class Neurex {
                                 this.optimizerStates.weights[l],
                                 this.learning_rate
                             );
-                            // Update biases
-                            this.optimizerStates.biases[l] = optimizerFn(
-                                this.onGPU,
-                                this.biases[l],
-                                biasGrads[l],
-                                this.optimizerStates.biases[l],
-                                this.learning_rate
-                            );
                         }
+
+                        // Update biases
+                        this.optimizerStates.biases[l] = optimizerFn(
+                            this.onGPU,
+                            this.biases[l],
+                            biasGrads[l],
+                            this.optimizerStates.biases[l],
+                            this.learning_rate
+                        );
                         
                     }
 
@@ -703,25 +688,6 @@ class Neurex {
                         kernels.push(rows);
                     }
                     this.weights.push(kernels);
-
-                    // initialize kernels grads
-                    // let kernelsGrads = [];
-                    // for (let numFilters = 0; numFilters < filters; numFilters++) {
-                    //     let grad_rows = [];
-                    //     for (let height = 0; height < kernelHeight; height++) {
-                    //         let grad_row_element = [];
-                    //         for (let width = 0; width < kernelWidth; width++) {
-                    //             let grad_depth_elements = [];
-                    //             for (let num_depth_elements = 0; num_depth_elements < depth; num_depth_elements++) {
-                    //                 grad_depth_elements.push(0);
-                    //             }
-                    //             grad_row_element.push(grad_depth_elements);
-                    //         }
-                    //         grad_rows.push(grad_row_element);
-                    //     }
-                    //     kernelsGrads.push(grad_rows);
-                    // }
-                    // this.weightGrads.push(kernelsGrads);
 
                     let kernelGrads = Array.from({length: filters}, 
                         () => Array.from({length: kernelHeight},
