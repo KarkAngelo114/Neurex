@@ -252,6 +252,13 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
 }
 
 
+/**
+ * 
+ * @param {*} weightGrads 
+ * @param {*} actualBatchSize 
+ * @param {*} layer_name 
+ * @returns 
+ */
 const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
     
     if (layer_name === "connected_layer") {
@@ -261,7 +268,6 @@ const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
     }
     
     if (layer_name === "convolutional2D") {
-        //console.log(scaleGradientWeightsForConv(weightGrads, actualBatchSize)[0])
         return scaleGradientWeightsForConv(weightGrads, actualBatchSize);
     }
 
@@ -285,6 +291,17 @@ const computeBiasGradients = (biasGrads, delta, layer_name) => {
     else if (layer_name === "convolutional2D") {
         return ComputeGradientsForConvBiases(biasGrads, delta);
     }
+}
+
+/**
+ * 
+ * @param {*} grad 
+ * @param {*} scalar 
+ * @returns 
+ */
+const scaleGradientsForBiases = (grad, scalar) => {
+
+    return grad.map(v => v / scalar);
 }
 
 // need to write a native binding for this but for testing, we implement it for now in plain JS
@@ -363,7 +380,9 @@ const ComputeGradientsForConvBiases = (biasGrads, delta) => {
     for (let f = 0; f < biasGrads.length; f++) {
         for (let h = 0; h < delta.length; h++) {
             for (let w = 0; w < delta[0].length; w++) {
-                biasGrads[f] += delta[h][w][f];
+                for (let d = 0; d < f; d++) {
+                    biasGrads[f] += delta[h][w][d];
+                }
             }
         }
     }
@@ -405,10 +424,7 @@ const scaleGradientWeightsForConv = (weightGrads, actualBatchSize) => {
     return scaled_kernels;
 }
 
-// need to write a native binding for this but for testing, we implement it for now in plain JS
-const scaleGradientsForBiases = (grad, scalar) => {
-    return grad.map(v => v / scalar);
-}
+
 
 
 module.exports = {

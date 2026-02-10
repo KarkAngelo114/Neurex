@@ -270,26 +270,8 @@ class Neurex {
     }
 
     /**
-    * @method load_images_from_directory
-    * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
-    * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
-    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @returns datasets and labels array that can be use to train
-    */
-    async load_images_from_directoryV2(targetDir, resize = [28, 28], pixelFormat = "grayscale") {
-        
-        const {datasets, labels} = await load_images_from_directory(targetDir, resize, pixelFormat)
-
-        return {
-            datasets: datasets,
-            labels: labels
-        }
-
-    }
-
-    /**
     * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
-    * * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
+    * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
     * computes the loss, backpropagates the error, and updates the weights and biases using gradient descent.
     *
     * @method train()

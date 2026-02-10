@@ -311,15 +311,6 @@ declare module 'neurex' {
         sequentialBuild(layer_data: any[]): void;
 
         /**
-        * @method load_images_from_directory
-        * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
-        * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
-        * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-        * @returns datasets and labels array that can be use to train
-        */
-        load_images_from_directoryV2(targetDir: String, resize: number[], pixelFormat: String): object;
-
-        /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
         *
@@ -440,7 +431,7 @@ declare module 'neurex' {
     * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
     * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @returns datasets and labels array that can be use to train
+    * @returns an object that contains the datasets, labels, and classes
     */
     export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String): object;
 

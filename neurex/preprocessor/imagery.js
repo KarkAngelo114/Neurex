@@ -8,7 +8,7 @@ const sharp = require('sharp');
  * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
  * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
  * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
- * @returns datasets and labels array that can be use to train
+ * @returns an object that contains the datasets, labels, and classes
  */
 const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFormat = "grayscale") => {
 
@@ -17,7 +17,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     const labels = []; // folder names where the image belongs to.
 
     try {
-        console.log(`${green}Loading datasets from ${targetDir} ${reset}`)
+        console.log(`\n${green}[Task]------- Loading datasets from "${targetDir}/" ${reset}`)
         const items = await fs.readdir(targetDir);
 
         // Only collect subdirectories (class names)
@@ -83,10 +83,13 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
         }
 
 
-        console.log(`${green}Successfully loaded datasets${reset}`);
+        console.log(`${green}[/]------- Successfully loaded datasets from "${targetDir}/"${reset}\n`);
+        console.log(`- Found ${subdirs.length} classes`);
+        console.log(`- Found ${datasets.length} items in total`);
         return {
             datasets: datasets,
-            labels: labels
+            labels: labels,
+            classes: subdirs
         }
     } catch (error) {
         console.error(`${red} Error occured in loading dataset: \n`, error, `${reset}`);
