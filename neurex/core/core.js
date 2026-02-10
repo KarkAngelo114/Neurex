@@ -13,11 +13,10 @@ import necessary modules
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
-const { scaleGradients} = require('../internals/gradientKernels');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
-const { computeWeightGradients, computeBiasGradients } = require('../core/bindings');
+const { computeWeightGradients, computeBiasGradients, scaleGradientsForWeights, scaleGradientsForBiases } = require('../core/bindings');
 const { getShape, flattenAll, calculateTensorShape } = require('../utils');
 const { load_images_from_directory } = require('../preprocessor/imagery');
 
@@ -517,13 +516,9 @@ class Neurex {
                     // Divide accumulated gradients by the actual batch size
                     for (let l = 0; l < this.num_layers; l++) {
 
-                        if (this.layers[l].layer_name === "connected_layer") {
+                        weightGrads[l] = scaleGradientsForWeights(weightGrads[l], actualBatchSize, this.layers[l].layer_name);
 
-                            for (let i = 0; i < weightGrads[l].length; i++) {
-                                weightGrads[l][i] = scaleGradients(this.onGPU, weightGrads[l][i], actualBatchSize);
-                            }
-                            biasGrads[l] = scaleGradients(this.onGPU, biasGrads[l], actualBatchSize);
-                        }
+                        biasGrads[l] = scaleGradientsForBiases(biasGrads[l], actualBatchSize);
                         
                     }
 
@@ -601,24 +596,7 @@ class Neurex {
                 throw new Error("\n[ERROR]-------No inputs")
             }
 
-            let inputTensor = input[0][0];
-
-            // if (Array.isArray(inputTensor)) {
-            //     const size = this.input_shape[0]*this.input_shape[1]*this.input_shape[2];
-            //     const height = inputTensor.length;
-            //     const width = inputTensor[0].length;
-            //     const depth = inputTensor[0][0].length;
-
-            //     if (size != (height*width*depth)) {
-            //         throw new Error(`[ERROR]------- Shape Mismatch | Input shape: (${height}, ${width}, ${depth}) | Expecting: (${this.input_shape[0]}, ${this.input_shape[1]}, ${this.input_shape[2]})`);
-            //     }
-            // }
-            // else {
-            //     if (input[0].length != this.input_size) {
-            //         throw new Error(`\n[ERROR]-------Shape Mismatch | Input shape length: ${input[0].length} | Expecting ${this.input_size}`);
-            //     }
-            // }
-            
+            let inputTensor = input[0][0];            
 
             let outputs = [];
             for (let sample_index = 0; sample_index < input.length; sample_index++) {
@@ -811,11 +789,6 @@ class Neurex {
         let deltas = deltas_array;
         let delta_indexer = this.num_layers - 2;
         for (let layer_index = delta_indexer; layer_index >= 0; layer_index--) {
-            // inline condition to check what layer need to get it's weights.
-            // when initializing weights, flatten layer has initialized weights and biases, but all are 0s. So we neeed to skip it because if we
-            // don't, the convolutional layer will get wrong kernels (weights)
-            
-            //const next_weights = this.weights[this.layers[layer_index].layer_name === "convolutional2D" ? delta_indexer : delta_indexer+1];
             
             const next_weights = this.weights[layer_index + 1]
             const next_delta = deltas[layer_index + 1];
@@ -837,39 +810,6 @@ class Neurex {
 
         return deltas;
     }
-    // #backpropagation(activations, zs, deltas) {
-        
-    //     console.log('Backprop');
-    //     for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
-
-    //         const currentLayer = this.layers[layer_index];
-
-    //         const next_delta = deltas[layer_index + 1];
-    //         const next_weights = this.weights[layer_index + 1];
-
-    //         console.log(
-    //             "Backprop at layer:",
-    //             currentLayer.layer_name,
-    //             "next_delta length:",
-    //             next_delta.length
-    //         );
-
-    //         const { current_delta } =
-    //             currentLayer.backpropagate(
-    //                 this.onGPU,
-    //                 next_weights,
-    //                 next_delta,
-    //                 zs,
-    //                 layer_index,
-    //                 currentLayer,
-    //                 activations
-    //             );
-
-    //         deltas[layer_index] = current_delta;
-    //     }
-
-    //     return deltas;
-    // }
 
 
     // forward propagation

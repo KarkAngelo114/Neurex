@@ -251,6 +251,25 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
     }
 }
 
+
+const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
+    
+    if (layer_name === "connected_layer") {
+
+        return scaleGradientWeightsForConnectedLayer(weightGrads, actualBatchSize);
+
+    }
+    
+    if (layer_name === "convolutional2D") {
+        //console.log(scaleGradientWeightsForConv(weightGrads, actualBatchSize)[0])
+        return scaleGradientWeightsForConv(weightGrads, actualBatchSize);
+    }
+
+    else {
+        return weightGrads;
+    }
+}
+
 /**
  * 
  * @param {*} biasGrads 
@@ -304,7 +323,7 @@ const ComputeGradientForKernels = (activated_outputs, delta, weightGrads) => {
                                 input_j >= 0 && input_j < activated_outputs[0].length
                             ) {
                                 const valA = activated_outputs[input_i][input_j] && activated_outputs[input_i][input_j][c];
-                                a = (typeof valA === 'number' && !isNaN(valA)) ? valA : 0;
+                                a = (typeof valA === 'number' && !isNaN(valA)) ? valA : Math.random();
                             }
                             if (
                                 delta[i] && delta[i][j] && typeof delta[i][j][f] === 'number' && !isNaN(delta[i][j][f])
@@ -322,7 +341,6 @@ const ComputeGradientForKernels = (activated_outputs, delta, weightGrads) => {
 
 
     if (output_grad.flat(Infinity).some(isNaN)) throw new Error('Error on gradient accumulator. Contains NaNs')
-
     return output_grad;
 };
 
@@ -337,6 +355,7 @@ const ComputeGradientsForDenseBiases = (biasGrads, delta) => {
     return output_grad;
 }
 
+// need to write a native binding for this but for testing, we implement it for now in plain JS
 const ComputeGradientsForConvBiases = (biasGrads, delta) => {
 
     const output_grad = biasGrads;
@@ -349,9 +368,48 @@ const ComputeGradientsForConvBiases = (biasGrads, delta) => {
         }
     }
 
-
     return output_grad;
 }
+
+// need to write a native binding for this but for testing, we implement it for now in plain JS
+const scaleGradientWeightsForConnectedLayer = (weightGrads, actualBatchSize) => {
+
+    const scaled_output = weightGrads;
+
+    for (let i = 0; i < weightGrads.length; i++) {
+       
+        for (let j = 0; j < weightGrads[i].length; j++) {
+            scaled_output[i][j] /= actualBatchSize;
+        }
+    }   
+
+    return scaled_output;
+
+}
+
+// need to write a native binding for this but for testing, we implement it for now in plain JS
+const scaleGradientWeightsForConv = (weightGrads, actualBatchSize) => {
+
+    const scaled_kernels = weightGrads;
+
+    for (let f = 0; f < weightGrads.length; f++) {
+        for (let kh = 0; kh < weightGrads[0].length; kh++) {
+            for (let kw = 0; kw <  weightGrads[0][0].length; kw++) {
+                for (let d = 0; d < weightGrads[0][0][0].length; d++) {
+                    scaled_kernels[f][kh][kw][d] /= actualBatchSize;
+                }
+            }
+        }
+    }
+
+    return scaled_kernels;
+}
+
+// need to write a native binding for this but for testing, we implement it for now in plain JS
+const scaleGradientsForBiases = (grad, scalar) => {
+    return grad.map(v => v / scalar);
+}
+
 
 module.exports = {
     MatMul,
@@ -366,6 +424,8 @@ module.exports = {
     ConvolveDelta,
     computeWeightGradients,
     computeBiasGradients,
+    scaleGradientsForWeights,
+    scaleGradientsForBiases,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,
