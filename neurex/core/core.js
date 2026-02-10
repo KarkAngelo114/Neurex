@@ -405,6 +405,7 @@ class Neurex {
             console.log("\n[TASK]------- Training session is starting\n");
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
+            let logMessage;
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
                 let totalepochLoss = 0;
@@ -438,6 +439,8 @@ class Neurex {
 
 
                     let batchLoss = 0;
+
+                    
 
                     // Accumulate gradients for each sample in the batch
                     for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
@@ -505,11 +508,8 @@ class Neurex {
 
                     batchLoss /= actualBatchSize;
                     totalepochLoss += batchLoss;
-                    process.stdout.write(
-                        `\r[Epoch] ${current_epoch + 1}/${epoch} ` +
-                        `| [Batch] ${currentBatch}/${totalBatches} ` +
-                        `| Loss: ${batchLoss.toFixed(6)}`
-                    );
+                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| Batch Loss: ${batchLoss.toFixed(6)} `
+                    process.stdout.write(`\r`+logMessage);
 
                     const flattenWeightGrads = flattenAll(this.weightGrads);
                     const flattenWeights = flattenAll(this.weights);
@@ -560,7 +560,7 @@ class Neurex {
                                 AverageEpochLoss > 0.04 ? color.yellow :
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
                 
-                let logMessage = `[Epoch] ${current_epoch+1}/${epoch} | [Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
+                logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
                 if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                     let epochPredictions = [];
@@ -576,8 +576,8 @@ class Neurex {
 
                     logMessage += ` | [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
                 }
-                process.stdout.write('\n');
-                console.log(logMessage);
+                process.stdout.write('\r'+logMessage);
+                console.log();
             }
             
         }
