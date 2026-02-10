@@ -19,6 +19,7 @@ const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
 const { computeWeightGradients, computeBiasGradients } = require('../core/bindings');
 const { getShape, flattenAll, calculateTensorShape } = require('../utils');
+const { load_images_from_directory } = require('../preprocessor/imagery');
 
 
 
@@ -267,7 +268,23 @@ class Neurex {
         catch(err) {
             console.error(err);
         }
+    }
+
+    /**
+    * @method load_images_from_directory
+    * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+    * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
+    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @returns datasets and labels array that can be use to train
+    */
+    async load_images_from_directoryV2(targetDir, resize = [28, 28], pixelFormat = "grayscale") {
         
+        const {datasets, labels} = await load_images_from_directory(targetDir, resize, pixelFormat)
+
+        return {
+            datasets: datasets,
+            labels: labels
+        }
 
     }
 
@@ -303,7 +320,7 @@ class Neurex {
     * * After training, you can use the network for predictions
     */
 
-    train(trainX, trainY, loss, epoch, batch_size) {
+    async train(trainX, trainY, loss, epoch, batch_size) {
 
         const lastLayerObject = this.layers[this.layers.length - 1];
         this.output_size = lastLayerObject.layer_size;
@@ -317,6 +334,12 @@ class Neurex {
         try {
             if (!trainX || !trainY || !loss) {
                 this.isfailed = true;
+                console.error(`\n${color.red}Error${color.reset}`);
+                console.log(`Train X: ${trainX ? "has data" : "no data"}`);
+                console.log(`Train Y: ${trainY ? "has data" : "no data"}`);
+                console.log(`Loss: ${loss ? "specified" : "not specified"}`);
+                console.log(`Epoch: ${epoch ? "specified" : "not specified"}`);
+                console.log(`Batch Size: ${batch_size ? "specified" : "not specified"}`);
                 throw new Error(`[FAILED]------- There is/are missing parameter/s. Failed to start training...`);
             }
 
@@ -413,6 +436,7 @@ class Neurex {
 
 
                     let batchLoss = 0;
+                    let batch_incrementor = 1;
 
                     // Accumulate gradients for each sample in the batch
                     for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
@@ -530,7 +554,7 @@ class Neurex {
                                 AverageEpochLoss > 0.04 ? color.yellow :
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
                 
-                let logMessage = `[Epoch] ${current_epoch+1}/${epoch} | [Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
+                let logMessage = `[Epoch] ${current_epoch+1}/${epoch} | Batch: ${batch_incrementor}/${batch_size}| [Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
                 if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                     let epochPredictions = [];

@@ -74,7 +74,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
                             tensor.push(row);
                         }
                         datasets.push(tensor);
-                        labels.push(className);
+                        labels.push([className]);
                     } catch (imgErr) {
                         console.error(`${red} Error processing image: ${imgPath}\n`, imgErr, `${reset}`);
                     }

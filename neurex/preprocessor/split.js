@@ -5,7 +5,7 @@
  * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
  * @returns {object} {X_train, Y_train, X_test, Y_test}
  */
-const split_dataset = (X, Y, split_ratio) => {
+const split_dataset = async (X, Y, split_ratio) => {
     // Ensure X and Y have the same number of samples
     if (X.length !== Y.length) {
         throw new Error("X and Y must have the same number of samples.");

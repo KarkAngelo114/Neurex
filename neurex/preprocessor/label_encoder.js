@@ -7,9 +7,7 @@
  * @returns {Array<Array<Number>>} Returns One-hot encoded labels, suitable for categorical classification.
  * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
  */
-const OneHotEncoded = (data) => {
-    console.log(data)
-
+const OneHotEncoded = async (data) => {
     if (!data) {
         throw new Error("[ERROR]------- No data is provided");
     }
@@ -52,8 +50,8 @@ const OneHotEncoded = (data) => {
  * @returns {Array<Array<Number>} returns Intger-encoded labels. Which can be use for categorical classification, particularly when calculating sparse_categorical_cross_entropy
  * @throws {Error} - when no data is provided
  */
-const IntegerLabeling = (data) => {
-
+const IntegerLabeling = async (data) => {
+    
     if (!data) {
         throw new Error("[ERROR]------- no data is provided");
     }
@@ -82,7 +80,7 @@ const IntegerLabeling = (data) => {
  * @throws {Error} - when no data is provided or there are more than two classes
  */
 
-const BinaryLabeling = (data) => {
+const BinaryLabeling = async (data) => {
     if (!data || !Array.isArray(data)) {
         throw new Error("[ERROR] No data provided or data is not an array.");
     }
