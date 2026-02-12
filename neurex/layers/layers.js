@@ -326,11 +326,6 @@ class Layers {
                         const padW = KW - 1 + 1;
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        // console.log(`Layer ${layer_index+1}`);
-                        // console.log('kernel shape', kernels.length, kernels[0].length, kernels[0][0].length, kernels[0][0][0].length);
-                        // console.log('Padded dilated delta shape', padded_dilated_input.length, padded_dilated_input[0].length, padded_dilated_input[0][0].length);
-                        // console.log(`Input Height: ${inputH}, Input width: ${inputW}, Input depth: ${input[0][0].length}`);
-
                         const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
 
                         //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, deltaConv.length, deltaConv[0].length, deltaConv[0][0].length, '\n');
