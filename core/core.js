@@ -68,8 +68,8 @@ class Neurex {
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
-            weights: [], // Array of state objects for each layer's weights
-            biases: []   // Array of state objects for each layer's biases
+            weights: [],
+            biases: []
         };
 
         this.onGPU = false;
@@ -308,8 +308,8 @@ class Neurex {
 
         // Initialize optimizer state for each layer
         this.optimizerStates = {
-            weights: Array(this.num_layers).fill().map(() => ({})),
-            biases: Array(this.num_layers).fill().map(() => ({}))
+            weights: [],
+            biases: []
         };
 
         try {
@@ -489,7 +489,7 @@ class Neurex {
 
                     batchLoss /= actualBatchSize;
                     totalepochLoss += batchLoss;
-                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| Batch Loss: ${batchLoss.toFixed(6)} `
+                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Batch Loss]: ${batchLoss.toFixed(6)} `
                     process.stdout.write(`\r`+logMessage);
 
                     const flattenWeightGrads = flattenAll(this.weightGrads);
@@ -506,26 +506,13 @@ class Neurex {
 
 
                     for (let l = 0; l < this.num_layers; l++) {
-                        // Update weights
-
-                        if (this.layers[l].layer_name === "connected_layer") {
-                            this.optimizerStates.weights[l] = optimizerFn(
-                                this.onGPU,
-                                this.weights[l],
-                                weightGrads[l],
-                                this.optimizerStates.weights[l],
-                                this.learning_rate
-                            );
-                        }
-
-                        // Update biases
-                        this.optimizerStates.biases[l] = optimizerFn(
-                            this.onGPU,
-                            this.biases[l],
-                            biasGrads[l],
-                            this.optimizerStates.biases[l],
-                            this.learning_rate
-                        );
+                        // update Weights and biases
+                        const res1 = optimizerFn(this.weights[l], weightGrads[l], this.optimizerStates.weights[l], this.learning_rate);
+                        const res2 = optimizerFn(this.biases[l], biasGrads[l], this.optimizerStates.biases[l], this.learning_rate)
+                        this.weights[l] = res1.params;
+                        this.biases[l] = res2.params;
+                        this.optimizerStates.weights[l] = res1.state;
+                        this.optimizerStates.biases[l] = res2.state;
                         
                     }
 

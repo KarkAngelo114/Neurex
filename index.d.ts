@@ -279,6 +279,8 @@ declare module 'neurex' {
         *   optimizer: 'adam'
         *   randMin: -1
         *   randMax: 1
+        *
+        * Available optimizers: 'sgd'and 'adam'
         */
         configure(configs: object): void;
 

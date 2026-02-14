@@ -127,11 +127,45 @@ const DilateInput = (input, stride) => {
 
 }
 
+
+const reshape = (flatArray, shape) => {
+    const expectedSize = shape.reduce((a,b) => a*b, 1);
+
+    if (flatArray.length !== expectedSize) {
+        throw new Error(
+            `Reshape error: flat size ${flatArray.length} does not match shape product ${expectedSize}`
+        );
+    }
+
+    let index = 0;
+
+    const build = (dim) => {
+        const size = shape[dim];
+        const arr = new Array(size);
+
+        if (dim === shape.length - 1) {
+            for (let i = 0; i < size; i++) {
+                arr[i] = flatArray[index++];
+            }
+        } else {
+            for (let i = 0; i < size; i++) {
+                arr[i] = build(dim + 1);
+            }
+        }
+
+        return arr;
+    };
+
+    return build(0);
+};
+
+
 module.exports = {
     getShape,
     flattenAll,
     calculateTensorShape,
     applyPadding,
     getPaddingSizes,
-    DilateInput
+    DilateInput,
+    reshape
 }

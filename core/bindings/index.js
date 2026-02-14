@@ -225,9 +225,9 @@ function ConvolveDelta(padded_dilated_delta, kernels, inputH, inputW, layerIdx) 
  * @returns 
  */
 const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrads, layer_data, allDeltas, layer_index) => {
-    if (activated_outputs.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "activated_outpus" has NaNs. If this error occured, please report this error`);
-    if (delta.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "delta" has NaNs. If this error occured, please report this error`); 
-    if (weightGrads.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "weightGrads" has NaNs. If this error occured, please report this error`); 
+    // if (activated_outputs.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "activated_outpus" has NaNs. If this error occured, please report this error`);
+    // if (delta.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "delta" has NaNs. If this error occured, please report this error`); 
+    // if (weightGrads.flat(Infinity).some(isNaN)) throw new Error(`Error occured when computing weight gradients on layer ${layer_data.layer_name} ${layer_index+1}. Reason: "weightGrads" has NaNs. If this error occured, please report this error`); 
 
 
     if (layer_name === "convolutional2D") {
@@ -340,7 +340,7 @@ const ComputeGradientForKernels = (activated_outputs, delta, weightGrads) => {
                                 input_j >= 0 && input_j < activated_outputs[0].length
                             ) {
                                 const valA = activated_outputs[input_i][input_j] && activated_outputs[input_i][input_j][c];
-                                a = (typeof valA === 'number' && !isNaN(valA)) ? valA : Math.random();
+                                a = (typeof valA === 'number' && !isNaN(valA)) ? valA : 0;
                             }
                             if (
                                 delta[i] && delta[i][j] && typeof delta[i][j][f] === 'number' && !isNaN(delta[i][j][f])
