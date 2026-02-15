@@ -268,6 +268,7 @@ class Layers {
                 "strides":strides,
                 // kernels are also considered weights
                 feedforward: (onGPU, input, weights, biases, current_layer) => {
+                    
                     // 1. compute expected output tensor shape
                     const { OutputHeight, OutputWidth } = calculateTensorShape(input.length, input[0].length, weights[0].length, weights[0][0].length, weights[0][0][0].length, current_layer.strides, current_layer.padding);
 

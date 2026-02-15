@@ -17,8 +17,8 @@ const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
 const { computeWeightGradients, computeBiasGradients, scaleGradientsForWeights, scaleGradientsForBiases } = require('../core/bindings');
-const { getShape, flattenAll, calculateTensorShape } = require('../utils');
-const { load_images_from_directory } = require('../preprocessor/imagery');
+const { calculateTensorShape } = require('../utils');
+const Layers = require('../layers/layers');
 
 
 
@@ -74,10 +74,11 @@ class Neurex {
 
         this.onGPU = false;
         this.isfailed = false;
-        this.paramRegistry = [];
-        this.totalParams = 0;
         this.weightGrads = [];
         this.biasGrads = [];
+
+        this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
+
     }
 
     /**
@@ -86,6 +87,7 @@ class Neurex {
     * @property {string} [optimizer] - Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ].
     * @property {number} [randMin] - Minimum value for random initialization of weights/biases.
     * @property {number} [randMax] - Maximum value for random initialization of weights/biases.
+    * @property {number} [checkpoint_per_epoch] - set a checkpoint per N epochs. Once set, every N epochs will save the model, even not yet fully trained.
     */
 
     /**
@@ -106,6 +108,13 @@ class Neurex {
         if (configs.optimizer !== undefined) this.optimizer = configs.optimizer;
         if (configs.randMin !== undefined) this.randMin = configs.randMin;
         if (configs.randMax !== undefined) this.randMax = configs.randMax;
+
+        if (configs.checkpoint_per_epoch < 0) {
+            this.isfailed = true;
+            throw new Error(`${color.red}[Error]------- checkpoint cannot be less than 0. ${color.reset}`)
+        }
+
+        if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch; 
     }
 
     /**
@@ -132,7 +141,7 @@ class Neurex {
         let [h, w, d] = currentShape;
 
         this.layers.forEach((layer, i) => {
-            const layerType = layer.layer_name;
+            const layerType = layer.layer_name || newLayer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
 
             if (layerType === 'convolutional2D') {
@@ -146,7 +155,6 @@ class Neurex {
                     h = Math.floor((h - kernelH) / stride + 1);
                     w = Math.floor((w - kernelW) / stride + 1);
                 }
-
                 const newShape = [h, w, filters];
                 const warning = (h <= 0 || w <= 0) ? '⚠️ INVALID OUTPUT SHAPE' : '';
 
@@ -179,8 +187,6 @@ class Neurex {
         console.log("Total layers: " + this.num_layers);
         console.log("Total Learnable parameters:",parseInt(total_weights+total_biases));
         console.log("===============================================================");
-
-        if (this.weightGrads.flat(Infinity).some(isNaN)) throw new Error('There are NaNs on weight grads');
         
     }
 
@@ -213,13 +219,21 @@ class Neurex {
                 derivative_activation_function_name: layer.derivative_activation_function ? layer.derivative_activation_function.name : null,
                 layer_size: layer.layer_size || null,
                 feedforward: layer.feedforward,
-                backpropagate: layer.backpropagate
+                backpropagate: layer.backpropagate,
+                padding: layer.padding || '',
+                filters: layer.filters || 0,
+                strides: layer.strides || 0,
+                kernel_size: layer.kernel_size || [0, 0]
             })),
             "input_size":this.input_size,
+            "input_shape":this.input_shape,
             "output_size":this.output_size,
             "num_layers":this.num_layers,
             "weights":this.weights,
             "biases":this.biases,
+            "optimizer_states":this.optimizerStates,
+            "weightGrads":this.weightGrads,
+            "biasGrads":this.biasGrads,
         };
 
         const metadata = [
@@ -234,6 +248,86 @@ class Neurex {
 
     /**
      * 
+     * @param {String} model - filename of the save model 
+     */
+    loadSavedModel(model) {
+        try {
+            if (!model) {
+                throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
+            }
+
+            const dir = path.dirname(require.main.filename);
+            const model_file = path.join(dir, `${model}`);
+
+            // Check extension
+            if (path.extname(model_file) !== '.nrx') {
+                throw new Error(`${color.red}Invalid file type. Only .nrx model files are supported.${color.reset}`);
+            }
+
+            // Read file
+            const rawBuffer = fs.readFileSync(model_file);
+
+            // Validate magic header
+            const header = rawBuffer.slice(0, 4).toString('utf-8');
+            if (header !== 'NRX2') {
+                throw new Error(`${color.red}Invalid file format. Not a valid NRX model.${color.reset}`);
+            }
+
+            // Check version
+            const version = rawBuffer[4];
+            if (version !== 0x02) {
+                throw new Error(`${color.red}Unsupported NRX version: ${version}${color.reset}`);
+            }
+
+            // Decompress and parse
+            const compressedData = rawBuffer.slice(5);
+            const jsonString = zlib.inflateSync(compressedData).toString('utf-8');
+            const modelData = JSON.parse(jsonString);
+
+            // Assign properties
+            this.task = modelData.task;
+            this.loss_function = modelData.loss_function;
+            this.epoch_count = modelData.epoch;
+            this.batch_size = modelData.batch_size;
+            this.optimizer = modelData.optimizer;
+            this.learning_rate = modelData.learning_rate;
+            this.input_size = modelData.input_size;
+            this.output_size = modelData.output_size;
+            this.num_layers = modelData.num_layers;
+            this.weights = modelData.weights;
+            this.biases = modelData.biases;
+            this.optimizer = modelData.optimizer;
+            this.optimizerStates = modelData.optimizer_states;
+            this.weightGrads = modelData.weightGrads;
+            this.biasGrads = modelData.biasGrads;
+            this.input_shape = modelData.input_shape
+            const layerBuilder = new Layers();
+            this.layers = modelData.layers.map(layerData => {
+                let newLayer;
+                if (layerData.layer_name === "connected_layer") {
+                    // Recreate the connected layer with the correct activation and size
+                    newLayer = layerBuilder.connectedLayer(layerData.activation_function_name, layerData.layer_size);
+                } else if (layerData.layer_name === "input_layer") {
+                    // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
+                    newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
+                } else if (layerData.layer_name === "convolutional2D") {
+                    // recreate Convolutional layer
+                    newLayer = layerBuilder.convolutional2D(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
+                } else {
+                    throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
+                }
+                
+                return newLayer;
+            });
+
+            console.log(`${color.lime}\n[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+        } catch (error) {
+            console.log(error.message);
+        }
+    }
+
+    /**
+     * 
      * @method sequentialBuild
      * 
      * interface to stack layer types. No weights and biases initialization here
@@ -244,7 +338,7 @@ class Neurex {
         try {
 
             if (!layer_data || layer_data.length < 2) {
-                throw new Error("[ERROR]------- No layers");
+                throw new Error(`${color.red}[ERROR]------- No layers${color.reset}`);
             }
 
             layer_data.forEach(layer => {
@@ -290,12 +384,12 @@ class Neurex {
         * const layer = new Layers();
         *
         * model.sequentialBuild([
-        *    layer.inputShape(X_train),
+        *    layer.inputShape({features: 2}),
         *    layer.connectedLayer("relu", 3),
         *    layer.connectedLayer("relu", 3),
         *    layer.connectedLayer("softmax", 2)
         * ]);
-        * model.build();
+        *
         *
         * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
     * * After training, you can use the network for predictions
@@ -305,12 +399,6 @@ class Neurex {
 
         const lastLayerObject = this.layers[this.layers.length - 1];
         this.output_size = lastLayerObject.layer_size;
-
-        // Initialize optimizer state for each layer
-        this.optimizerStates = {
-            weights: [],
-            biases: []
-        };
 
         try {
             if (!trainX || !trainY || !loss) {
@@ -356,7 +444,7 @@ class Neurex {
                 trainY.forEach(row => {
                     if (this.output_size != row.length) {
                         this.isfailed = true;
-                        throw new Error(`[ERROR]------- Output shape mismatch. The size of the output layer must be the same number of classes`);
+                        throw new Error(`${color.red}[ERROR]------- Output shape mismatch. The size of the output layer must be the same number of classes${color.reset}`);
                     }
                 });
 
@@ -367,7 +455,7 @@ class Neurex {
                 }
                 else {
                     this.isfailed = true;
-                    throw new Error("[ERROR]------- Y_train must be one-hot encoded for the categorical_cross_entropy loss. Use 'sparse_categorical_cross_entropy' instead if the Y_train is interger-encoded labels.");
+                    throw new Error(`${color.red}[ERROR]------- Y_train must be one-hot encoded for the categorical_cross_entropy loss. Use 'sparse_categorical_cross_entropy' instead if the Y_train is interger-encoded labels.${color.reset}`);
                 }
                 
             }
@@ -376,14 +464,14 @@ class Neurex {
             }
             else {
                 this.isfailed = true;
-                throw new Error(`[ERROR]------- Using ${lossLower} having output size of ${this.output_size} and a ${lastLayerActivation} function in the output layer is currently unavailable for this core's task.`);
+                throw new Error(`${color.red}[ERROR]------- Using ${lossLower} having output size of ${this.output_size} and a ${lastLayerActivation} function in the output layer is currently unavailable for this core's task.${color.reset}`);
             }
 
             if (!optimizerFn) {
                 this.isfailed = true;
-                throw new Error(`Unknown optimizer: ${this.optimizer}`)
+                throw new Error(`${color.red}Unknown optimizer: ${this.optimizer} ${color.reset}`)
             };
-            console.log("\n[TASK]------- Training session is starting\n");
+            console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
             let logMessage;
@@ -456,7 +544,7 @@ class Neurex {
                                     dOutputlayer[actual[0]] -= 1; 
                                 }
                                 else {
-                                    throw new Error(`[ERROR]------- Uknown loss function for multi-class classification loss. Loss: ${lossLower} is unknown.`)
+                                    throw new Error(`${color.red}[ERROR]------- Uknown loss function for multi-class classification loss. Loss: ${lossLower} is unknown.${color.reset}`)
                                 }
                             }
                             else {
@@ -492,8 +580,6 @@ class Neurex {
                     logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Batch Loss]: ${batchLoss.toFixed(6)} `
                     process.stdout.write(`\r`+logMessage);
 
-                    const flattenWeightGrads = flattenAll(this.weightGrads);
-                    const flattenWeights = flattenAll(this.weights);
 
                     // Divide accumulated gradients by the actual batch size
                     for (let l = 0; l < this.num_layers; l++) {
@@ -506,12 +592,22 @@ class Neurex {
 
 
                     for (let l = 0; l < this.num_layers; l++) {
-                        // update Weights and biases
+                        // update Weights
                         const res1 = optimizerFn(this.weights[l], weightGrads[l], this.optimizerStates.weights[l], this.learning_rate);
-                        const res2 = optimizerFn(this.biases[l], biasGrads[l], this.optimizerStates.biases[l], this.learning_rate)
+
+                        // Update biases
+                        const res2 = optimizerFn(this.biases[l], biasGrads[l], this.optimizerStates.biases[l], this.learning_rate);
+
+                        // assigned updated weights to it's current index position relative to the layer's index
                         this.weights[l] = res1.params;
+
+                        // assigned updated biases to it's current index position relative to the layer's index
                         this.biases[l] = res2.params;
+
+                        // assigned updated weight states to it's current index position relative to the layer's index
                         this.optimizerStates.weights[l] = res1.state;
+
+                        // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[l] = res2.state;
                         
                     }
@@ -541,6 +637,12 @@ class Neurex {
                     logMessage += ` | [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
                 }
                 process.stdout.write('\r'+logMessage);
+                // if the checkpoint is not 0 (assume it was configured), proceed to saving the model after showing the latest training information
+                if (this.checkpoint > 0 && (current_epoch + 1) % this.checkpoint === 0) {
+                    console.log();
+                    console.log(`\n${color.orange}🗼 [CHECKPOINT] Saving at epoch ${current_epoch + 1}... 🗼${color.reset}`);
+                    this.saveModel(`Checkpoint_Epoch_${current_epoch + 1}`);
+                }
                 console.log();
             }
             
@@ -583,7 +685,6 @@ class Neurex {
     }
 
     // ========= Private methods =======
-
     #build() {
         try {
 
@@ -698,52 +799,10 @@ class Neurex {
                     prev_size = CalculatedTensorShape;
                     
                 }
-                // else if (layer_data.layer_name === "flatten_layer") {
-                //     // flatten layer supposedly has no weights and biases, but in order to mitigate mismatching, we initialized weights and biases but all are 0s;
-                //     let weights = Array(prev_size).fill(0);
-                //     let biases = Array(prev_size).fill(0);
-                //     this.weights.push(weights);
-                //     this.biases.push(biases);
-                //     this.weightGrads.push(weights);
-                //     this.biasGrads.push(biases);
-                //     this.filters = this.layers[idx-1].filters;
-                //     prev_size = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
-                // }
-                // else if (layer_data.layer_name === "flatten_layer") {
-                //     // flatten has no weights
-                //     // but it changes the dimensionality
-                //     prev_size = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
-                //     this.filters = 1;
-                // }
 
             });
 
             this.hasBuilt = true;
-
-            function registerParam(tensor, meta) {
-                const flatSize = tensor.flat(Infinity).length;
-                this.paramRegistry.push({
-                    offset,
-                    size: flatSize,
-                    shape: getShape(tensor),
-                    ...meta
-                });
-                offset += flatSize;
-            }
-
-            // register weights
-            this.weights.forEach((W, l) => {
-                if (this.layers[l].layer_name === 'flatten_layer') return;
-                registerParam.call(this, W, { layer: l, type: 'weights' });
-            });
-
-            // register biases
-            this.biases.forEach((B, l) => {
-                if (this.layers[l].layer_name === 'flatten_layer') return;
-                registerParam.call(this, B, { layer: l, type: 'biases' });
-            });
-
-            this.totalParams = offset;
 
         }
         catch (error) {
@@ -843,7 +902,7 @@ class Neurex {
             fs.writeFileSync(nrxFilePath, finalBuffer);
             fs.writeFileSync(metadataFilePath, JSON.stringify(metadata, null, 2));
 
-            console.log(`[SUCCESS]------- Model is saved as ${fileName}.nrx`);
+            console.log(`[SUCCESS]------- Model is saved as ${fileName}.nrx\n`);
         }
     }
 

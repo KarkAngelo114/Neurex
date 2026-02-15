@@ -258,15 +258,19 @@ declare module 'neurex' {
     * @property {Object} optimizerStates - Internal state for optimizers, storing per-layer weight and bias states.
     * 
     */
+    export interface NeurexConfig {
+        /** Learning rate for training. Default: 0.001 */
+        learning_rate?: number;
+        /** Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ]. Default: 'adam' */
+        optimizer?: 'sgd' | 'adam';
+        /** Minimum value for random initialization of weights/biases. Default: -1 */
+        randMin?: number;
+        /** Maximum value for random initialization of weights/biases. Default: 1 */
+        randMax?: number;
+        /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
+        checkpoint_per_epoch?: number;
+    }
     export class Neurex {
-        /**
-        * @typedef {Object} NeurexConfig
-        * @property {number} [learning_rate] - Learning rate for training.
-        * @property {string} [optimizer] - Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ].
-        * @property {number} [randMin] - Minimum value for random initialization of weights/biases.
-        * @property {number} [randMax] - Maximum value for random initialization of weights/biases.
-        */
-
         /**
         * Allows configuration of your neural network's parameters.
         * @method configure
@@ -282,7 +286,8 @@ declare module 'neurex' {
         *
         * Available optimizers: 'sgd'and 'adam'
         */
-        configure(configs: object): void;
+        
+        configure(configs: NeurexConfig): void;
 
         /**
         * 
@@ -302,6 +307,15 @@ declare module 'neurex' {
         
         */
         saveModel(modelName: string): void;
+
+        /**
+        * @method loadSavedModel()
+        * @param {*} model - the trained model
+
+        The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
+
+        */
+        loadSavedModel(model: string): void;
 
         /**
         * 

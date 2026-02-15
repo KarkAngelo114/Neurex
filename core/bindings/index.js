@@ -109,6 +109,8 @@ const dlinear = (input) => addon.DLinear(input);
  * @param {Number} OutputWidth
  * @returns array of 4D feature maps
  */
+
+// let idx = 1;
 const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth);
 /**
  * 
@@ -374,19 +376,17 @@ const ComputeGradientsForDenseBiases = (biasGrads, delta) => {
 
 // need to write a native binding for this but for testing, we implement it for now in plain JS
 const ComputeGradientsForConvBiases = (biasGrads, delta) => {
-
-    const output_grad = biasGrads;
-
-    for (let f = 0; f < biasGrads.length; f++) {
+    const output_grad = biasGrads.slice(); // shallow copy to avoid mutation
+    for (let f = 0; f < output_grad.length; f++) {
         for (let h = 0; h < delta.length; h++) {
             for (let w = 0; w < delta[0].length; w++) {
-                for (let d = 0; d < f; d++) {
-                    biasGrads[f] += delta[h][w][d];
+                const v = delta[h][w][f];
+                if (typeof v === 'number' && !isNaN(v)) {
+                    output_grad[f] += v;
                 }
             }
         }
     }
-
     return output_grad;
 }
 
