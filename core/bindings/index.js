@@ -110,14 +110,38 @@ const dlinear = (input) => addon.DLinear(input);
  * @returns array of 4D feature maps
  */
 
-// let idx = 1;
 const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth);
+
 /**
  * 
  * @param {Array<Array<Array<Array<Number>>>>} featureMaps 
  * @returns 1 stack of feature map with increasing depth
  */
 const StackFeatureMaps = (featureMaps) => addon.StackFeatureMaps(featureMaps);
+
+/**
+ * 
+ * @param {Array<Number>} params - flattened array of parameters 
+ * @param {Array<Number>} grads - flattened array of grads 
+ * @param {Number} learning_rate - learning rate value
+ * @returns 
+ */
+const ApplySGD = (params, grads, learning_rate ) => addon.SGD(params, grads, learning_rate);
+
+/**
+ * 
+ * @param {Array<Number>} params - flattened array of parameters 
+ * @param {Array<Number>} grads - flattened array of grads  
+ * @param {Array<Number>} m - first momentum of average gradients vector
+ * @param {Array<Number>} v - second momentum of squared average gradients vector
+ * @param {Number} t - Time step counter 
+ * @param {Number} learning_rate - learning rate value 
+ * @param {Number} beta1 - beta1 value
+ * @param {Number} beta2 - beta2 value
+ * @param {Number} epsilon - epsilon constant value
+ * @returns 
+ */
+const ApplyAdam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => addon.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
 
 /// ======================================= ///
 
@@ -442,6 +466,8 @@ module.exports = {
     computeBiasGradients,
     scaleGradientsForWeights,
     scaleGradientsForBiases,
+    ApplySGD,
+    ApplyAdam,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

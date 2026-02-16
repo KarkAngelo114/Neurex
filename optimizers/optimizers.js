@@ -1,4 +1,5 @@
 
+const { ApplySGD, ApplyAdam } = require('../core/bindings');
 const { flattenAll, getShape, reshape } = require('../utils');
 
 const SGD = (params, grads, state = {}, lr) => {
@@ -11,12 +12,12 @@ const SGD = (params, grads, state = {}, lr) => {
         throw new Error("SGD: Params and grads size mismatch");
     }
 
-    for (let i = 0; i < flatten_params.length; i++) {
-        flatten_params[i] -= lr * flatten_grads[i];
-    }
+    // for (let i = 0; i < flatten_params.length; i++) {
+    //     flatten_params[i] -= lr * flatten_grads[i];
+    // }
 
     return {
-        params: reshape(flatten_params, params_shape),
+        params: reshape(ApplySGD(flatten_params, flatten_grads, lr), params_shape),
         state: state
     };
 };
@@ -40,21 +41,13 @@ const Adam = (params, grads, state = {}, lr, beta1 = 0.9, beta2 = 0.999, epsilon
 
     state.t += 1;
 
-    for (let i = 0; i < flatParams.length; i++) {
+    const res = ApplyAdam(flatParams, flatGrads, state.m, state.v, state.t, lr, beta1, beta2, epsilon);
 
-        const g = flatGrads[i];
-
-        state.m[i] = beta1 * state.m[i] + (1 - beta1) * g;
-        state.v[i] = beta2 * state.v[i] + (1 - beta2) * g * g;
-
-        const mHat = state.m[i] / (1 - Math.pow(beta1, state.t));
-        const vHat = state.v[i] / (1 - Math.pow(beta2, state.t));
-
-        flatParams[i] -= lr * mHat / (Math.sqrt(vHat) + epsilon);
-    }
+    state.m = res.m; // update first momentum
+    state.v = res.v; // update second momentum
 
     return {
-        params: reshape(flatParams, shape),
+        params: reshape(res.params, shape),
         state:state
     };
 };
