@@ -307,9 +307,8 @@ class Layers {
                 
                     let input = next_delta;
                     let kernels = weights;
-                    
                         
-                        // If this is the input to the first convolutional layer, stop here
+                    // If this is the input to the first convolutional layer, stop here
                     if (layer_index == 0) {
                         const current_Z = StackFeatureMaps(zs[layer_index]);
                         const inputH = current_Z.length;
@@ -327,9 +326,7 @@ class Layers {
                         const padW = KW - 1 + 1;
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
-
-                        //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, deltaConv.length, deltaConv[0].length, deltaConv[0][0].length, '\n');
+                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW)
                     
                         return {
                             current_delta: deltaConv,
@@ -359,35 +356,14 @@ class Layers {
                     const KW = kernels[0][0].length;
                     // dilate the input
 
-                    // if (input.flat(Infinity).some(isNaN)) {
-                    //     console.log(`Input already has NaNs at layer ${layer_index+1}`);
-                    // }
-
                     const dilated_input = DilateInput(input, strides);
 
                     // apply padding
                     const padH = KH - 1 + 1;
                     const padW = KW - 1 + 1;
                     const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
-
-                    // console.log(`Layer ${layer_index+1}`);
-                    // console.log('kernel shape', kernels.length, kernels[0].length, kernels[0][0].length, kernels[0][0][0].length);
-                    // console.log('Padded dilated delta shape', padded_dilated_input.length, padded_dilated_input[0].length, padded_dilated_input[0][0].length);
-                    // console.log(`Input Height: ${inputH}, Input width: ${inputW}`);
                 
-                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1);
-                    // if (dilated_input.flat(Infinity).some(isNaN)) console.log(`dilated_input conv already has NaNs in layer ${layer_index+1}`);
-                    // if (padded_dilated_input.flat(Infinity).some(isNaN)) console.log(`padded_dilated_input already has NaNs in layer ${layer_index+1}`);
-                    // if (deltaConv.flat(Infinity).some(isNaN)) console.log(`output delta conv already has NaNs in layer ${layer_index+1}\n`);
-
-                    // const flattened = padded_dilated_input.flat(Infinity);
-
-                    // if (flattened.some(isNaN)) {
-                    //     console.log("There are NaN's in padded_dilated_input delta input after reshaping and convolving at",layer_index+1);
-                    //     throw new Error();
-                    // }
-
-                    if (deltaConv.flat(Infinity).some(isNaN)) throw new Error(`Layer ${layer_index+1} has NaNs after delta convolution`)
+                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
 
                     const z = current_Z;
 
@@ -398,8 +374,6 @@ class Layers {
 
                     // multiply input x dAct_Z
                     const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
-
-                    //console.log(`Output delta shape of this convolutional layer ${layer_index+1},`, outputDelta.length, outputDelta[0].length, outputDelta[0][0].length, '\n');
 
                     return {
                         current_delta: outputDelta,
