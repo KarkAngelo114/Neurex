@@ -156,6 +156,14 @@ const ApplyAdam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon)
 
 /**
  * 
+ * @param {Array<Number>} grad - initiated bias grads 
+ * @param {Number} actual_batch_size - actual batch size 
+ * @returns 
+ */
+const scaleGradientsForBiases = (grad, actual_batch_size) => addon.scaleGradientsForBiases(grad, actual_batch_size);
+
+/**
+ * 
  * @param {*} activated_outputs 
  * @param {*} delta 
  * @param {*} layer_name 
@@ -198,12 +206,12 @@ const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
     
     if (layer_name === "connected_layer") {
 
-        return scaleGradientWeightsForConnectedLayer(weightGrads, actualBatchSize);
+        return addon.scaleGradientWeightsForConnectedLayer(weightGrads, actualBatchSize);
 
     }
     
     if (layer_name === "convolutional2D") {
-        return scaleGradientWeightsForConv(weightGrads, actualBatchSize);
+        return addon.scaleGradientWeightsForConv(weightGrads, actualBatchSize);
     }
 
     else {
@@ -221,84 +229,75 @@ const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
 const computeBiasGradients = (biasGrads, delta, layer_name) => {
 
     if (layer_name === "connected_layer") {
-        return ComputeGradientsForDenseBiases(biasGrads, delta);
+        return addon.ComputeGradientsForDenseBiases(biasGrads, delta);
     }
     else if (layer_name === "convolutional2D") {
-        return ComputeGradientsForConvBiases(biasGrads, delta);
+        return addon.ComputeGradientsForConvBiases(biasGrads, delta);
     }
 }
 
-/**
- * 
- * @param {*} grad 
- * @param {*} scalar 
- * @returns 
- */
-const scaleGradientsForBiases = (grad, scalar) => {
 
-    return grad.map(v => v / scalar);
-}
 
 // need to write a native binding for this but for testing, we implement it for now in plain JS
-const ComputeGradientsForDenseBiases = (biasGrads, delta) => {
+// const ComputeGradientsForDenseBiases = (biasGrads, delta) => {
 
-    let output_grad = biasGrads;
-    for (let j = 0; j < biasGrads.length; j++) {
-        output_grad[j] += delta[j];
-    }
+//     let output_grad = biasGrads;
+//     for (let j = 0; j < biasGrads.length; j++) {
+//         output_grad[j] += delta[j];
+//     }
 
-    return output_grad;
-}
-
-// need to write a native binding for this but for testing, we implement it for now in plain JS
-const ComputeGradientsForConvBiases = (biasGrads, delta) => {
-    const output_grad = biasGrads.slice(); // shallow copy to avoid mutation
-    for (let f = 0; f < output_grad.length; f++) {
-        for (let h = 0; h < delta.length; h++) {
-            for (let w = 0; w < delta[0].length; w++) {
-                const v = delta[h][w][f];
-                if (typeof v === 'number' && !isNaN(v)) {
-                    output_grad[f] += v;
-                }
-            }
-        }
-    }
-    return output_grad;
-}
+//     return output_grad;
+// }
 
 // need to write a native binding for this but for testing, we implement it for now in plain JS
-const scaleGradientWeightsForConnectedLayer = (weightGrads, actualBatchSize) => {
+// const ComputeGradientsForConvBiases = (biasGrads, delta) => {
+//     const output_grad = biasGrads.slice(); // shallow copy to avoid mutation
+//     for (let f = 0; f < output_grad.length; f++) {
+//         for (let h = 0; h < delta.length; h++) {
+//             for (let w = 0; w < delta[0].length; w++) {
+//                 const v = delta[h][w][f];
+//                 if (typeof v === 'number' && !isNaN(v)) {
+//                     output_grad[f] += v;
+//                 }
+//             }
+//         }
+//     }
+//     return output_grad;
+// }
 
-    const scaled_output = weightGrads;
+// // need to write a native binding for this but for testing, we implement it for now in plain JS
+// const scaleGradientWeightsForConnectedLayer = (weightGrads, actualBatchSize) => {
 
-    for (let i = 0; i < weightGrads.length; i++) {
+//     const scaled_output = weightGrads;
+
+//     for (let i = 0; i < weightGrads.length; i++) {
        
-        for (let j = 0; j < weightGrads[i].length; j++) {
-            scaled_output[i][j] /= actualBatchSize;
-        }
-    }   
+//         for (let j = 0; j < weightGrads[i].length; j++) {
+//             scaled_output[i][j] /= actualBatchSize;
+//         }
+//     }   
 
-    return scaled_output;
+//     return scaled_output;
 
-}
+// }
 
 // need to write a native binding for this but for testing, we implement it for now in plain JS
-const scaleGradientWeightsForConv = (weightGrads, actualBatchSize) => {
+// const scaleGradientWeightsForConv = (weightGrads, actualBatchSize) => {
 
-    const scaled_kernels = weightGrads;
+//     const scaled_kernels = weightGrads;
 
-    for (let f = 0; f < weightGrads.length; f++) {
-        for (let kh = 0; kh < weightGrads[0].length; kh++) {
-            for (let kw = 0; kw <  weightGrads[0][0].length; kw++) {
-                for (let d = 0; d < weightGrads[0][0][0].length; d++) {
-                    scaled_kernels[f][kh][kw][d] /= actualBatchSize;
-                }
-            }
-        }
-    }
+//     for (let f = 0; f < weightGrads.length; f++) {
+//         for (let kh = 0; kh < weightGrads[0].length; kh++) {
+//             for (let kw = 0; kw <  weightGrads[0][0].length; kw++) {
+//                 for (let d = 0; d < weightGrads[0][0][0].length; d++) {
+//                     scaled_kernels[f][kh][kw][d] /= actualBatchSize;
+//                 }
+//             }
+//         }
+//     }
 
-    return scaled_kernels;
-}
+//     return scaled_kernels;
+// }
 
 
 
