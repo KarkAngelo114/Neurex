@@ -169,47 +169,6 @@ declare module 'neurex' {
     }
 
     /**
-    * This class allows you to run inference predictions on your applications. You can load your trained model and run predictions
-    *
-    * @class
-    * @deprecated this module might be removed soon
-    * please use the "neurex-runtime"
-    *
-    * ```bash
-    * npm install neurex-runtime
-    * ```
-    */
-    export class Interpreter {
-        /**
-        * @method loadSavedModel()
-        * @param {*} model - the trained model
-
-        The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
-
-        */
-        loadSavedModel(model: string): void;
-
-        /**
-        * 
-        @method predict
-        @param {Array} input - input data 
-        @returns Array of predictions
-        @throws Error when there's shape mismatch and no input data
-
-        produces predictions based on the input data
-        */
-        predict(input: number[][]): number[];
-
-        /**
-        * 
-        @method modelSummary
-
-        Shows the model architecture
-        */
-        modelSummary(): void;
-    }
-
-    /**
     * @method MinMaxScaler
     * Scales input features (array of arrays) to [0, 1] based on feature-wise min/max.
     * Requires fitting on training data first.
@@ -236,28 +195,6 @@ declare module 'neurex' {
         inverseTransform(data: number[]): number[];
     }
 
-    /**
-    * Neurex is a configurable feedforward neural network.
-    * 
-    * This class allows you to define the architecture of a neural network by specifying the number of layers,
-    * neurons per layer, and activation functions. It supports training with various optimizers, saving
-    * model state, and provides utility methods for inspecting the model structure.
-    * 
-    * @class
-    * 
-    * @property {Array<Array<Array<number>>>} weights - The weights for each layer, organized as 3D array [layer][input][output].
-    * @property {Array<Array<number>>} biases - The biases for each layer, organized as 2D array [layer][neuron].
-    * @property {number} learning_rate - The learning rate used during training.
-    * @property {number} num_layers - The total number of layers in the network.
-    * @property {Array<Function>} activation_functions - The activation functions for each layer.
-    * @property {Array<Function>} derivative_functions - The derivatives of the activation functions for each layer.
-    * @property {Array<number>} number_of_neurons - The number of neurons in each layer.
-    * @property {number} input_size - The number of input features (input layer size).
-    * @property {number} epoch_count - The number of epochs the model has been trained for.
-    * @property {string} optimizer - The name of the optimizer used for training.
-    * @property {Object} optimizerStates - Internal state for optimizers, storing per-layer weight and bias states.
-    * 
-    */
     export interface NeurexConfig {
         /** Learning rate for training. Default: 0.001 */
         learning_rate?: number;
@@ -270,6 +207,15 @@ declare module 'neurex' {
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
     }
+
+    /**
+     *
+     * A trainable neural network
+     *
+     *
+     * @class Neurex
+     * 
+     */
     export class Neurex {
         /**
         * Allows configuration of your neural network's parameters.
@@ -454,12 +400,17 @@ declare module 'neurex' {
 
     /**
     * 
-    * @class
+    * 
     *
     * Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
+    * 
+    * 
     * available layers:
-    * inputShape() - This will tell the network that your input layer has this X number of input neuron.
-    * connectedLayer() - to build fully connected layers.
+    *  - inputShape() - This will tell the network that your input layer has this X number of input neuron.
+    *  - connectedLayer() - to build fully connected layers.
+    *  - convolutional2D() - to build Convolutional layers.
+    *
+    * @class Layers
     */
     export class Layers {
         /**
