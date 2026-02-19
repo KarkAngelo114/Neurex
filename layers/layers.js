@@ -228,7 +228,7 @@ class Layers {
     /**
      * 
      * Allows you to add convolutional layers in your model architecture in sequential building.
-     * @method convolutional2D
+     * @method convolutionalLayer
      * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
      * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
      * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
@@ -237,7 +237,7 @@ class Layers {
      * @throws {Error} - if any of the parameters are invalid.
      *
      */
-    convolutional2D(filters, strides, kernel_size, activation_function, padding) {
+    convolutionalLayer(filters, strides, kernel_size, activation_function, padding) {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -259,7 +259,7 @@ class Layers {
             }
 
             return {
-                "layer_name":"convolutional2D",
+                "layer_name":"convolutionalLayer",
                 "activation_function":activation[function_name],
                 "derivative_activation_function":activation.derivatives[function_name],
                 "kernel_size":kernel_size,

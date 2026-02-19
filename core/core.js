@@ -144,7 +144,7 @@ class Neurex {
             const layerType = layer.layer_name || newLayer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
 
-            if (layerType === 'convolutional2D') {
+            if (layerType === 'convolutionalLayer') {
                 const [kernelH, kernelW] = layer.kernel_size;
                 const stride = layer.strides;
                 const padding = layer.padding.toLowerCase();
@@ -310,9 +310,9 @@ class Neurex {
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
-                } else if (layerData.layer_name === "convolutional2D") {
+                } else if (layerData.layer_name === "convolutionalLayer") {
                     // recreate Convolutional layer
-                    newLayer = layerBuilder.convolutional2D(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
+                    newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
                 } else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
@@ -396,6 +396,9 @@ class Neurex {
     */
 
     async train(trainX, trainY, loss, epoch, batch_size) {
+        
+        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`); 
+
 
         const lastLayerObject = this.layers[this.layers.length - 1];
         this.output_size = lastLayerObject.layer_size;
@@ -740,7 +743,7 @@ class Neurex {
                     this.filters = 1; // we reset it to 1 so that the value of this.filters is only used by the first connected layer only after flatten
                     prev_size = layer_size;
                 }
-                else if (layer_data.layer_name === "convolutional2D") {
+                else if (layer_data.layer_name === "convolutionalLayer") {
                     const filters = layer_data.filters;
                     const [kernelHeight, kernelWidth] = layer_data.kernel_size;
                     const stride = layer_data.strides || 1;

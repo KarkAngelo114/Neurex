@@ -408,7 +408,7 @@ declare module 'neurex' {
     * available layers:
     *  - inputShape() - This will tell the network that your input layer has this X number of input neuron.
     *  - connectedLayer() - to build fully connected layers.
-    *  - convolutional2D() - to build Convolutional layers.
+    *  - convolutionalLayer() - to build Convolutional layers.
     *
     * @class Layers
     */
@@ -440,7 +440,7 @@ declare module 'neurex' {
         /**
          * 
          * Allows you to add convolutional layers in your model architecture when sequential building.
-         * @method convolutional2D
+         * @method convolutionalLayer
          * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
          * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
          * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
@@ -449,7 +449,7 @@ declare module 'neurex' {
          * @throws {Error} - if any of the parameters are invalid.
          *
          */
-        convolutional2D(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
+        convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
         
     }
 }

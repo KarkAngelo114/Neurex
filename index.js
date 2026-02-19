@@ -9,7 +9,6 @@
  */
 
 const Neurex = require('./core');
-const Interpreter = require('./interpreter');
 const CsvDataHandler = require('./preprocessor/CsvDataHandler');
 const {MinMaxScaler} = require('./preprocessor/normalizer');
 const Layers = require('./layers');
@@ -22,7 +21,6 @@ const { load_images_from_directory } = require('./preprocessor/imagery');
 
 module.exports= {
     Neurex,
-    Interpreter,
     CsvDataHandler,
     MinMaxScaler,
     Layers,

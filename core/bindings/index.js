@@ -197,7 +197,7 @@ const scaleGradientsForBiases = (grad, actual_batch_size) => addon.scaleGradient
  */
 const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrads, layer_data, allDeltas, layer_index) => {
 
-    if (layer_name === "convolutional2D") {
+    if (layer_name === "convolutionalLayer") {
 
         if (layer_index == 0) return weightGrads;
     
@@ -235,7 +235,7 @@ const scaleGradientsForWeights = (weightGrads, actualBatchSize, layer_name) => {
 
     }
     
-    if (layer_name === "convolutional2D") {
+    if (layer_name === "convolutionalLayer") {
         return addon.scaleGradientWeightsForConv(weightGrads, actualBatchSize);
     }
 
@@ -257,7 +257,7 @@ const computeBiasGradients = (biasGrads, delta, layer_name) => {
     if (layer_name === "connected_layer") {
         return addon.ComputeGradientsForDenseBiases(biasGrads, delta);
     }
-    else if (layer_name === "convolutional2D") {
+    else if (layer_name === "convolutionalLayer") {
         return addon.ComputeGradientsForConvBiases(biasGrads, delta);
     }
 }
