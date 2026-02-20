@@ -12,10 +12,6 @@ const SGD = (params, grads, state = {}, lr) => {
         throw new Error("SGD: Params and grads size mismatch");
     }
 
-    // for (let i = 0; i < flatten_params.length; i++) {
-    //     flatten_params[i] -= lr * flatten_grads[i];
-    // }
-
     return {
         params: reshape(ApplySGD(flatten_params, flatten_grads, lr), params_shape),
         state: state
@@ -34,8 +30,8 @@ const Adam = (params, grads, state = {}, lr, beta1 = 0.9, beta2 = 0.999, epsilon
 
     // Lazy state initialization
     if (!state.m) {
-        state.m = new Array(flatParams.length).fill(0);
-        state.v = new Array(flatParams.length).fill(0);
+        state.m = Array.from({length: flatParams.length}).fill(0);
+        state.v = Array.from({length: flatParams.length}).fill(0);
         state.t = 0;
     }
 
@@ -43,8 +39,8 @@ const Adam = (params, grads, state = {}, lr, beta1 = 0.9, beta2 = 0.999, epsilon
 
     const res = ApplyAdam(flatParams, flatGrads, state.m, state.v, state.t, lr, beta1, beta2, epsilon);
 
-    state.m = res.m; // update first momentum
-    state.v = res.v; // update second momentum
+    state.m = res.m.map(m => !Number.isFinite(m) ? 0 : m); // update first momentum, check if there are Infinity values
+    state.v = res.v.map(v => !Number.isFinite(v) ? 0 : v); // update second momentum, check if there are Infinity values
 
     return {
         params: reshape(res.params, shape),

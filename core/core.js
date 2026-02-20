@@ -63,8 +63,8 @@ class Neurex {
         // default configs
         this.optimizer = 'sgd';
         this.learning_rate = 0.001;
-        this.randMin = -1;
-        this.randMax = 1;
+        this.randMin = -0.01;
+        this.randMax = 0.01;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {

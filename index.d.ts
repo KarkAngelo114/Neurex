@@ -227,8 +227,8 @@ declare module 'neurex' {
         * Default configurations:
         *   learning_rate: 0.001
         *   optimizer: 'adam'
-        *   randMin: -1
-        *   randMax: 1
+        *   randMin: -0.01
+        *   randMax: 0.01
         *
         * Available optimizers: 'sgd'and 'adam'
         */
