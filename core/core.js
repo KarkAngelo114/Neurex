@@ -235,14 +235,8 @@ class Neurex {
             "weightGrads":this.weightGrads,
             "biasGrads":this.biasGrads,
         };
-
-        const metadata = [
-            this.epoch_count,
-            this.optimizer,
-            this.loss_function,
-            this.task
-        ];
-        this.#save(data, fileName, metadata);
+        
+        this.#save(data, fileName);
         
     }
 
@@ -870,22 +864,12 @@ class Neurex {
         };
     }
     //saving model
-    #save(data, fileName, meta) {
+    #save(data, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
         }
         else {
             const dir = path.dirname(require.main.filename);
-
-            const metadata = {
-                "Date Created": `${new Date().toISOString().replace(/[:.]/g, '-')}`,
-                "Number of epoch to train": meta[0],
-                "Optimizer": meta[1],
-                "Loss function": meta[2],
-                "Task": meta[3],
-                "Trained using": "Neurex",
-                "Note": "This model can only be used on Neurex library. This cannot be used directly in other ML frameworks. DO NOT modify any of the parameters."
-            };
 
             // Serialize and compress the model data
             const jsonString = JSON.stringify(data);
@@ -900,10 +884,8 @@ class Neurex {
             const finalBuffer = Buffer.concat([header, version, compressedData]);
 
             const nrxFilePath = path.join(dir, `${fileName}.nrx`);
-            const metadataFilePath = path.join(dir, `metadata.json`);
 
             fs.writeFileSync(nrxFilePath, finalBuffer);
-            fs.writeFileSync(metadataFilePath, JSON.stringify(metadata, null, 2));
 
             console.log(`[SUCCESS]------- Model is saved as ${fileName}.nrx\n`);
         }

@@ -1,7 +1,8 @@
 const activation = require('../core/bindings');
 const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps, ConvolveDelta} = require('../core/bindings');
 const {calculateTensorShape, getPaddingSizes, applyPadding, DilateInput} = require('../utils/utils');
-const { toTensor } = require('../preprocessor/reshaper')
+const { toTensor } = require('../preprocessor/reshaper');
+const { ConvolveDeltaTest } = require('../core/bindings/test');
 
 class Layers {
     constructor () {
@@ -326,7 +327,7 @@ class Layers {
                         const padW = KW - 1 + 1;
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW)
+                        const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW)
                     
                         return {
                             current_delta: deltaConv,
@@ -363,7 +364,7 @@ class Layers {
                     const padW = KW - 1 + 1;
                     const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
                 
-                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
+                    const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
 
                     const z = current_Z;
 
