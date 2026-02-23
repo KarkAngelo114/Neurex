@@ -17,7 +17,7 @@ const ConvolveDeltaTest = (padded_dilated_delta, kernels, inputH, inputW) => {
     const kernels_array = getKernels(kernels);
     let KH = kernels_array[0].length;
     let KW = kernels_array[0][0].length;
-    let D = padded_dilated_delta[0][0].length
+    let D =  padded_dilated_delta[0][0].length > kernels_array[0][0][0].length ? kernels_array[0][0][0].length : padded_dilated_delta[0][0].length; 
 
     const output = Array.from({length: inputH}, () => Array.from({length: inputW}, () => Array(kernels_array.length).fill(0)));
 
@@ -31,8 +31,9 @@ const ConvolveDeltaTest = (padded_dilated_delta, kernels, inputH, inputW) => {
                 for (let kh = 0; kh < KH; kh++) {
                     for (let kw = 0; kw < KW; kw++) {
                         for (let c = 0; c < D; c++) {
-                            let input = padded_dilated_delta[y + kh][x + kh][c];
+                            let input = padded_dilated_delta[y + kh][x + kw][c];
                             let kernel_value = kernel[kh][kw][c];
+
                             sum += input * kernel_value;
                         }
                     }
@@ -42,8 +43,7 @@ const ConvolveDeltaTest = (padded_dilated_delta, kernels, inputH, inputW) => {
 
             }
         }
-    }
-    
+    };
 
     return output
 

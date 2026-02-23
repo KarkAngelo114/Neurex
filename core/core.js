@@ -206,6 +206,7 @@ class Neurex {
             fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
         }
 
+
         const data = {
             "task":this.task,
             "loss_function":this.loss_function,
@@ -235,7 +236,7 @@ class Neurex {
             "weightGrads":this.weightGrads,
             "biasGrads":this.biasGrads,
         };
-        
+
         this.#save(data, fileName);
         
     }
@@ -248,6 +249,11 @@ class Neurex {
         try {
             if (!model) {
                 throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
+            }
+
+            if (this.layers.length > 0) {
+                this.isfailed = true;
+                throw new Error(`${color.red}[ERROR]------- Failed to load model.\nReason:\nThere's already a new network being built. ${color.reset}`);
             }
 
             const dir = path.dirname(require.main.filename);
@@ -317,6 +323,7 @@ class Neurex {
             console.log(`${color.lime}\n[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
             console.log(error.message);
+            process.exit(1);
         }
     }
 
@@ -331,8 +338,13 @@ class Neurex {
 
         try {
 
+            if (this.layers.length > 0) {
+                console.log(`\n${color.orange}[INFO]------- Skipping sequential build: \n\n reason:\n There/you might have loaded a model already. Please check if already load a model.\n${color.reset}`);
+                return;
+            }
+
             if (!layer_data || layer_data.length < 2) {
-                throw new Error(`${color.red}[ERROR]------- No layers${color.reset}`);
+                throw new Error(`${color.red}[ERROR]------- No layers${color.reset} added.`);
             }
 
             layer_data.forEach(layer => {
@@ -357,6 +369,29 @@ class Neurex {
         }
     }
 
+    /**
+     * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
+     * @throws {Error} - if there are no layers
+     */
+    pop() {
+        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]-------- No layers has been added${color.reset}`);
+
+        // get the last index
+        const index = this.layers.length - 1;
+
+        this.layers.splice(index, 1);
+        this.weights.splice(index, 1);
+        this.weightGrads.splice(index, 1);
+        this.biases.splice(index, 1);
+        this.biasGrads.splice(index, 1);
+        this.optimizerStates.weights.splice(index, 1);
+        this.optimizerStates.biases.splice(index, 1);
+
+    }
+
+    add() {
+
+    }
     /**
     * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
     * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
@@ -557,6 +592,7 @@ class Neurex {
 
                         // backpropagation loop
                         const allDeltas = this.#backpropagation(activations, zs, deltas);
+
 
                         // === STEP 3: Accumulate Gradients === //
                         for (let l = 0; l < this.num_layers; l++) {

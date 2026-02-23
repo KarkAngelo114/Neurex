@@ -308,10 +308,12 @@ class Layers {
                 
                     let input = next_delta;
                     let kernels = weights;
+
                         
                     // If this is the input to the first convolutional layer, stop here
                     if (layer_index == 0) {
                         const current_Z = StackFeatureMaps(zs[layer_index]);
+                        const dActivation = activation.derivatives[function_name];
                         const inputH = current_Z.length;
                         const inputW = current_Z[0].length;
 
@@ -327,15 +329,26 @@ class Layers {
                         const padW = KW - 1 + 1;
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW)
+                        const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW);
+                    
+                        const dAct_Z = current_Z.map(row => row.map(cell => dActivation(cell)));
+
+                        // multiply input x dAct_Z
+                        const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
+
+                        
+                        if (outputDelta.flat(Infinity).some(isNaN)) {
+                            console.log(`\nlayer ${layer_index+1} outputs a tensor delta having NaN values.`)
+                            throw new Error('Error: NaN values detected');
+                        }
                     
                         return {
-                            current_delta: deltaConv,
+                            current_delta: outputDelta,
                             decrementor_value: 1
                         };
                     }
 
-                    const current_Z = StackFeatureMaps(zs[layer_index-1]);
+                    const current_Z = StackFeatureMaps(zs[layer_index]);
 
                     if (!Array.isArray(input[0][0])) {
 
@@ -375,6 +388,13 @@ class Layers {
 
                     // multiply input x dAct_Z
                     const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
+
+                    
+                    if (outputDelta.flat(Infinity).some(isNaN)) {
+                        console.log(`\nlayer ${layer_index+1} outputs a tensor delta having NaN values.`)
+                        throw new Error('Error: NaN values detected');
+                    }
+
 
                     return {
                         current_delta: outputDelta,

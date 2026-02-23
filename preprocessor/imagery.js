@@ -9,9 +9,10 @@ const sharp = require('sharp');
  * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
  * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
  * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+ * @param {Number} limit_per_class - limit the number of items per class
  * @returns an object that contains the datasets, labels, and classes
  */
-const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFormat = "grayscale") => {
+const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFormat = "grayscale", limit_per_class = 0) => {
 
     const subdirs = []; // only subdirectories (class names)
     const datasets = []; // all images converted to tensors and already normalized.
@@ -33,7 +34,14 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
         for (let className of subdirs) {
             const classDir = `${targetDir}/${className}`;
             const imgItems = await fs.readdir(classDir);
+
+            let loadedCount = 0;
             for (let imgName of imgItems) {
+                
+                if (loadedCount >= limit_per_class) {
+                    break;
+                }
+
                 const imgPath = `${classDir}/${imgName}`;
                 const stat = await fs.stat(imgPath);
                 if (stat.isFile()) {
@@ -56,6 +64,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
                         
                         datasets.push(toTensor(normalized, [height, width, channels]));
                         labels.push([className]);
+                        loadedCount++;
                     } catch (imgErr) {
                         console.error(`${red} Error processing image: ${imgPath}\n`, imgErr, `${reset}`);
                     }

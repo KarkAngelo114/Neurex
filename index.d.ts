@@ -264,6 +264,12 @@ declare module 'neurex' {
         loadSavedModel(model: string): void;
 
         /**
+        * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
+        * @throws {Error} - if there are no layers
+        */
+        pop(): void;
+
+        /**
         * 
         * @method sequentialBuild
         * 
@@ -393,9 +399,10 @@ declare module 'neurex' {
     * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
     * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @param {Number} limit_per_class - limit the number of items per class. Default is 0.
     * @returns an object that contains the datasets, labels, and classes
     */
-    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String): object;
+    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): object;
 
 
     /**

@@ -198,10 +198,8 @@ const scaleGradientsForBiases = (grad, actual_batch_size) => addon.scaleGradient
 const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrads, layer_data, allDeltas, layer_index) => {
 
     if (layer_name === "convolutionalLayer") {
-
-        if (layer_index == 0) return weightGrads;
     
-        return addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads);
+        return ComputeGradientForKernels(activated_outputs, delta, weightGrads);
     }
     else if (layer_name === "connected_layer") {
         let input = activated_outputs;
@@ -217,6 +215,47 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
         return weightGrads;
     }
 }
+
+const ComputeGradientForKernels = (input, delta, weightGrads) => {
+
+    const H = delta.length;
+    const W = delta[0].length;
+    const Cout = weightGrads.length;
+
+    const Kh = weightGrads[0].length;
+    const Kw = weightGrads[0][0].length;
+    const Cin = weightGrads[0][0][0].length;
+
+    const padH = Math.floor(Kh / 2);
+    const padW = Math.floor(Kw / 2);
+
+    for (let f = 0; f < Cout; f++) {
+        for (let kh = 0; kh < Kh; kh++) {
+            for (let kw = 0; kw < Kw; kw++) {
+                for (let c = 0; c < Cin; c++) {
+
+                    let sum = 0;
+
+                    for (let h = 0; h < H; h++) {
+                        for (let w = 0; w < W; w++) {
+
+                            const inH = h + kh - padH;
+                            const inW = w + kw - padW;
+
+                            if (inH >= 0 && inH < input.length &&inW >= 0 && inW < input[0].length) {
+                                sum += input[inH][inW][c] * delta[h][w][f];
+                            }
+                        }
+                    }
+
+                    weightGrads[f][kh][kw][c] += sum;
+                }
+            }
+        }
+    }
+
+    return weightGrads;
+};
 
 
 /**

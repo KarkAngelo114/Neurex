@@ -19,10 +19,11 @@ const SGD = (params, grads, state = {}, lr) => {
 };
 
 const Adam = (params, grads, state = {}, lr, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8) => {
-
+    
     const flatParams = flattenAll(params);
     const flatGrads  = flattenAll(grads);
-    const shape      = getShape(params);
+
+    const shape = getShape(params);
 
     if (flatParams.length !== flatGrads.length) {
         throw new Error("Adam: Params and grads size mismatch");
