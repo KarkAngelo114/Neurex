@@ -127,8 +127,7 @@ const dlinear = (input) => addon.DLinear(input);
  * @param {Number} OutputWidth
  * @returns array of 4D feature maps
  */
-
-const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth);
+const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth)
 
 /**
  * 

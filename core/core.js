@@ -48,6 +48,9 @@ class Neurex {
         this.num_layers = 0;
         this.input_size = 0;
         this.input_shape = [];
+        this.output_shape = [];
+        this.currentShape = null;
+        this.currentSize = null;
         this.accuracy = '';
         this.loss_function = '';
         this.output_size = 0;
@@ -319,7 +322,8 @@ class Neurex {
                 
                 return newLayer;
             });
-
+            
+            this.#recalculateShape();
             console.log(`${color.lime}\n[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
             console.log(error.message);
@@ -353,6 +357,9 @@ class Neurex {
                     this.input_size = layer.layer_size;
                     this.input_shape = layer.input_shape || 0;
                     this.depth = this.input_shape[2] || 0;
+
+                    this.currentShape = [...this.input_shape];
+                    this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
                 }
                 else {
                     this.layers.push(layer);
@@ -361,9 +368,13 @@ class Neurex {
 
             this.hasSequentiallyBuild = true;
             this.num_layers = this.layers.length;
+            this.#recalculateShape();
             this.#build();
+            
             return layer_data; 
         }
+
+        
         catch(err) {
             console.error(err);
         }
@@ -387,11 +398,31 @@ class Neurex {
         this.optimizerStates.weights.splice(index, 1);
         this.optimizerStates.biases.splice(index, 1);
 
+        this.num_layers--;
+        this.#recalculateShape();
     }
 
-    add() {
+
+    /**
+     * @method add_layer
+     * @param {Object} layer_data - layer data returned from Layers class
+     *
+     * @example
+     * // sample usage
+     * nrx.add_layer(layer.connectedLayer("relu", 10));
+     */
+    add_layer(layer_data) {
+
+        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]-------- No layers has been added${color.reset}`);
+
+        this.num_layers++;
+
+        this.layers.push(layer_data);
+
+        this.#buildSingle(layer_data);
 
     }
+
     /**
     * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
     * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
@@ -424,7 +455,7 @@ class Neurex {
     * * After training, you can use the network for predictions
     */
 
-    async train(trainX, trainY, loss, epoch, batch_size) {
+    async train(trainX, trainY, loss, epoch, batch_size = 1) {
         
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`); 
 
@@ -433,7 +464,7 @@ class Neurex {
         this.output_size = lastLayerObject.layer_size;
 
         try {
-            if (!trainX || !trainY || !loss) {
+            if (!trainX || trainX.length == 0 || !trainY || trainY.length == 0 || !loss) {
                 this.isfailed = true;
                 console.error(`\n${color.red}Error${color.reset}`);
                 console.log(`Train X: ${trainX ? "has data" : "no data"}`);
@@ -444,9 +475,9 @@ class Neurex {
                 throw new Error(`[FAILED]------- There is/are missing parameter/s. Failed to start training...`);
             }
 
-            if (epoch == 0 || batch_size == 0 || !epoch || !batch_size) {
+            if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
-                throw new Error("[FAILED]------- Epoch or batch size cannot be zero");
+                throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
             }
 
             this.loss_function = loss.toLowerCase();
@@ -723,7 +754,6 @@ class Neurex {
 
             let prev_size = this.input_size;
             let prevDepth = this.depth; // input layer depth
-            let offset = 0;
 
             let input_Height = this.input_shape[0] || 0;
             let input_Width = this.input_shape[1] || 0;
@@ -829,6 +859,8 @@ class Neurex {
                     const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(input_Height, input_Width, kernelHeight, kernelWidth, prevDepth, stride, padding);
                     input_Height = OutputHeight;
                     input_Width = OutputWidth;
+                    this.currentShape = [OutputHeight, OutputWidth, filters];
+                    this.currentSize = CalculatedTensorShape;
                     prev_size = CalculatedTensorShape;
                     
                 }
@@ -840,6 +872,77 @@ class Neurex {
         }
         catch (error) {
             console.error(error);
+        }
+    }
+
+    #buildSingle(layer_data) {
+        if (layer_data.layer_name === "connected_layer") {
+            const inputSize = this.currentSize;
+            const outputSize = layer_data.layer_size;
+
+            // init weights
+            const layerWeights = Array.from(
+                { length: inputSize },
+                () => Array.from(
+                    { length: outputSize },
+                    () => Math.random() * (this.randMax - this.randMin) + this.randMin
+                )
+            );
+
+            this.weights.push(layerWeights);
+            this.biases.push(Array(outputSize).fill(0));
+            this.weightGrads.push(
+                Array.from({ length: inputSize },
+                    () => Array(outputSize).fill(0)
+                )
+            );
+            this.biasGrads.push(Array(outputSize).fill(0));
+
+            // UPDATE TRACKER
+            this.currentShape = [1, 1, outputSize];
+            this.currentSize = outputSize;
+        }
+
+        else if (layer_data.layer_name === "convolutionalLayer") {
+            const [H, W, D] = this.currentShape;
+            const filters = layer_data.filters;
+            const [kernelHeight, kernelWidth] = layer_data.kernel_size;
+            const stride = layer_data.strides || 1;
+            const padding = layer_data.padding || "same";
+
+            const kernels = Array.from({ length: filters }, () =>
+                Array.from({ length: kernelHeight }, () =>
+                    Array.from({ length: kernelWidth }, () =>
+                        Array.from({ length: D }, () =>
+                            Math.random() * (this.randMax - this.randMin) + this.randMin
+                        )
+                    )
+                )
+            );
+
+            this.weights.push(kernels);
+
+            let kernelGrads = Array.from({length: filters}, 
+                () => Array.from({length: kernelHeight},
+                    () => Array.from({length: kernelWidth}, 
+                        () => Array.from({length: D}).fill(0)
+                    )
+                )
+            )
+
+            this.weightGrads.push(kernelGrads);
+
+            const bias = Array.from({ length: filters }, () =>
+                Math.random() * (this.randMax - this.randMin) + this.randMin
+            );
+
+            this.biases.push(bias);
+            this.biasGrads.push(Array(filters).fill(0));
+
+            const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(H, W, kernelHeight, kernelWidth, D, stride, padding);
+            
+            this.currentShape = [OutputHeight, OutputWidth, filters];
+            this.currentSize = CalculatedTensorShape;
         }
     }
 
@@ -855,8 +958,8 @@ class Neurex {
             const next_delta = deltas[layer_index + 1];
         
 
-            if (!Array.isArray(next_delta)) {
-                throw new Error(`deltaNext at layer ${layer_index + 1} is undefined`);
+            if (next_delta.flat(Infinity).some(isNaN)) {
+                throw new Error(`deltaNext at layer ${layer_index + 1} is undefined or NaN. If this error occurred, please report this error.`);
             }
             
             // Get the current layer object, which now holds its backpropagation logic
@@ -980,6 +1083,37 @@ class Neurex {
             if (onesCount !== 1) return false;
         }
         return true;
+    }
+
+    #recalculateShape() {
+        let H = this.input_shape[0];
+        let W = this.input_shape[1];
+        let D = this.input_shape[2];
+
+        for (let i = 0; i < this.layers.length; i++) {
+            const layer = this.layers[i];
+
+            if (layer.layer_name === "convolutionalLayer") {
+                const filters = layer.filters;
+                const [kernelHeight, kernelWidth] = layer.kernel_size;
+                const stride = layer.strides || 1;
+                const padding = layer.padding || "same";
+
+                const {OutputHeight, OutputWidth} = calculateTensorShape(H, W, kernelHeight, kernelWidth, D, stride, padding);
+                H = OutputHeight;
+                W = OutputWidth;
+                D = filters;
+                
+            }
+            else if (layer.layer_name === "connected_layer") {
+                H = 1;
+                W = 1;
+                D = layer.layer_size;
+            }
+        }
+
+        this.currentShape = [H, W, D];
+        this.currentSize = H * W * D;
     }
 }
 

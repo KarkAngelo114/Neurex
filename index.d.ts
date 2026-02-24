@@ -270,6 +270,16 @@ declare module 'neurex' {
         pop(): void;
 
         /**
+        * @method add_layer - Appends a new layer to an existing model architecture. Upon appending a new layer will initiates untrained parameters.
+        * @param {Object} layer_data - layer data returned from Layers class
+        *
+        * @example
+        * // sample usage
+        * nrx.add_layer(layer.connectedLayer("relu", 10));
+        */
+        add_layer(layer_data: Object): void;
+
+        /**
         * 
         * @method sequentialBuild
         * 
