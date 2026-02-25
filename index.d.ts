@@ -210,7 +210,7 @@ declare module 'neurex' {
 
     /**
      *
-     * A trainable neural network
+     * The core class of the library.
      *
      *
      * @class Neurex

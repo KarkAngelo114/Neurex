@@ -235,7 +235,6 @@ class Neurex {
             "num_layers":this.num_layers,
             "weights":this.weights,
             "biases":this.biases,
-            "optimizer_states":this.optimizerStates,
             "weightGrads":this.weightGrads,
             "biasGrads":this.biasGrads,
         };
@@ -300,7 +299,6 @@ class Neurex {
             this.weights = modelData.weights;
             this.biases = modelData.biases;
             this.optimizer = modelData.optimizer;
-            this.optimizerStates = modelData.optimizer_states;
             this.weightGrads = modelData.weightGrads;
             this.biasGrads = modelData.biasGrads;
             this.input_shape = modelData.input_shape
@@ -355,10 +353,10 @@ class Neurex {
                 // extract input size
                 if (layer.layer_name === "input_layer") {
                     this.input_size = layer.layer_size;
-                    this.input_shape = layer.input_shape || 0;
+                    this.input_shape = layer.input_shape || [1, 1, 1];
                     this.depth = this.input_shape[2] || 0;
 
-                    this.currentShape = [...this.input_shape];
+                    this.currentShape = [this.input_shape[0],this.input_shape[1], this.input_shape[2]];
                     this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
                 }
                 else {
@@ -395,8 +393,6 @@ class Neurex {
         this.weightGrads.splice(index, 1);
         this.biases.splice(index, 1);
         this.biasGrads.splice(index, 1);
-        this.optimizerStates.weights.splice(index, 1);
-        this.optimizerStates.biases.splice(index, 1);
 
         this.num_layers--;
         this.#recalculateShape();
@@ -551,28 +547,13 @@ class Neurex {
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
 
-                    // Initialize accumulators for gradients
-                    // function zerosLike(arr) {
-                    //     if (Array.isArray(arr)) {
-                    //         return arr.map(zerosLike);
-                    //     }
-                    //     return 0;
-                    // }
-
-                    // let weightGrads = this.weights.map(zerosLike);
-                    // let biasGrads = this.biases.map(zerosLike);
-                    
-                    // let weightGrads = this.weights.map(layer => layer.map(row => row.map(() => 0)));
-                    // let biasGrads = this.biases.map(layer => layer.map(() => 0));
+                    this.#reinitiateWeightSBiasGrads(); // reset to grads (weights and biases grads) to 0s
 
                     let weightGrads = this.weightGrads;
 
                     let biasGrads = this.biasGrads;
 
-
-                    let batchLoss = 0;
-
-                    
+                    let batchLoss = 0;                    
 
                     // Accumulate gradients for each sample in the batch
                     for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
@@ -1114,6 +1095,25 @@ class Neurex {
 
         this.currentShape = [H, W, D];
         this.currentSize = H * W * D;
+    }
+
+    #reinitiateWeightSBiasGrads() {
+        const zeroRecursive = (arr) => {
+            if (Array.isArray(arr)) {
+                for (let i = 0; i < arr.length; i++) {
+                    if (Array.isArray(arr[i])) {
+                        zeroRecursive(arr[i]);
+                    } else {
+                        arr[i] = 0;
+                    }
+                }
+            }
+        };
+
+        for (let l = 0; l < this.num_layers; l++) {
+            zeroRecursive(this.weightGrads[l]);
+            zeroRecursive(this.biasGrads[l]);
+        }
     }
 }
 

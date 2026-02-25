@@ -318,7 +318,7 @@ class Layers {
                         const inputW = current_Z[0].length;
 
                         kernels = weights[layer_index];
-                        input = toTensor(input, [activations[layer_index].length, activations[layer_index][0].length, activations[layer_index][0][0].length]);
+                        //input = toTensor(input, [activations[layer_index].length, activations[layer_index][0].length, activations[layer_index][0][0].length]);
                         const KH = kernels[0].length;
                         const KW = kernels[0][0].length;
                         // dilate the input

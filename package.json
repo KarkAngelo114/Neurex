@@ -27,7 +27,13 @@
   "license": "MIT",
   "author": "Kark Angelo",
   "type": "commonjs",
-  "main":"./index.js",
+  "main": "./index.js",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "import": "./index.mjs"
+    }
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

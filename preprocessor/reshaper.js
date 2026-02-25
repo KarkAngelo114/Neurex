@@ -1,3 +1,5 @@
+const { red, reset } = require('../prettify')
+
 /**
  * 
  * @param {Array<Number>} input - Scalar input
@@ -11,9 +13,11 @@ const toTensor = (input, shape = [0, 0, 0]) => {
 
     // if arr_Length not equal to h*w*d, append 0s to match the given shape
     if (arr_Length != (h * w * d)) {
-        for (let i = 0; i < (h * w * d) - arr_Length; i++) {
-            arr.push(0);
-        }
+        // for (let i = 0; i < (h * w * d) - arr_Length; i++) {
+        //     arr.push(0);
+        // }
+        console.log(`${red}[ERROR]------- Failed to reshape: the length of the input is less than or not eqaul to the given h * w * d${reset}`);
+        process.exit(1);
     }
 
     let index = 0
