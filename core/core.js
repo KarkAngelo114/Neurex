@@ -194,6 +194,15 @@ class Neurex {
     }
 
     /**
+     * Get the input shape
+     *
+     * @returns tensor input shape
+     */
+    getTensorShape() {
+        return this.input_shape;
+    }
+
+    /**
     * 
      @method saveModel()
      @param {string} modelName - the filename of your model
@@ -258,7 +267,7 @@ class Neurex {
                 throw new Error(`${color.red}[ERROR]------- Failed to load model.\nReason:\nThere's already a new network being built. ${color.reset}`);
             }
 
-            const dir = path.dirname(require.main.filename);
+            const dir = process.cwd();
             const model_file = path.join(dir, `${model}`);
 
             // Check extension
@@ -660,9 +669,9 @@ class Neurex {
                 }
 
                 let AverageEpochLoss = totalepochLoss / numBatches; 
-                let setColor = AverageEpochLoss > 0.09 ? color.red : 
-                                AverageEpochLoss > 0.06 ? color.orange :
-                                AverageEpochLoss > 0.04 ? color.yellow :
+                let setColor = AverageEpochLoss > 0.9 ? color.red : 
+                                AverageEpochLoss > 0.5 ? color.orange :
+                                AverageEpochLoss > 0.1 ? color.yellow :
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
                 
                 logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
@@ -989,7 +998,7 @@ class Neurex {
             console.log('[FAILED]------- Failed to save model');
         }
         else {
-            const dir = path.dirname(require.main.filename);
+            const dir = process.cwd() //path.dirname(require.main.filename);
 
             // Serialize and compress the model data
             const jsonString = JSON.stringify(data);

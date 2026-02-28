@@ -64,7 +64,7 @@ class CsvDataHandler {
             throw new Error("[ERROR]------ No file provided.");
         }
 
-        const dir = path.dirname(require.main.filename);
+        const dir = process.cwd();
         const extension_name = path.extname(filename);
 
         if (extension_name !== this._FILE_EXTENSION) {
@@ -365,7 +365,7 @@ class CsvDataHandler {
      */
     exportCSV(file_Name, data) {
         const columnNames = this.columnNames;
-        const dir = path.dirname(require.main.filename);
+        const dir = process.cwd();
         const escape = (value) => {
             if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
             return `"${value.replace(/"/g, '""')}"`; // escape double quotes

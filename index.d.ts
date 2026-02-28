@@ -242,6 +242,13 @@ declare module 'neurex' {
         Shows the model architecture
         */
         modelSummary(): void;
+
+        /**
+        * Get the input shape. Works only after loading a model or after sequential building
+        *
+        * @returns tensor input shape
+        */
+        getTensorShape(): Number[];
         
         /**
         * 
@@ -414,6 +421,15 @@ declare module 'neurex' {
     */
     export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): object;
 
+    /**
+    * 
+    * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
+    * @param {Array<Number>} flat_arr_1 - a flat array input
+    * @param {Array<Number>} flat_arr_2 - a flat array input
+    * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
+    * @throws an error will occured if both array are not equal in length
+    */
+    export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Number[];
 
     /**
     * 

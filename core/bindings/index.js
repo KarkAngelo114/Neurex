@@ -5,6 +5,7 @@
  */
 
 let path = require('path');
+const { red, reset } = require('../../prettify');
 
 let addon;
 
@@ -300,6 +301,26 @@ const computeBiasGradients = (biasGrads, delta, layer_name) => {
     }
 }
 
+/**
+ * 
+ * @function Marix_Mul use to multiply elements inside both arrays. Requires both arrays has same length;
+ * @param {Array<Number>} flat_arr_1 - a flat array input
+ * @param {Array<Number>} flat_arr_2 - a flat array input
+ * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
+ * @throws am error will occured if both array are not equal in length
+ */
+const element_wise_mul = (flat_arr_1, flat_arr_2) => {
+
+    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[EROR]------- Error: Both arrays are not equal in length. ${reset}`)
+
+    const output = Array.from({length: flat_arr_1.length}).fill(0);
+    for (let i = 0; i < flat_arr_1.length; i++) {
+        output[i] = flat_arr_1[i] * flat_arr_2[i];
+    }
+
+    return output;
+}
+
 
 module.exports = {
     MatMul,
@@ -318,6 +339,7 @@ module.exports = {
     scaleGradientsForBiases,
     ApplySGD,
     ApplyAdam,
+    element_wise_mul,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

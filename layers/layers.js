@@ -1,5 +1,5 @@
 const activation = require('../core/bindings');
-const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps, ConvolveDelta} = require('../core/bindings');
+const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps, ConvolveDelta, element_wise_mul} = require('../core/bindings');
 const {calculateTensorShape, getPaddingSizes, applyPadding, DilateInput} = require('../utils/utils');
 const { toTensor } = require('../preprocessor/reshaper');
 const { ConvolveDeltaTest } = require('../core/bindings/test');
@@ -287,15 +287,12 @@ class Layers {
                                  
                     const z_values = new_feature_maps; // z_values are the new feature maps before activation
 
-                    //console.log(z_values[0].length);
-
                     // activate each depth input using the given activation function
                     const activation_function = activation[function_name];
-                    const outputs = [];
-                    stacked.forEach((row, i) => {
-                        const innerRow = row.map(cell => activation_function(cell));
-                        outputs.push(innerRow);
-                    });
+
+                    const [h, w, d] = [stacked.length, stacked[0].length, stacked[0][0].length];
+
+                    const outputs = toTensor(activation_function(stacked.flat(Infinity)), [h, w, d]);
 
                     return {
                         outputs,
@@ -318,7 +315,6 @@ class Layers {
                         const inputW = current_Z[0].length;
 
                         kernels = weights[layer_index];
-                        //input = toTensor(input, [activations[layer_index].length, activations[layer_index][0].length, activations[layer_index][0][0].length]);
                         const KH = kernels[0].length;
                         const KW = kernels[0][0].length;
                         // dilate the input
@@ -330,11 +326,12 @@ class Layers {
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
                         const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW);
-                    
-                        const dAct_Z = current_Z.map(row => row.map(cell => dActivation(cell)));
+
+                        const [h, w, d] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
+                        const dAct_Z = dActivation(current_Z.flat(Infinity));
 
                         // multiply input x dAct_Z
-                        const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
+                        const outputDelta = toTensor(element_wise_mul(deltaConv.flat(Infinity), dAct_Z), [h, w, d]);
 
                         
                         if (outputDelta.flat(Infinity).some(isNaN)) {
@@ -379,15 +376,15 @@ class Layers {
                 
                     const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
 
-                    const z = current_Z;
-
                     const dActivation = activation.derivatives[function_name];
 
                     // apply the derivative activation function for all zs
-                    const dAct_Z = z.map(row => row.map(cell => dActivation(cell)));
+                    const [h, w, d] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
+                    const dAct_Z = dActivation(current_Z.flat(Infinity))
 
                     // multiply input x dAct_Z
-                    const outputDelta = deltaConv.map((row, h) => row.map((cell, w) => cell.map((val, c) => val * dAct_Z[h][w][c])));
+                    // element_wise_mul() operates on 1D arrays, so we flattened the delta map as input arr 1 and dAct_Z as input arr 2. We reshape the delta tensor map using toTensor()
+                    const outputDelta = toTensor(element_wise_mul(deltaConv.flat(Infinity), dAct_Z), [h, w, d]);
 
                     
                     if (outputDelta.flat(Infinity).some(isNaN)) {

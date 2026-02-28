@@ -12,5 +12,6 @@ export const {
     RegressionMetrics,
     ClassificationMetrics,
     toTensor,
-    load_images_from_directory
+    load_images_from_directory,
+    element_wise_mul
 } = pkg;

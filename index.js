@@ -18,6 +18,7 @@ const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
 const {toTensor} = require('./preprocessor/reshaper');
 const { load_images_from_directory } = require('./preprocessor/imagery');
+const { element_wise_mul } = require('./core/bindings');
 
 module.exports= {
     Neurex,
@@ -31,5 +32,6 @@ module.exports= {
     RegressionMetrics,
     ClassificationMetrics,
     toTensor,
-    load_images_from_directory
+    load_images_from_directory,
+    element_wise_mul,
 }

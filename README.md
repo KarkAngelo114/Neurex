@@ -19,10 +19,15 @@ npm install neurex
 4. After successful installation, you can now train ANN models and do predictions in your backend applications.
 
 ## Documentation
-Checkout the documentation how to get started and some starter examples [here](https://neurex-documentation.vercel.app/).
+Checkout the documentation for full API reference and some starter examples [here](https://neurex-documentation.vercel.app/).
 
 # Neurex
-Neurex is a Javascript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications.
+Neurex is a Javascript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications. This library supports:
+
+✅ training ANN
+✅ training CNN + ANN
+✅ both CommonJS and ES module importing
+✅ retraining and transfer learning
 
 ## Sample usage - training a XOR 
 Here's an example on you can use `Neurex` to train on XOR problem.
@@ -60,8 +65,6 @@ nrx.sequentialBuild([
     layer.connectedLayer('sigmoid',1)
 ]);
 
-// build the model
-nrx.build();
 
 // you can show the summary of your model by calling modelSummary()
 nrx.modelSummary();
