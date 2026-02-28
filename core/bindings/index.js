@@ -128,15 +128,7 @@ const dlinear = (input) => addon.DLinear(input);
  * @param {Number} OutputWidth
  * @returns array of 4D feature maps
  */
-const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth)
-
-/**
- * 
- * "✅"
- * @param {Array<Array<Array<Array<Number>>>>} featureMaps 
- * @returns 1 stack of feature map with increasing depth
- */
-const StackFeatureMaps = (featureMaps) => addon.StackFeatureMaps(featureMaps);
+const Convolve = (strides = 1,input, kernels, biases, OutputHeight, OutputWidth) => addon.Convolve(strides, input, kernels, biases, OutputHeight, OutputWidth);
 
 /**
  * "✅"
@@ -186,6 +178,16 @@ const ApplyAdam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon)
 const scaleGradientsForBiases = (grad, actual_batch_size) => addon.scaleGradientsForBiases(grad, actual_batch_size);
 
 /**
+ * "✅"
+ * @param {Array<Number} arr - input 1D array 
+ * @param {Number} h - set height
+ * @param {Number} w - set width
+ * @param {Number} d - set depth
+ * @returns reshaped tensor
+ */
+const transform_to_tensor = (arr, h, w, d) => addon.toTensor(arr, h, w, d);
+
+/**
  * 
  * "✅"
  * @param {*} activated_outputs 
@@ -199,7 +201,7 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
 
     if (layer_name === "convolutionalLayer") {
     
-        return ComputeGradientForKernels(activated_outputs, delta, weightGrads);
+        return addon.ComputeGradientForKernels(activated_outputs, delta, weightGrads);
     }
     else if (layer_name === "connected_layer") {
         let input = activated_outputs;
@@ -215,47 +217,6 @@ const computeWeightGradients = (activated_outputs, delta, layer_name, weightGrad
         return weightGrads;
     }
 }
-
-const ComputeGradientForKernels = (input, delta, weightGrads) => {
-
-    const H = delta.length;
-    const W = delta[0].length;
-    const Cout = weightGrads.length;
-
-    const Kh = weightGrads[0].length;
-    const Kw = weightGrads[0][0].length;
-    const Cin = weightGrads[0][0][0].length;
-
-    const padH = Math.floor(Kh / 2);
-    const padW = Math.floor(Kw / 2);
-
-    for (let f = 0; f < Cout; f++) {
-        for (let kh = 0; kh < Kh; kh++) {
-            for (let kw = 0; kw < Kw; kw++) {
-                for (let c = 0; c < Cin; c++) {
-
-                    let sum = 0;
-
-                    for (let h = 0; h < H; h++) {
-                        for (let w = 0; w < W; w++) {
-
-                            const inH = h + kh - padH;
-                            const inW = w + kw - padW;
-
-                            if (inH >= 0 && inH < input.length &&inW >= 0 && inW < input[0].length) {
-                                sum += input[inH][inW][c] * delta[h][w][f];
-                            }
-                        }
-                    }
-
-                    weightGrads[f][kh][kw][c] += sum;
-                }
-            }
-        }
-    }
-
-    return weightGrads;
-};
 
 
 /**
@@ -303,6 +264,7 @@ const computeBiasGradients = (biasGrads, delta, layer_name) => {
 
 /**
  * 
+ * "✅"
  * @function Marix_Mul use to multiply elements inside both arrays. Requires both arrays has same length;
  * @param {Array<Number>} flat_arr_1 - a flat array input
  * @param {Array<Number>} flat_arr_2 - a flat array input
@@ -313,12 +275,7 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[EROR]------- Error: Both arrays are not equal in length. ${reset}`)
 
-    const output = Array.from({length: flat_arr_1.length}).fill(0);
-    for (let i = 0; i < flat_arr_1.length; i++) {
-        output[i] = flat_arr_1[i] * flat_arr_2[i];
-    }
-
-    return output;
+    return addon.Matrix_Mul(flat_arr_1, flat_arr_2);
 }
 
 
@@ -331,7 +288,6 @@ module.exports = {
     softmax,
     linear,
     Convolve,
-    StackFeatureMaps,
     ConvolveDelta,
     computeWeightGradients,
     computeBiasGradients,
@@ -340,6 +296,7 @@ module.exports = {
     ApplySGD,
     ApplyAdam,
     element_wise_mul,
+    transform_to_tensor,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

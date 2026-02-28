@@ -1,8 +1,7 @@
 const activation = require('../core/bindings');
-const {MatMul, DeltaMatMul, Convolve, StackFeatureMaps, ConvolveDelta, element_wise_mul} = require('../core/bindings');
+const {MatMul, DeltaMatMul, Convolve, ConvolveDelta, element_wise_mul} = require('../core/bindings');
 const {calculateTensorShape, getPaddingSizes, applyPadding, DilateInput} = require('../utils/utils');
 const { toTensor } = require('../preprocessor/reshaper');
-const { ConvolveDeltaTest } = require('../core/bindings/test');
 
 class Layers {
     constructor () {
@@ -280,19 +279,17 @@ class Layers {
                     const paddedInput = applyPadding(input, top, bottom, left, right);
 
                     // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const new_feature_maps = Convolve(strides, paddedInput, weights, biases, OutputHeight, OutputWidth);
+                    const new_feature_map = Convolve(strides, paddedInput, weights, biases, OutputHeight, OutputWidth);
 
-
-                    const stacked = StackFeatureMaps(new_feature_maps);
-                                 
-                    const z_values = new_feature_maps; // z_values are the new feature maps before activation
+                    const z_values = new_feature_map; // z_values are the new feature maps before activation
 
                     // activate each depth input using the given activation function
                     const activation_function = activation[function_name];
 
-                    const [h, w, d] = [stacked.length, stacked[0].length, stacked[0][0].length];
+                    const [h, w, d] = [new_feature_map.length, new_feature_map[0].length, new_feature_map[0][0].length];
 
-                    const outputs = toTensor(activation_function(stacked.flat(Infinity)), [h, w, d]);
+                    // flatten, use the activation function and reshape
+                    const outputs = toTensor(activation_function(new_feature_map.flat(Infinity)), [h, w, d]);
 
                     return {
                         outputs,
@@ -309,7 +306,7 @@ class Layers {
                         
                     // If this is the input to the first convolutional layer, stop here
                     if (layer_index == 0) {
-                        const current_Z = StackFeatureMaps(zs[layer_index]);
+                        const current_Z = zs[layer_index];
                         const dActivation = activation.derivatives[function_name];
                         const inputH = current_Z.length;
                         const inputW = current_Z[0].length;
@@ -325,8 +322,8 @@ class Layers {
                         const padW = KW - 1 + 1;
                         const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
 
-                        const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW);
-
+                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
+                        
                         const [h, w, d] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
                         const dAct_Z = dActivation(current_Z.flat(Infinity));
 
@@ -345,7 +342,7 @@ class Layers {
                         };
                     }
 
-                    const current_Z = StackFeatureMaps(zs[layer_index]);
+                    const current_Z = zs[layer_index];
 
                     if (!Array.isArray(input[0][0])) {
 
@@ -374,7 +371,7 @@ class Layers {
                     const padW = KW - 1 + 1;
                     const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
                 
-                    const deltaConv = ConvolveDeltaTest(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
+                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
 
                     const dActivation = activation.derivatives[function_name];
 
