@@ -17,7 +17,7 @@ const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
 const {toTensor} = require('./preprocessor/reshaper');
-const { load_images_from_directory } = require('./preprocessor/imagery');
+const { load_images_from_directory, load_single_image } = require('./preprocessor/imagery');
 const { element_wise_mul } = require('./core/bindings');
 
 module.exports= {
@@ -34,4 +34,5 @@ module.exports= {
     toTensor,
     load_images_from_directory,
     element_wise_mul,
+    load_single_image
 }

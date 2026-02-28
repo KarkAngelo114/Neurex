@@ -87,6 +87,57 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     }
 }
 
+/**
+ * 
+ * @param {String} file_path - path to the image file (can be nested anywhere)
+ * @param {Array<Number>} resize - resize the image to [H, W]
+ * @param {String} pixelFormat - grayscale, rgb, or rgba.
+ * @returns a normalized tensor map
+ */
+const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale") => {
+
+    try {
+        console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+
+        const stat = await fs.stat(file_path);
+
+        if (!stat.isFile()) {
+            throw new Error("Provided path is not a valid file.");
+        }
+
+        let image = sharp(file_path).resize(resize[1], resize[0]);
+
+        // Apply pixel format
+        if (pixelFormat === 'grayscale') {
+            image = image.grayscale();
+        } else if (pixelFormat === 'rgb') {
+            image = image.removeAlpha();
+        } else if (pixelFormat === 'rgba') {
+            image = image.ensureAlpha();
+        }
+
+        const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+
+        // Normalize to [0, 1]
+        const normalized = Array.from(data).map(v => v / 255);
+        const { width, height, channels } = info;
+
+        const tensor = toTensor(normalized, [height, width, channels]);
+
+        console.log(`${green}[/]------- Successfully loaded image "${file_path}"${reset}\n`);
+
+        return {
+            datasets: [tensor],
+            shape: [height, width, channels]
+        };
+
+    } catch (error) {
+        console.error(`${red} Error occurred while loading image:\n`, error, `${reset}`);
+        process.exit(1);
+    }
+};
+
 module.exports = {
-    load_images_from_directory
+    load_images_from_directory,
+    load_single_image
 }

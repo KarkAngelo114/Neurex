@@ -13,5 +13,6 @@ export const {
     ClassificationMetrics,
     toTensor,
     load_images_from_directory,
+    load_single_image,
     element_wise_mul
 } = pkg;

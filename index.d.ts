@@ -431,6 +431,17 @@ declare module 'neurex' {
     */
     export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Number[];
 
+
+    /**
+    * 
+    * @function load_single_image allows you to load a single image
+    * @param {String} file_path - points to the directory of the image
+    * @param {Array<Number>} resize - resize the image to [h][w][d]
+    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @returns a normalized tensor map
+    */
+    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String): Number[][][];
+
     /**
     * 
     * 
