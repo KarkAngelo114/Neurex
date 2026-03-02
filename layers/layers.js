@@ -303,6 +303,19 @@ class Layers {
                     let input = next_delta;
                     let kernels = weights;
 
+                    const current_Z = zs[layer_index];
+
+                    if (!Array.isArray(input[0][0])) {
+
+                        const [H, W, D] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
+
+                        const flatten_delta = DeltaMatMul(next_weights, input);
+                        
+                        // reshape the flattened_Delta
+                        input = toTensor(flatten_delta, [H, W, D]);
+
+                    }
+
                         
                     // If this is the input to the first convolutional layer, stop here
                     if (layer_index == 0) {
@@ -342,18 +355,7 @@ class Layers {
                         };
                     }
 
-                    const current_Z = zs[layer_index];
-
-                    if (!Array.isArray(input[0][0])) {
-
-                        const [H, W, D] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
-
-                        const flatten_delta = DeltaMatMul(next_weights, input);
-                        
-                        // reshape the flattened_Delta
-                        input = toTensor(flatten_delta, [H, W, D]);
-
-                    }
+                    
 
                     const inputH = current_Z.length;
                     const inputW = current_Z[0].length;
