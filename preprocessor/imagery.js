@@ -118,7 +118,6 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
 
         const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
 
-        // Normalize to [0, 1]
         const normalized = Array.from(data).map(v => v / 255);
         const { width, height, channels } = info;
 
@@ -137,7 +136,63 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
     }
 };
 
+
+/**
+ * 
+ * @param {String} file_path - path to the image file (can be nested anywhere)
+ * @param {Array<Number>} resize - resize the image to [H, W]
+ * @param {String} pixelFormat - grayscale, rgb, or rgba.
+ * @returns an object containing an array of tensor normalized tensor maps and their file path
+ */
+const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = "grayscale") => {
+
+    const datasets = [];
+    const paths = [];
+
+    try {
+        console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+
+        const items = await fs.readdir(file_path);
+
+        for (const img of items) {
+            const imagePath = `${file_path}/${img}`;
+
+            paths.push(imagePath);
+
+            let image = sharp(imagePath).resize(resize[1], resize[0]);
+
+            if (pixelFormat === "grayscale") {
+                image = image.grayscale();
+            }
+            else if (pixelFormat === "rgb") {
+                image = image.removeAlpha();
+            }
+            else if (pixelFormat === "rgba") {
+                image = image.ensureAlpha();
+            }
+
+            const {data, info} = await image.raw().toBuffer({ resolveWithObject:true});
+            const normalized = Array.from(data).map(v => v / 255);
+            const { width, height, channels } = info;
+
+            datasets.push(toTensor(normalized, [height, width, channels]));
+            
+
+        }
+
+        return {
+            datasets: datasets,
+            paths: paths
+        }
+    }
+    catch (error) {
+        console.error(`${red} Error occurred while loading image:\n`, error, `${reset}`);
+        process.exit(1);
+    }
+}
+
 module.exports = {
     load_images_from_directory,
-    load_single_image
+    load_single_image,
+    load_multiple_images
 }

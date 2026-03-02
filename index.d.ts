@@ -444,6 +444,16 @@ declare module 'neurex' {
 
     /**
     * 
+    * @function load_single_image allows you to load a single image
+    * @param {String} file_path - points to the directory of the image
+    * @param {Array<Number>} resize - resize the image to [h][w][d]
+    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @returns an array of normalized tensor maps
+    */
+    export function load_multiple_images(targetDir: String, resize: Number[], pixelFormat: String): Number[][][][];
+
+    /**
+    * 
     * 
     *
     * Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
