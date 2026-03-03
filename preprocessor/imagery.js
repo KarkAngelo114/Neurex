@@ -1,6 +1,6 @@
 
 const { toTensor } = require('./reshaper');
-const { red, reset, green } = require('../prettify')
+const { red, reset, green, lime } = require('../prettify')
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
@@ -150,7 +150,7 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
     const paths = [];
 
     try {
-        console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+        console.log(`\n${green}[Task]------- Loading images from "${file_path}" ${reset}`);
 
         const items = await fs.readdir(file_path);
 
@@ -176,9 +176,9 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
             const { width, height, channels } = info;
 
             datasets.push(toTensor(normalized, [height, width, channels]));
-            
-
         }
+
+        console.log(`\n${lime}[SUCCESS]------ Successfully loaded images from "${file_path}/"${reset}`)
 
         return {
             datasets: datasets,

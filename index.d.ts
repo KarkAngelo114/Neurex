@@ -249,6 +249,13 @@ declare module 'neurex' {
         * @returns tensor input shape
         */
         getTensorShape(): Number[];
+
+        /**
+        * Get the input size
+        * 
+        * @returns the input size equivalent of number of features as innput
+        */
+        getInputSize(): Number;
         
         /**
         * 
@@ -505,5 +512,30 @@ declare module 'neurex' {
          */
         convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
         
+    }
+
+    /**
+     * 
+     * Automate annotations with `Annotator` module
+     *
+     * @class Annotator
+     */
+
+    export interface AnnotatorConfig {
+        /** Model file to be loaded */
+        model_path?: String;
+        /** Target directory of images */
+        target_directory_path?: String;
+        /** Array of class names */
+        classes?: Array<String>;
+        /** Load a CSV file */
+        CSV_file_name?: String;
+    }
+
+    export class Annotator {
+        configure(config: AnnotatorConfig): void;
+        init(): void;
+        imageClassifier(): void;
+        image_classify(): void;
     }
 }

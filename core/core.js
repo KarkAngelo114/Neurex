@@ -47,7 +47,7 @@ class Neurex {
         this.biases = [];
         this.num_layers = 0;
         this.input_size = 0;
-        this.input_shape = [];
+        this.input_shape = null;
         this.output_shape = [];
         this.currentShape = null;
         this.currentSize = null;
@@ -203,6 +203,15 @@ class Neurex {
     }
 
     /**
+     * Get the input size
+     * 
+     * @returns the input size equivalent of number of features as innput
+     */
+    getInputSize() {
+        return this.input_size;
+    }
+
+    /**
     * 
      @method saveModel()
      @param {string} modelName - the filename of your model
@@ -336,6 +345,10 @@ class Neurex {
             console.log(error.message);
             process.exit(1);
         }
+    }
+
+    get_task_type() {
+        return this.task || "Task not specified";
     }
 
     /**

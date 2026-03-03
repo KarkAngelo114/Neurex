@@ -4,6 +4,7 @@ export const {
     Neurex,
     CsvDataHandler,
     MinMaxScaler,
+    Annotator,
     Layers,
     OneHotEncoded,
     IntegerLabeling,
