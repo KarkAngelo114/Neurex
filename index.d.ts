@@ -533,9 +533,27 @@ declare module 'neurex' {
     }
 
     export class Annotator {
+        /**
+         * @method configure()
+         * @param {Object} config - set configuration for annotation
+         */
         configure(config: AnnotatorConfig): void;
+
+        /**
+         * @method init() - Initialize instances, loading the model and setting internal variables
+         */
         init(): void;
+
+        /**
+         * @async
+         * @method imageClassifier() - prepares data and internal variales for annotation
+         */
         imageClassifier(): void;
+
+        /**
+         * @async
+         * @method image_classify() - starts the annotation process. Automatically classify images and sorting them based on the predicted class. 
+         */
         image_classify(): void;
     }
 }
