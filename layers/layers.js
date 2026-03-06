@@ -207,12 +207,18 @@ class Layers {
                     };
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
-                    const current_delta = DeltaMatMul(next_weights, next_delta).map((value, i) =>
-                        value * activation.derivatives[function_name]([zs[layer_index][i]])
-                    );
+                    // const current_delta = DeltaMatMul(next_weights, next_delta).map((value, i) =>
+                    //     value * activation.derivatives[function_name]([zs[layer_index][i]])
+                    // );
 
+                    const dActivation = activation.derivatives[function_name];
+
+                    const dAct = dActivation(zs[layer_index]);
+
+                    const delta_res = DeltaMatMul(next_weights, next_delta);
+
+                    const current_delta = element_wise_mul(dAct, delta_res);
                     
-
                     return {
                         current_delta,
                         decrementor_value: 1
