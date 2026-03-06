@@ -375,11 +375,12 @@ class Neurex {
                 // extract input size
                 if (layer.layer_name === "input_layer") {
                     this.input_size = layer.layer_size;
-                    this.input_shape = layer.input_shape || [1, 1, 1];
+                    this.input_shape = layer.input_shape || [1, 1, this.input_size || 0];
                     this.depth = this.input_shape[2] || 0;
 
                     this.currentShape = [this.input_shape[0],this.input_shape[1], this.input_shape[2]];
                     this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
+
                 }
                 else {
                     this.layers.push(layer);
@@ -754,127 +755,92 @@ class Neurex {
     // ========= Private methods =======
     #build() {
         try {
+            // Start from the base input state
+            let [H, W, D] = this.input_shape;
+            this.currentShape = [H, W, D];
+            this.currentSize = H * W * D;
 
-            let prev_size = this.input_size;
-            let prevDepth = this.depth; // input layer depth
-
-            let input_Height = this.input_shape[0] || 0;
-            let input_Width = this.input_shape[1] || 0;
-
-            // initialized weights and biases
-            this.layers.forEach((layer_data, idx) => {
+            this.layers.forEach((layer_data) => {
                 if (layer_data.layer_name === "connected_layer") {
-                    let layer_size = layer_data.layer_size;
+                    const layer_size = layer_data.layer_size;
+                    const input_size = this.currentSize;
 
-                    // initialize biases
-                    let generated_biases = [];
-                    for (let j = 0; j < layer_size; j++) {
-                        generated_biases.push(Math.random() * (this.randMax - this.randMin) + this.randMin);
-                    }
+                    // 1. Initialize Biases
+                    const generated_biases = Array.from({ length: layer_size }, 
+                        () => Math.random() * (this.randMax - this.randMin) + this.randMin
+                    );
                     this.biases.push(generated_biases);
+                    this.biasGrads.push(new Array(layer_size).fill(0));
 
-                    // initialized bias grads;
-                    let initiatedBiasGrads = [];
-                    for (let j = 0; j < layer_size; j++) {
-                        initiatedBiasGrads.push(0);
-                    }
-                    this.biasGrads.push(initiatedBiasGrads);
-
-                    // initialize weights
-                    let layerWeights = [];
-                    for (let r = 0; r < prev_size * this.filters; r++) {
-                        let row = [];
-                        for (let c = 0; c < layer_size; c++) {
-                            row.push(Math.random() * (this.randMax - this.randMin) + this.randMin);
-                        }
-                        layerWeights.push(row);
-                    }
+                    // 2. Initialize Weights [Input x Output]
+                    const layerWeights = Array.from({ length: input_size }, () =>
+                        Array.from({ length: layer_size }, 
+                            () => Math.random() * (this.randMax - this.randMin) + this.randMin
+                        )
+                    );
                     this.weights.push(layerWeights);
-
-                    // initialized weight grads
-                    let initiated_weightGrads = [];
-                    for (let r = 0; r < prev_size * this.filters; r++) {
-                        let row = [];
-                        for (let c = 0; c < layer_size; c++) {
-                            row.push(0);
-                        }
-                        initiated_weightGrads.push(row);
-                    }
+                    
+                    const initiated_weightGrads = Array.from({ length: input_size }, 
+                        () => new Array(layer_size).fill(0)
+                    );
                     this.weightGrads.push(initiated_weightGrads);
 
-
-                    this.filters = 1; // we reset it to 1 so that the value of this.filters is only used by the first connected layer only after flatten
-                    prev_size = layer_size;
-                }
+                    // 3. Update state for the next layer
+                    this.currentShape = [1, 1, layer_size];
+                    this.currentSize = layer_size;
+                } 
+                
                 else if (layer_data.layer_name === "convolutionalLayer") {
                     const filters = layer_data.filters;
-                    const [kernelHeight, kernelWidth] = layer_data.kernel_size;
+                    const [kH, kW] = layer_data.kernel_size;
                     const stride = layer_data.strides || 1;
                     const padding = layer_data.padding || "same";
+                    const inputDepth = this.currentShape[2];
 
-                    const depth = prevDepth;
-
-
-                    // initialize kernels
-                    let kernels = [];
-                    for (let numFilters = 0; numFilters < filters; numFilters++) {
-                        let rows = [];
-                        for (let height = 0; height < kernelHeight; height++) {
-                            let row_element = [];
-                            for (let width = 0; width < kernelWidth; width++) {
-                                let depth_elements = [];
-                                for (let num_depth_elements = 0; num_depth_elements < depth; num_depth_elements++) {
-                                    depth_elements.push(Math.random() * (this.randMax - this.randMin)+this.randMin);
-                                }
-                                row_element.push(depth_elements);
-                            }
-                            rows.push(row_element);
-                        }
-                        kernels.push(rows);
-                    }
-                    this.weights.push(kernels);
-
-                    let kernelGrads = Array.from({length: filters}, 
-                        () => Array.from({length: kernelHeight},
-                            () => Array.from({length: kernelWidth}, 
-                                () => Array.from({length: depth}).fill(0)
+                    // 1. Initialize Kernels [Filters x Height x Width x Depth]
+                    const kernels = Array.from({ length: filters }, () =>
+                        Array.from({ length: kH }, () =>
+                            Array.from({ length: kW }, () =>
+                                Array.from({ length: inputDepth }, 
+                                    () => Math.random() * (this.randMax - this.randMin) + this.randMin
+                                )
                             )
                         )
-                    )
+                    );
+                    this.weights.push(kernels);
 
-                    this.weightGrads.push(kernelGrads)
+                    const kernelGrads = Array.from({ length: filters }, () =>
+                        Array.from({ length: kH }, () =>
+                            Array.from({ length: kW }, () => 
+                                new Array(inputDepth).fill(0)
+                            )
+                        )
+                    );
+                    this.weightGrads.push(kernelGrads);
 
-                    // initialize bias for each kernel
-                    let biases = [];
-                    for (let numFilters = 0; numFilters < filters; numFilters++) {
-                        biases.push(Math.random() * (this.randMax - this.randMin)+this.randMin);
-                    }
+                    // 2. Initialize Biases (one per filter)
+                    const biases = Array.from({ length: filters }, 
+                        () => Math.random() * (this.randMax - this.randMin) + this.randMin
+                    );
                     this.biases.push(biases);
+                    this.biasGrads.push(new Array(filters).fill(0));
 
-                    // initialized bias grads for kernels
-                    let biasesKernelGrads = [];
-                    for (let numFilters = 0; numFilters < filters; numFilters++) {
-                        biasesKernelGrads.push(0);
-                    }
-                    this.biasGrads.push(biasesKernelGrads);
-                    prevDepth = filters;
-                    
-                    const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(input_Height, input_Width, kernelHeight, kernelWidth, prevDepth, stride, padding);
-                    input_Height = OutputHeight;
-                    input_Width = OutputWidth;
+                    // 3. Calculate new shape using utility
+                    const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(
+                        this.currentShape[0], 
+                        this.currentShape[1], 
+                        kH, kW, filters, stride, padding
+                    );
+
                     this.currentShape = [OutputHeight, OutputWidth, filters];
                     this.currentSize = CalculatedTensorShape;
-                    prev_size = CalculatedTensorShape;
-                    
                 }
-
             });
 
             this.hasBuilt = true;
-
-        }
-        catch (error) {
-            console.error(error);
+        } catch (error) {
+            console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
+            throw error;
         }
     }
 
