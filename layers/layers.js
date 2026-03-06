@@ -49,117 +49,6 @@ class Layers {
         }
     }
 
-    /**
-    * 
-    *
-    @method flatten()  
-    Flattens the output of the last convolutional layer into a 1D array. This layer is crucial before connecting to fully connected layers as
-    it bridges the gap between feature extraction part of your network and the connected layers.
-    */
-    flatten() {
-        return {
-            "layer_name":"flatten_layer",
-            feedforward: (onGPU, input, weights=null, bias = null, current_layer) => {
-                
-                const flattened = input.flat(Infinity);
-
-                //console.log('forward Flattened:',flattened)
-
-                return {
-                    outputs: flattened,
-                    z_values: flattened,
-                    incrementor_value: 0
-                }
-            },
-            backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
-                // Get the feature maps output from the previous convolutional layer
-
-                // console.log('Weights',next_weights)
-                const feature_maps = zs[layer_index - 1];
-                const filters = feature_maps.length;
-                const [H, W, D] = [
-                    feature_maps[0].length,
-                    feature_maps[0][0].length,
-                    feature_maps[0][0][0].length
-                ];
-
-                // STEP 1: Compute the delta for the flatten layer (pre-flattened form)
-                // multiply next_weights * next_delta
-                // let flatten_delta = new Array(next_weights.length).fill(0);
-                // for (let i = 0; i < next_weights.length; i++) {
-                //     let sum = 0;
-                //     for (let j = 0; j < next_weights[i].length; j++) {
-                //         sum += next_weights[i][j] * next_delta[j];
-                //     }
-                //     flatten_delta[i] = sum;
-                // }
-
-                const flatten_delta = DeltaMatMul(next_weights, next_delta);
-                // console.log('What the flatten layer receive during backprop',flatten_delta);
-
-                // STEP 2: Reshape flatten_delta back to convolutional feature maps
-                const reshapeFeatureMaps = [];
-                let idx = 0;
-                for (let f = 0; f < filters; f++) {
-                    const feature_map = [];
-                    for (let h = 0; h < H; h++) {
-                        let row = [];
-                        for (let w = 0; w < W; w++) {
-                            let depthArr = [];
-                            for (let d = 0; d < D; d++) {
-                                depthArr.push(flatten_delta[idx++]);
-                            }
-                            row.push(depthArr);
-                        }
-                        feature_map.push(row);
-                    }
-                    reshapeFeatureMaps.push(feature_map);
-                }
-
-                const delta = StackFeatureMaps(reshapeFeatureMaps);
-
-                return {
-                    current_delta: delta,
-                    decrementor_value: 0
-                };
-            }
-            // backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
-            //     // next_delta is already δ_flat
-
-            //     // console.log('what the flatten received',next_delta)
-            //     const flatten_delta = next_delta;
-
-            //     const [F, H, W, D] = currentLayer.input_shape;
-
-            //     const reshapeFeatureMaps = [];
-            //     let idx = 0;
-
-            //     for (let f = 0; f < F; f++) {
-            //         const feature_map = [];
-            //         for (let h = 0; h < H; h++) {
-            //             const row = [];
-            //             for (let w = 0; w < W; w++) {
-            //                 const depthArr = [];
-            //                 for (let d = 0; d < D; d++) {
-            //                     depthArr.push(flatten_delta[idx++]);
-            //                 }
-            //                 row.push(depthArr);
-            //             }
-            //             feature_map.push(row);
-            //         }
-            //         reshapeFeatureMaps.push(feature_map);
-            //     }
-
-            //     return {
-            //         current_delta: reshapeFeatureMaps,
-            //         decrementor_value: 0
-            //     };
-            // }
-
-
-        }
-    }
-
 
     /**
      * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
@@ -207,9 +96,6 @@ class Layers {
                     };
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
-                    // const current_delta = DeltaMatMul(next_weights, next_delta).map((value, i) =>
-                    //     value * activation.derivatives[function_name]([zs[layer_index][i]])
-                    // );
 
                     const dActivation = activation.derivatives[function_name];
 
