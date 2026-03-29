@@ -16,8 +16,7 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../prettify');
-const { computeWeightGradients, computeBiasGradients, scaleGradientsForWeights, scaleGradientsForBiases } = require('../core/bindings');
-const { calculateTensorShape } = require('../utils');
+const { calculateTensorShape, XavierInitialization } = require('../utils');
 const Layers = require('../layers/layers');
 
 
@@ -66,8 +65,6 @@ class Neurex {
         // default configs
         this.optimizer = 'sgd';
         this.learning_rate = 0.001;
-        this.randMin = -0.01;
-        this.randMax = 0.01;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -109,8 +106,6 @@ class Neurex {
     configure(configs) {
         if (configs.learning_rate !== undefined) this.learning_rate = configs.learning_rate;
         if (configs.optimizer !== undefined) this.optimizer = configs.optimizer;
-        if (configs.randMin !== undefined) this.randMin = configs.randMin;
-        if (configs.randMax !== undefined) this.randMax = configs.randMax;
 
         if (configs.checkpoint_per_epoch < 0) {
             this.isfailed = true;
@@ -184,8 +179,8 @@ class Neurex {
                 [h, w, d] = currentShape;
             }
         });
-        const total_weights = this.weights.flat(Infinity).length
-        const total_biases = this.biases.flat(Infinity).length
+        const total_weights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
+        const total_biases = this.biases.reduce((sum, arr) => sum + arr.length, 0);
         console.log("===============================================================");
         console.log("Total layers: " + this.num_layers);
         console.log("Total Learnable parameters:",parseInt(total_weights+total_biases));
@@ -245,16 +240,21 @@ class Neurex {
                 padding: layer.padding || '',
                 filters: layer.filters || 0,
                 strides: layer.strides || 0,
-                kernel_size: layer.kernel_size || [0, 0]
+                kernel_size: layer.kernel_size || [0, 0],
+                weightShape: layer.weightShape || [],
+                inputShape: layer.inputShape || [],
+                outputShape: layer.outputShape || [],
+
             })),
             "input_size":this.input_size,
             "input_shape":this.input_shape,
             "output_size":this.output_size,
             "num_layers":this.num_layers,
-            "weights":this.weights,
-            "biases":this.biases,
-            "weightGrads":this.weightGrads,
-            "biasGrads":this.biasGrads,
+            "weights":this.weights.map(w => Array.from(w)),
+            "biases":this.biases.map(b => Array.from(b)),
+            "weightGrads":this.weightGrads.map(wg => Array.from(wg)),
+            "biasGrads":this.biasGrads.map(bg => Array.from(bg)),
+            
         };
 
         this.#save(data, fileName);
@@ -289,13 +289,13 @@ class Neurex {
 
             // Validate magic header
             const header = rawBuffer.slice(0, 4).toString('utf-8');
-            if (header !== 'NRX2') {
-                throw new Error(`${color.red}Invalid file format. Not a valid NRX model.${color.reset}`);
+            if (header !== 'NRX3') {
+                throw new Error(`${color.red}Invalid version format.${color.reset}`);
             }
 
             // Check version
             const version = rawBuffer[4];
-            if (version !== 0x02) {
+            if (version !== 0x03) {
                 throw new Error(`${color.red}Unsupported NRX version: ${version}${color.reset}`);
             }
 
@@ -314,11 +314,11 @@ class Neurex {
             this.input_size = modelData.input_size;
             this.output_size = modelData.output_size;
             this.num_layers = modelData.num_layers;
-            this.weights = modelData.weights;
-            this.biases = modelData.biases;
+            this.weights = modelData.weights.map(w => new Float32Array(w));
+            this.biases = modelData.biases.map(b => new Float32Array(b));
             this.optimizer = modelData.optimizer;
-            this.weightGrads = modelData.weightGrads;
-            this.biasGrads = modelData.biasGrads;
+            this.weightGrads = modelData.weightGrads.map(wg => new Float32Array(wg));
+            this.biasGrads = modelData.biasGrads.map(bg => new Float32Array(bg));
             this.input_shape = modelData.input_shape
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
@@ -326,12 +326,16 @@ class Neurex {
                 if (layerData.layer_name === "connected_layer") {
                     // Recreate the connected layer with the correct activation and size
                     newLayer = layerBuilder.connectedLayer(layerData.activation_function_name, layerData.layer_size);
+                    newLayer.weightShape = layerData.weightShape;
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
                 } else if (layerData.layer_name === "convolutionalLayer") {
                     // recreate Convolutional layer
                     newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
                 } else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
@@ -474,10 +478,24 @@ class Neurex {
     * * After training, you can use the network for predictions
     */
 
-    async train(trainX, trainY, loss, epoch, batch_size = 1) {
+    async train(inputs, trainY, loss, epoch, batch_size = 1) {
         
-        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`); 
+        
+        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
 
+        let trainX = [];
+
+        for (let i = 0; i < inputs.length; i++) {
+            // the inputs must be in float32array, if any of the inputs are not in float32array, they'll be converted to float32array, otherwise, pass the input
+
+            if (inputs[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || inputs[i].length != this.input_size) {
+                this.isfailed = true;
+                console.log(`${color.red}[ERROR]------- Input data must be the same shape set in the input layer${color.reset}\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${inputs[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
+                throw new Error(`${color.red}Shape mismatch${color.reset}`);
+            }
+
+            trainX.push(inputs[i] instanceof Float32Array ? inputs[i] : new Float32Array(inputs[i].flat(Infinity)));
+        }
 
         const lastLayerObject = this.layers[this.layers.length - 1];
         this.output_size = lastLayerObject.layer_size;
@@ -553,6 +571,10 @@ class Neurex {
                 this.isfailed = true;
                 throw new Error(`${color.red}Unknown optimizer: ${this.optimizer} ${color.reset}`)
             };
+
+            
+
+
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
@@ -623,7 +645,8 @@ class Neurex {
                             }
                         }
 
-                        deltas[output_layer_index] = dOutputlayer;
+                        deltas[output_layer_index] = new Float32Array(dOutputlayer);
+
 
                         // backpropagation loop
                         const allDeltas = this.#backpropagation(activations, zs, deltas);
@@ -633,12 +656,15 @@ class Neurex {
                         for (let l = 0; l < this.num_layers; l++) {
                             const delta = allDeltas[l];
                             const a_prev = activations[l];
+                            const layer_data_obj = this.layers[l];
+
 
                             // Accumulate weight gradients
-                            weightGrads[l] = computeWeightGradients(a_prev, delta, this.layers[l].layer_name, weightGrads[l], this.layers[l], allDeltas, l);
+                            weightGrads[l] = layer_data_obj.computeWeightGradients(a_prev, delta, weightGrads[l], layer_data_obj);
+
 
                             // Accumulate bias gradients
-                            biasGrads[l] = computeBiasGradients(biasGrads[l], delta, this.layers[l].layer_name);
+                            biasGrads[l] = layer_data_obj.computeBiasGradients(biasGrads[l], delta, layer_data_obj);
 
                         }
                     }
@@ -649,17 +675,17 @@ class Neurex {
                     process.stdout.write(`\r`+logMessage);
 
 
-                    // Divide accumulated gradients by the actual batch size
+                    // Divide accumulated gradients by the actual batch size and use the optimizer function to update the paramters
                     for (let l = 0; l < this.num_layers; l++) {
-
-                        weightGrads[l] = scaleGradientsForWeights(weightGrads[l], actualBatchSize, this.layers[l].layer_name);
-
-                        biasGrads[l] = scaleGradientsForBiases(biasGrads[l], actualBatchSize);
                         
-                    }
+                        const layer_data_obj = this.layers[l];
 
+                        // scale weight gradients
+                        weightGrads[l] = layer_data_obj.scaleGrads(weightGrads[l], actualBatchSize, layer_data_obj);
 
-                    for (let l = 0; l < this.num_layers; l++) {
+                        // scale bias gradients
+                        biasGrads[l] = layer_data_obj.scaleGrads(biasGrads[l], actualBatchSize);
+
                         // update Weights
                         const res1 = optimizerFn(this.weights[l], weightGrads[l], this.optimizerStates.weights[l], this.learning_rate);
 
@@ -677,7 +703,6 @@ class Neurex {
 
                         // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[l] = res2.state;
-                        
                     }
 
                 }
@@ -735,7 +760,13 @@ class Neurex {
                 throw new Error("\n[ERROR]-------No inputs")
             }
 
-            let inputTensor = input[0][0];            
+            for (let i = 0; i < input.length; i++) {
+                if (input[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || input[i].length != this.input_size) {
+                    this.isfailed = true;
+                    console.log(`${color.red}[ERROR]------- Input data must be the same shape set in the input layer${color.reset}\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${input[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
+                    throw new Error(`${color.red}Shape mismatch${color.reset}`);
+                }
+            }            
 
             let outputs = [];
             for (let sample_index = 0; sample_index < input.length; sample_index++) {
@@ -762,78 +793,84 @@ class Neurex {
 
             this.layers.forEach((layer_data) => {
                 if (layer_data.layer_name === "connected_layer") {
-                    const layer_size = layer_data.layer_size;
-                    const input_size = this.currentSize;
+                    const inputSize = this.currentSize;
+                    const outputSize = layer_data.layer_size;
+                    const TotalWeightSize = outputSize * inputSize;
 
-                    // 1. Initialize Biases
-                    const generated_biases = Array.from({ length: layer_size }, 
-                        () => Math.random() * (this.randMax - this.randMin) + this.randMin
-                    );
-                    this.biases.push(generated_biases);
-                    this.biasGrads.push(new Array(layer_size).fill(0));
+                    const weights = new Float32Array(TotalWeightSize);
+                    const weightGrads = new Float32Array(TotalWeightSize);
+                    const biases = new Float32Array(outputSize);
+                    const biasGrads = new Float32Array(outputSize);
 
-                    // 2. Initialize Weights [Input x Output]
-                    const layerWeights = Array.from({ length: input_size }, () =>
-                        Array.from({ length: layer_size }, 
-                            () => Math.random() * (this.randMax - this.randMin) + this.randMin
-                        )
-                    );
-                    this.weights.push(layerWeights);
+                    const limit = XavierInitialization(inputSize, outputSize);
+
+
+                    for (let i = 0; i < TotalWeightSize; i++) {
+                        weights[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    for (let i = 0; i < outputSize; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    this.weights.push(weights);
+                    this.biases.push(biases);
+                    this.weightGrads.push(weightGrads);
+                    this.biasGrads.push(biasGrads);
+
+                    this.currentShape = [1, 1, outputSize];
+                    this.currentSize = outputSize;
                     
-                    const initiated_weightGrads = Array.from({ length: input_size }, 
-                        () => new Array(layer_size).fill(0)
-                    );
-                    this.weightGrads.push(initiated_weightGrads);
-
-                    // 3. Update state for the next layer
-                    this.currentShape = [1, 1, layer_size];
-                    this.currentSize = layer_size;
+                    layer_data.weightShape = [inputSize, outputSize];
                 } 
                 
                 else if (layer_data.layer_name === "convolutionalLayer") {
+
                     const filters = layer_data.filters;
                     const [kH, kW] = layer_data.kernel_size;
                     const stride = layer_data.strides || 1;
                     const padding = layer_data.padding || "same";
+
+                    const inputH = this.currentShape[0];
+                    const inputW = this.currentShape[1];
                     const inputDepth = this.currentShape[2];
 
-                    // 1. Initialize Kernels [Filters x Height x Width x Depth]
-                    const kernels = Array.from({ length: filters }, () =>
-                        Array.from({ length: kH }, () =>
-                            Array.from({ length: kW }, () =>
-                                Array.from({ length: inputDepth }, 
-                                    () => Math.random() * (this.randMax - this.randMin) + this.randMin
-                                )
-                            )
-                        )
-                    );
+                    layer_data.inputShape = [inputH, inputW, inputDepth];
+
+                    const TotalSize = filters * kH * kW * inputDepth;
+
+                    let kernels = new Float32Array(TotalSize);
+                    let kernelGrads = new Float32Array(TotalSize);
+                    let biases = new Float32Array(filters);
+                    let biasGrads = new Float32Array(filters);
+
+                    const fanIn = kH * kW * inputDepth;
+                    const fanOut = kH * kW * filters;
+                    const limit = XavierInitialization(fanIn, fanOut);
+
+                    for (let i = 0; i < TotalSize; i++) {
+                        kernels[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    for (let i = 0; i < filters; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
                     this.weights.push(kernels);
-
-                    const kernelGrads = Array.from({ length: filters }, () =>
-                        Array.from({ length: kH }, () =>
-                            Array.from({ length: kW }, () => 
-                                new Array(inputDepth).fill(0)
-                            )
-                        )
-                    );
                     this.weightGrads.push(kernelGrads);
-
-                    // 2. Initialize Biases (one per filter)
-                    const biases = Array.from({ length: filters }, 
-                        () => Math.random() * (this.randMax - this.randMin) + this.randMin
-                    );
                     this.biases.push(biases);
-                    this.biasGrads.push(new Array(filters).fill(0));
+                    this.biasGrads.push(biasGrads);
 
-                    // 3. Calculate new shape using utility
-                    const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(
-                        this.currentShape[0], 
-                        this.currentShape[1], 
-                        kH, kW, filters, stride, padding
-                    );
+                    // Calculate output shape
+                    const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(inputH, inputW, kH, kW, filters, stride, padding);
+
+                    // store output shape too
+                    layer_data.outputShape = [OutputHeight, OutputWidth, filters];
 
                     this.currentShape = [OutputHeight, OutputWidth, filters];
                     this.currentSize = CalculatedTensorShape;
+
+                    layer_data.weightShape = [filters, kH, kW, inputDepth];
                 }
             });
 
@@ -845,71 +882,65 @@ class Neurex {
     }
 
     #buildSingle(layer_data) {
+        const layer_index = this.layers.length - 1;
+
         if (layer_data.layer_name === "connected_layer") {
             const inputSize = this.currentSize;
             const outputSize = layer_data.layer_size;
+            const totalWeightSize = inputSize * outputSize;
 
-            // init weights
-            const layerWeights = Array.from(
-                { length: inputSize },
-                () => Array.from(
-                    { length: outputSize },
-                    () => Math.random() * (this.randMax - this.randMin) + this.randMin
-                )
-            );
+            // Initialize flat Float32Arrays
+            const weights = new Float32Array(totalWeightSize);
+            const weightGrads = new Float32Array(totalWeightSize);
+            const biases = new Float32Array(outputSize);
+            const biasGrads = new Float32Array(outputSize);
 
-            this.weights.push(layerWeights);
-            this.biases.push(Array(outputSize).fill(0));
-            this.weightGrads.push(
-                Array.from({ length: inputSize },
-                    () => Array(outputSize).fill(0)
-                )
-            );
-            this.biasGrads.push(Array(outputSize).fill(0));
+            const limit = XavierInitialization(inputSize, outputSize);
+            for (let i = 0; i < totalWeightSize; i++) {
+                weights[i] = (Math.random() * 2 - 1) * limit;
+            }
 
-            // UPDATE TRACKER
+            this.weights.push(weights);
+            this.biases.push(biases);
+            this.weightGrads.push(weightGrads);
+            this.biasGrads.push(biasGrads);
+
+            layer_data.weightShape = [inputSize, outputSize];
             this.currentShape = [1, 1, outputSize];
             this.currentSize = outputSize;
-        }
-
+        } 
+        
         else if (layer_data.layer_name === "convolutionalLayer") {
             const [H, W, D] = this.currentShape;
             const filters = layer_data.filters;
-            const [kernelHeight, kernelWidth] = layer_data.kernel_size;
+            const [kH, kW] = layer_data.kernel_size;
             const stride = layer_data.strides || 1;
             const padding = layer_data.padding || "same";
 
-            const kernels = Array.from({ length: filters }, () =>
-                Array.from({ length: kernelHeight }, () =>
-                    Array.from({ length: kernelWidth }, () =>
-                        Array.from({ length: D }, () =>
-                            Math.random() * (this.randMax - this.randMin) + this.randMin
-                        )
-                    )
-                )
-            );
+            const totalSize = filters * kH * kW * D;
+            const kernels = new Float32Array(totalSize);
+            const kernelGrads = new Float32Array(totalSize);
+            const biases = new Float32Array(filters);
+            const biasGrads = new Float32Array(filters);
+
+            // Initialization
+            const limit = XavierInitialization(kH * kW * D, kH * kW * filters);
+            for (let i = 0; i < totalSize; i++) {
+                kernels[i] = (Math.random() * 2 - 1) * limit;
+            }
 
             this.weights.push(kernels);
-
-            let kernelGrads = Array.from({length: filters}, 
-                () => Array.from({length: kernelHeight},
-                    () => Array.from({length: kernelWidth}, 
-                        () => Array.from({length: D}).fill(0)
-                    )
-                )
-            )
-
+            this.biases.push(biases);
             this.weightGrads.push(kernelGrads);
+            this.biasGrads.push(biasGrads);
 
-            const bias = Array.from({ length: filters }, () =>
-                Math.random() * (this.randMax - this.randMin) + this.randMin
-            );
-
-            this.biases.push(bias);
-            this.biasGrads.push(Array(filters).fill(0));
-
-            const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(H, W, kernelHeight, kernelWidth, D, stride, padding);
+            // Calculate output shape
+            const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(H, W, kH, kW, filters, stride, padding);
             
+            layer_data.inputShape = [H, W, D];
+            layer_data.outputShape = [OutputHeight, OutputWidth, filters];
+            layer_data.weightShape = [filters, kH, kW, D];
+
             this.currentShape = [OutputHeight, OutputWidth, filters];
             this.currentSize = CalculatedTensorShape;
         }
@@ -923,19 +954,15 @@ class Neurex {
         let delta_indexer = this.num_layers - 2;
         for (let layer_index = delta_indexer; layer_index >= 0; layer_index--) {
             
-            const next_weights = this.weights[layer_index + 1]
+            const next_weights = this.weights[layer_index + 1];
+            const nextLayer = this.layers[layer_index + 1];
             const next_delta = deltas[layer_index + 1];
-        
-
-            if (next_delta.flat(Infinity).some(isNaN)) {
-                throw new Error(`deltaNext at layer ${layer_index + 1} is undefined or NaN. If this error occurred, please report this error.`);
-            }
             
             // Get the current layer object, which now holds its backpropagation logic
             const currentLayer = this.layers[layer_index];
 
             // Call the layer's specific backpropagation method
-            const {current_delta, decrementor_value} = currentLayer.backpropagate(this.onGPU,next_weights, next_delta, zs, layer_index, currentLayer, this.weights, activations);
+            const {current_delta, decrementor_value} = currentLayer.backpropagate(this.onGPU,next_weights, next_delta, zs, layer_index, currentLayer, this.weights, activations, nextLayer, this.layers);
             delta_indexer--;
             
             deltas[layer_index] = current_delta;
@@ -985,8 +1012,8 @@ class Neurex {
 
             // Define file format:
             // [HEADER (4 bytes)] + [VERSION (1 byte)] + [DATA (compressed)]
-            const header = Buffer.from("NRX2"); // Magic bytes
-            const version = Buffer.from([0x02]); // Version 2
+            const header = Buffer.from("NRX3"); // Magic bytes
+            const version = Buffer.from([0x03]); // Version 3
 
             // Combine all parts
             const finalBuffer = Buffer.concat([header, version, compressedData]);
@@ -1086,21 +1113,14 @@ class Neurex {
     }
 
     #reinitiateWeightSBiasGrads() {
-        const zeroRecursive = (arr) => {
-            if (Array.isArray(arr)) {
-                for (let i = 0; i < arr.length; i++) {
-                    if (Array.isArray(arr[i])) {
-                        zeroRecursive(arr[i]);
-                    } else {
-                        arr[i] = 0;
-                    }
-                }
-            }
-        };
-
         for (let l = 0; l < this.num_layers; l++) {
-            zeroRecursive(this.weightGrads[l]);
-            zeroRecursive(this.biasGrads[l]);
+            if (this.weightGrads[l]) {
+                this.weightGrads[l].fill(0);
+            }
+            if (this.biasGrads[l]) {
+                this.biasGrads[l].fill(0);
+            }
+
         }
     }
 }

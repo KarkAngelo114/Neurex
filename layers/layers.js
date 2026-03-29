@@ -1,7 +1,34 @@
-const activation = require('../core/bindings');
-const {MatMul, DeltaMatMul, Convolve, ConvolveDelta, element_wise_mul} = require('../core/bindings');
-const {calculateTensorShape, getPaddingSizes, applyPadding, DilateInput} = require('../utils/utils');
+/**
+ * This is the Layers class, each layers (except inputShape()) has it's own:
+ * - feedforward()
+ * - backpropagate()
+ * - computeWeightGrads()
+ * - computeBiasGrads()
+ * - scaleGrads()
+ *
+ */
+
+
+const {
+    MatMul, 
+    DeltaMatMul, 
+    computeWeightGradientsForWeightsInConnectedLayer, 
+    computeBiasGradsForConnected_Layer,
+    applyPadding,
+    Convolve, 
+    Dilate_Input,
+    rotate_kernels,
+    ConvolveDelta,
+    scaleGrads,
+    element_wise_mul,
+    computeBiasGradsForConv,
+    ComputeGradientForKernels
+} = require('../core/bindings');
+
+const {calculateTensorShape, getPaddingSizes} = require('../utils/utils');
 const { toTensor } = require('../preprocessor/reshaper');
+const activation = require('../core/bindings');
+
 
 class Layers {
     constructor () {
@@ -49,7 +76,6 @@ class Layers {
         }
     }
 
-
     /**
      * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
      * build connected layers or multilayer perceptron
@@ -57,7 +83,7 @@ class Layers {
      * @param {Number} layer_size specify the number of neuron for this layer.
      * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
      */
-    connectedLayer(activation_function, layer_size) {
+    connectedLayer(activation_function = 'relu', layer_size = 5) {
         try {
 
             if (!activation_function || !layer_size || layer_size <= 0) {
@@ -76,18 +102,16 @@ class Layers {
                 "derivative_activation_function":activation.derivatives[function_name],
                 "layer_size":layer_size,
                 feedforward: (onGPU, current_input, weights, biases, current_layer) => {
-                
+
                     let input = current_input;
-                    if (Array.isArray(input[0]) || Array.isArray(input[0][0])) {
-                        input = input.flat(Infinity);                  
-                    }
-                    
-                    
-                    const z_values = MatMul(input, weights, biases);
+
+                    const z_values = MatMul(input, weights, biases, current_layer.weightShape[0], current_layer.weightShape[1]);
                     const activation_function = activation[function_name];
 
                     let outputs;
                     outputs = activation_function(z_values);
+                    
+                    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
                     
                     return {
                         outputs, 
@@ -95,21 +119,26 @@ class Layers {
                         incrementor_value: 1
                     };
                 },
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer) => {
-
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
                     const dActivation = activation.derivatives[function_name];
-
                     const dAct = dActivation(zs[layer_index]);
+                    const delta_res = DeltaMatMul(next_delta, next_weights, nextLayer.weightShape[0], nextLayer.weightShape[1]);
 
-                    const delta_res = DeltaMatMul(next_weights, next_delta);
+                    const current_delta = element_wise_mul(dAct, delta_res);     
 
-                    const current_delta = element_wise_mul(dAct, delta_res);
-                    
+                    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
+
                     return {
                         current_delta,
                         decrementor_value: 1
                     };
-                }
+                },
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
+
+                computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
+
+                // since all are in float32 1D array, we can use the function for scaling weights and biases gradients
+                scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
             };
         }
         catch (error) {
@@ -129,7 +158,7 @@ class Layers {
      * @throws {Error} - if any of the parameters are invalid.
      *
      */
-    convolutionalLayer(filters, strides, kernel_size, activation_function, padding) {
+    convolutionalLayer(filters = 3, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -161,134 +190,135 @@ class Layers {
                 // kernels are also considered weights
                 feedforward: (onGPU, input, weights, biases, current_layer) => {
                     
-                    // 1. compute expected output tensor shape
-                    const { OutputHeight, OutputWidth } = calculateTensorShape(input.length, input[0].length, weights[0].length, weights[0][0].length, weights[0][0][0].length, current_layer.strides, current_layer.padding);
+                    let [f, kh, kw, kd] = current_layer.weightShape;
+                    let [input_H, input_W, input_D] = current_layer.inputShape; 
+                    let padding = current_layer.padding;
+                    let strides = current_layer.strides;
 
-                    // 2. Get padding sizes based on ORIGINAL input
-                    const { top, bottom, left, right } = getPaddingSizes(input.length, input[0].length, weights[0].length, weights[0][0].length, current_layer.strides, current_layer.padding);
-                    
-                    // 3. Apply the padding
-                    const paddedInput = applyPadding(input, top, bottom, left, right);
+                    // 1. compute expected output tensor shape
+                    const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, current_layer.strides, current_layer.padding);
+
+                    // 2. get padding sizes for each sides
+                    const {top, bottom, left, right} = getPaddingSizes(input_H, input_W, kh, kw, strides, padding);
+
+                    // 3. apply padding
+                    const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
                     // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const new_feature_map = Convolve(strides, paddedInput, weights, biases, OutputHeight, OutputWidth);
+                    const convolve_result = Convolve(data, weights, biases, current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1]);
 
-                    const z_values = new_feature_map; // z_values are the new feature maps before activation
+                    if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
-                    // activate each depth input using the given activation function
+                    // 5. activate each depth input using the given activation function
                     const activation_function = activation[function_name];
 
-                    const [h, w, d] = [new_feature_map.length, new_feature_map[0].length, new_feature_map[0][0].length];
+                    const outputs = activation_function(convolve_result);
 
-                    // flatten, use the activation function and reshape
-                    const outputs = toTensor(activation_function(new_feature_map.flat(Infinity)), [h, w, d]);
+                    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");
 
                     return {
-                        outputs,
-                        z_values,
+                        outputs: outputs,
+                        z_values: convolve_result,
                         incrementor_value: 1
                     };
                 },
 
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations) => {
-                
+                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
                     let input = next_delta;
-                    let kernels = weights;
+                    let params = next_weights;
+                    let Current_Z = zs[layer_index];
+                    let dActivation = activation.derivatives[function_name];
 
-                    const current_Z = zs[layer_index];
+                    if (next_layer.layer_name === "connected_layer") {
+                        const [inputSize, outputSize] = next_layer.weightShape;
+                        input = DeltaMatMul(input, params, inputSize, outputSize);
 
-                    if (!Array.isArray(input[0][0])) {
-
-                        const [H, W, D] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
-
-                        const flatten_delta = DeltaMatMul(next_weights, input);
+                        if (input.some(v => Number.isNaN(v))) throw new Error('Delta coming after DeltaMatMuk() has NaNs'); 
                         
-                        // reshape the flattened_Delta
-                        input = toTensor(flatten_delta, [H, W, D]);
-
                     }
 
-                        
-                    // If this is the input to the first convolutional layer, stop here
-                    if (layer_index == 0) {
-                        const current_Z = zs[layer_index];
-                        const dActivation = activation.derivatives[function_name];
-                        const inputH = current_Z.length;
-                        const inputW = current_Z[0].length;
+                    const kernels = weights[layer_index];
+                    const [f, kh, kw, kc] = currentLayer.weightShape; 
+                    const [iH, iW, iD] = currentLayer.inputShape;
+                    const [oH, oW, oD] = currentLayer.outputShape;
+                    const strides = currentLayer.strides;
+                    const padding = currentLayer.padding;
 
-                        kernels = weights[layer_index];
-                        const KH = kernels[0].length;
-                        const KW = kernels[0][0].length;
-                        // dilate the input
-                        const dilated_input = DilateInput(input, strides);
+                    // rotate kernels
+                    const rotated_kernels = rotate_kernels(kernels, f, kh, kw, kc);
 
-                        // apply padding
-                        const padH = KH - 1 + 1;
-                        const padW = KW - 1 + 1;
-                        const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
+                    // dilate delta
+                    const dilated = Dilate_Input(input, [oH, oW, oD], strides);
+                    if (dilated.some(v => Number.isNaN(v))) throw new Error("Input dilation has NaNs");
 
-                        const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW);
-                        
-                        const [h, w, d] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
-                        const dAct_Z = dActivation(current_Z.flat(Infinity));
+                    let padTop, padBottom, padLeft, padRight;
 
-                        // multiply input x dAct_Z
-                        const outputDelta = toTensor(element_wise_mul(deltaConv.flat(Infinity), dAct_Z), [h, w, d]);
+                    if (padding === "valid") {
+                        // FULL padding for backprop
+                        padTop = kh - 1 + 1;
+                        padBottom = kh - 1 + 1;
+                        padLeft = kw - 1 + 1;
+                        padRight = kw - 1 + 1;
+                    } else if (padding === "same") {
+                        const padAlongHeight = kh - 1;
+                        const padAlongWidth  = kw - 1;
 
-                        
-                        if (outputDelta.flat(Infinity).some(isNaN)) {
-                            console.log(`\nlayer ${layer_index+1} outputs a tensor delta having NaN values.`)
-                            throw new Error('Error: NaN values detected');
-                        }
-                    
-                        return {
-                            current_delta: outputDelta,
-                            decrementor_value: 1
-                        };
+                        padTop = Math.floor(padAlongHeight / 2);
+                        padBottom = padAlongHeight - padTop;
+
+                        padLeft = Math.floor(padAlongWidth / 2);
+                        padRight = padAlongWidth - padLeft;
                     }
-
-                    
-
-                    const inputH = current_Z.length;
-                    const inputW = current_Z[0].length;
-
-                    kernels = weights[layer_index];
-
-                    const KH = kernels[0].length;
-                    const KW = kernels[0][0].length;
-                    // dilate the input
-
-                    const dilated_input = DilateInput(input, strides);
 
                     // apply padding
-                    const padH = KH - 1 + 1;
-                    const padW = KW - 1 + 1;
-                    const padded_dilated_input = applyPadding(dilated_input, padH, padH, padW, padW);
-                
-                    const deltaConv = ConvolveDelta(padded_dilated_input, kernels, inputH, inputW, layer_index+1)
+                    const {data, shape} = applyPadding(dilated, oH, oW, oD, padTop, padBottom, padLeft, padRight);
+                    if (data.some(v => Number.isNaN(v))) throw new Error("Padded input has NaNs");
 
-                    const dActivation = activation.derivatives[function_name];
 
-                    // apply the derivative activation function for all zs
-                    const [h, w, d] = [current_Z.length, current_Z[0].length, current_Z[0][0].length];
-                    const dAct_Z = dActivation(current_Z.flat(Infinity))
+                    // perform delta convolution
+                    const delta_res = ConvolveDelta(data, shape, rotated_kernels, [f, kh, kw, kc], oH, oW);
+                    if (delta_res.some(v => Number.isNaN(v))) throw new Error("Delta convolution result has NaNs");
 
-                    // multiply input x dAct_Z
-                    // element_wise_mul() operates on 1D arrays, so we flattened the delta map as input arr 1 and dAct_Z as input arr 2. We reshape the delta tensor map using toTensor()
-                    const outputDelta = toTensor(element_wise_mul(deltaConv.flat(Infinity), dAct_Z), [h, w, d]);
+                    // console.log(delta_res.length);
+                    // console.log(Current_Z.length);
+
+                    // perform element-wise multiplication with derivative outputs of Zs and the delta convolution results
+                    const output = element_wise_mul(dActivation(Current_Z), delta_res);
+                    if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
+
 
                     
-                    if (outputDelta.flat(Infinity).some(isNaN)) {
-                        console.log(`\nlayer ${layer_index+1} outputs a tensor delta having NaN values.`)
-                        throw new Error('Error: NaN values detected');
-                    }
-
+                    
 
                     return {
-                        current_delta: outputDelta,
+                        current_delta: output,
                         decrementor_value: 1
                     };
-                }
+                    
+                    
+                    
+                },
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
+                    const [filters, kH, kW, inDepth] = layer_data.weightShape
+                    const [inH, inW] = layer_data.inputShape
+                    const [outH, outW] = layer_data.outputShape
+
+
+                    const output = ComputeGradientForKernels(activation_outputs,deltas,weightGrads,inH, inW, inDepth,outH, outW, filters,kH, kW);
+
+                    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
+
+                    return output;
+                },
+                computeBiasGradients: (biasgrads, deltas, layer_data) => {
+                    const [filters] = layer_data.weightShape;
+                    const [outH, outW] = layer_data.outputShape;
+
+                    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
+                },
+                
+                // since all are in float32 1D array, we can use the function for scaling weights and biases gradients
+                scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
 
 
             }

@@ -1,16 +1,7 @@
-const getShape = (arr) => {
-    const shape = [];
-    let curr = arr;
-    while (Array.isArray(curr)) {
-        shape.push(curr.length);
-        curr = curr[0];
-    }
 
-    return shape;
-};
 
-const flattenAll = (params) => {
-    return params.flat(Infinity);
+const XavierInitialization = (inputSize, outputSize) => {
+    return Math.sqrt(2 / (inputSize + outputSize));
 }
 
 const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, padding) => {
@@ -31,40 +22,42 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
     };
 };
 
-/**
- * Pads a 3D Tensor [H][W][C]
- * @param {Array} input - The 3D array
- * @param {number} padTop - Padding amounts
- * @param {number} padBottom - Padding amounts
- * @param {number} padLeft - Padding amounts
- * @param {number} padRight - Padding amounts
- * @returns {Array} The padded 3D array
- */
-const applyPadding = (input, padTop, padBottom, padLeft, padRight) => {
-    const inputH = input.length;
-    const inputW = input[0].length;
-    const channels = input[0][0].length;
+// /**
+//  * Pads a 3D Tensor [H][W][C]
+//  * @param {Array} input - The 3D array
+//  * @param {number} padTop - Padding amounts
+//  * @param {number} padBottom - Padding amounts
+//  * @param {number} padLeft - Padding amounts
+//  * @param {number} padRight - Padding amounts
+//  * @returns {Array} The padded 3D array
+//  */
+// const applyPadding = (input, padTop, padBottom, padLeft, padRight) => {
+//     const inputH = input.length;
+//     const inputW = input[0].length;
+//     const channels = input[0][0].length;
 
-    const newH = inputH + padTop + padBottom;
-    const newW = inputW + padLeft + padRight;
+//     const newH = inputH + padTop + padBottom;
+//     const newW = inputW + padLeft + padRight;
 
-    // Create a new 3D tensor filled with zeros
-    // Using Array.from is cleaner for initializing nested arrays
-    const output = Array.from({ length: newH }, () =>
-        Array.from({ length: newW }, () => 
-            new Array(channels).fill(0)
-        )
-    );
+//     // Create a new 3D tensor filled with zeros
+//     // Using Array.from is cleaner for initializing nested arrays
+//     const output = Array.from({ length: newH }, () =>
+//         Array.from({ length: newW }, () => 
+//             new Array(channels).fill(0)
+//         )
+//     );
 
-    // Fill the inner part with the original input data
-    for (let i = 0; i < inputH; i++) {
-        for (let j = 0; j < inputW; j++) {
-            output[i + padTop][j + padLeft] = input[i][j];
-        }
-    }
+//     // Fill the inner part with the original input data
+//     for (let i = 0; i < inputH; i++) {
+//         for (let j = 0; j < inputW; j++) {
+//             output[i + padTop][j + padLeft] = input[i][j];
+//         }
+//     }
 
-    return output;
-}
+//     return output;
+// }
+
+
 
 /**
  * 
@@ -128,44 +121,9 @@ const DilateInput = (input, stride) => {
 }
 
 
-const reshape = (flatArray, shape) => {
-    const expectedSize = shape.reduce((a,b) => a*b, 1);
-
-    if (flatArray.length !== expectedSize) {
-        throw new Error(
-            `Reshape error: flat size ${flatArray.length} does not match shape product ${expectedSize}`
-        );
-    }
-
-    let index = 0;
-
-    const build = (dim) => {
-        const size = shape[dim];
-        const arr = new Array(size);
-
-        if (dim === shape.length - 1) {
-            for (let i = 0; i < size; i++) {
-                arr[i] = flatArray[index++];
-            }
-        } else {
-            for (let i = 0; i < size; i++) {
-                arr[i] = build(dim + 1);
-            }
-        }
-
-        return arr;
-    };
-
-    return build(0);
-};
-
-
 module.exports = {
-    getShape,
-    flattenAll,
     calculateTensorShape,
-    applyPadding,
     getPaddingSizes,
     DilateInput,
-    reshape
+    XavierInitialization
 }

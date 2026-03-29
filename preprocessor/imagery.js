@@ -1,5 +1,4 @@
 
-const { toTensor } = require('./reshaper');
 const { red, reset, green, lime } = require('../prettify')
 const fs = require('fs').promises;
 const sharp = require('sharp');
@@ -57,12 +56,11 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
                             image = image.ensureAlpha();
                         }
 
-                        const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+                        const { data } = await image.raw().toBuffer({ resolveWithObject: true });
                         // Normalize pixel values to [0, 1] and reshape to [height][width][channels]
                         const normalized = Array.from(data).map(v => v / 255);
-                        const { width, height, channels } = info;
                         
-                        datasets.push(toTensor(normalized, [height, width, channels]));
+                        datasets.push(new Float32Array(normalized));
                         labels.push([className]);
                         loadedCount++;
                     } catch (imgErr) {
@@ -116,17 +114,14 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
             image = image.ensureAlpha();
         }
 
-        const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+        const { data } = await image.raw().toBuffer({ resolveWithObject: true });
 
         const normalized = Array.from(data).map(v => v / 255);
-        const { width, height, channels } = info;
-
-        const tensor = toTensor(normalized, [height, width, channels]);
 
         console.log(`${green}[/]------- Successfully loaded image "${file_path}"${reset}\n`);
 
         return {
-            datasets: [tensor],
+            datasets: [new Float32Array(normalized)],
             shape: [height, width, channels]
         };
 
@@ -171,11 +166,10 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
                 image = image.ensureAlpha();
             }
 
-            const {data, info} = await image.raw().toBuffer({ resolveWithObject:true});
+            const {data} = await image.raw().toBuffer({ resolveWithObject:true});
             const normalized = Array.from(data).map(v => v / 255);
-            const { width, height, channels } = info;
 
-            datasets.push(toTensor(normalized, [height, width, channels]));
+            datasets.push(new Float32Array(normalized));
         }
 
         console.log(`\n${lime}[SUCCESS]------ Successfully loaded images from "${file_path}/"${reset}`)

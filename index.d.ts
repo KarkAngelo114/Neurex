@@ -169,7 +169,7 @@ declare module 'neurex' {
     }
 
     /**
-    * @method MinMaxScaler
+    * @class MinMaxScaler
     * Scales input features (array of arrays) to [0, 1] based on feature-wise min/max.
     * Requires fitting on training data first.
     */
@@ -200,10 +200,6 @@ declare module 'neurex' {
         learning_rate?: number;
         /** Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ]. Default: 'adam' */
         optimizer?: 'sgd' | 'adam';
-        /** Minimum value for random initialization of weights/biases. Default: -1 */
-        randMin?: number;
-        /** Maximum value for random initialization of weights/biases. Default: 1 */
-        randMax?: number;
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
     }
@@ -246,7 +242,7 @@ declare module 'neurex' {
         /**
         * Get the input shape. Works only after loading a model or after sequential building
         *
-        * @returns tensor input shape
+        * @returns tensor input shape as [H, W, C]
         */
         getTensorShape(): Number[];
 
@@ -263,7 +259,7 @@ declare module 'neurex' {
         @param {string} modelName - the filename of your model. If not provided, the filename of the model is date today.
 
         saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
-        as a .nrx (neurex) model and a metadata.json will be generated along with the model file.
+        as a .nrx (neurex) model.
         
         */
         saveModel(modelName: string): void;
@@ -305,7 +301,7 @@ declare module 'neurex' {
         /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
-        *
+        * 
         * @method train()
         * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
         * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
@@ -329,7 +325,6 @@ declare module 'neurex' {
         *    layer.connectedLayer("relu", 3),
         *    layer.connectedLayer("softmax", 2)
         * ]);
-        * model.build();
         *
         * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
         * 
@@ -351,6 +346,8 @@ declare module 'neurex' {
 
     /**
     * Splits a dataset into training and testing sets.
+    * @async
+    * @function split_dataset
     * @param {Array<Array<number>>} X - array of features (input data)
     * @param {Array<number>} Y - array of labels (target data)
     * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
@@ -382,15 +379,18 @@ declare module 'neurex' {
 
     /**
     * Converts a column of categorical labels into one-hot encoded vectors.
-    *
+    * @async
+    * @function OneHotEncoded
     * @param {Array<Array<any>>} data - An array where each inner array represents a row and contains a single categorical label.
     * @returns {Array<Array<Number>>} Returns One-hot encoded labels, suitable for categorical classification.
     * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
- */
+    */
     export function OneHotEncoded(data: any[][]): number[][];
 
     /**
     * Converts labels that cannot be converted to interger labels (example: words). If your labels already integer-labeled (ex: 0, 1, 2, 3, ...), no need to use this function
+    * @async
+    * @function IntegerLabeling
     * @param {Array<Array<any>>} data - column of your dataset that can be use as categorical labeling 
     * @returns {Array<Array<Number>>} returns Intger-encoded labels. Which can be use for categorical classification, particularly when calculating sparse_categorical_cross_entropy
     * @throws {Error} - when no data is provided
@@ -399,6 +399,8 @@ declare module 'neurex' {
 
     /**
     * Converts labels that cannot be converted to binary labels (example: words). If your labels already 0s and 1s, no need to use this function
+    * @async
+    * @function BinaryLabeling
     * @param {Array<Array<any>>} data - column of your dataset that can be use as binary labeling (0 or 1)
     * @returns {Array<Array<Number>>} returns labels which contains 1 vector labels of 1s and 0s. Can be use for Binary classifcation
     * @throws {Error} - when no data is provided or there are more than two classes
@@ -406,19 +408,7 @@ declare module 'neurex' {
     export function BinaryLabeling(data: any[][]): number[][];
 
     /**
-     * 
-     *
-     * Used to rehape a 1D array into a tensor map using the given height, width, and depth values. If the length of the 1D array didn't match with the given H * W * D, it will be filled with 0s before reshaping
-     * @param {Array<Number>} input usually a 1D array 
-     * @param {Array<Number>} shape array containing values for HxWxD (Height, Width, Depth). Note: They must be arrange in correct order as [Height, Width, Depth]
-     * @returns {Array<Array<Array<Array<Number>>>>} a tensor map
-     * @throws {Error} - if there are missing parameters
-     * 
-     * 
-     */
-    export function toTensor(input: number[], shape: number[]): number[][][][];
-
-    /**
+    * @async
     * @function load_images_from_directory
     * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
     * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
@@ -429,7 +419,7 @@ declare module 'neurex' {
     export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): object;
 
     /**
-    * 
+    * @async
     * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
     * @param {Array<Number>} flat_arr_1 - a flat array input
     * @param {Array<Number>} flat_arr_2 - a flat array input
@@ -440,9 +430,9 @@ declare module 'neurex' {
 
 
     /**
-    * 
+    * @async
     * @function load_single_image allows you to load a single image
-    * @param {String} file_path - points to the directory of the image
+    * @param {String} targetDir - points to the directory of the image
     * @param {Array<Number>} resize - resize the image to [h][w][d]
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
     * @returns a normalized tensor map
@@ -452,7 +442,7 @@ declare module 'neurex' {
     /**
     * 
     * @function load_single_image allows you to load a single image
-    * @param {String} file_path - points to the directory of the image
+    * @param {String} targetDir - points to the directory of the image
     * @param {Array<Number>} resize - resize the image to [h][w][d]
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
     * @returns an array of normalized tensor maps
