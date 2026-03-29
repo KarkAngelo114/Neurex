@@ -16,7 +16,6 @@ const {OneHotEncoded, IntegerLabeling, BinaryLabeling} = require('./preprocessor
 const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
-const {toTensor} = require('./preprocessor/reshaper');
 const { load_images_from_directory, load_single_image, load_multiple_images } = require('./preprocessor/imagery');
 const { element_wise_mul } = require('./core/bindings');
 const { Annotator } = require('./preprocessor/annotator');
@@ -33,7 +32,6 @@ module.exports= {
     split_dataset,
     RegressionMetrics,
     ClassificationMetrics,
-    toTensor,
     load_images_from_directory,
     element_wise_mul,
     load_single_image,

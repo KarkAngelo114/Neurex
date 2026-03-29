@@ -114,7 +114,8 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
             image = image.ensureAlpha();
         }
 
-        const { data } = await image.raw().toBuffer({ resolveWithObject: true });
+        const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+        const {height, width, channels} = info;
 
         const normalized = Array.from(data).map(v => v / 255);
 
