@@ -341,8 +341,8 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
     // ---- Convolution ----
     for (let f = 0; f < F; f++) {
 
-        for (let h = 0; h < H; h++) {
-            for (let w = 0; w < W; w++) {
+        for (let h = 0; h < oH; h++) {
+            for (let w = 0; w < oW; w++) {
 
                 let sum = 0.0;
 
@@ -353,8 +353,8 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
                         const pw = w + kw;
 
                         for (let c = 0; c < C; c++) {
-
-                            const inputVal = padded[idx3(ph, pw, c, Wp, C_in)];
+                            const pad_idx = idx3(ph, pw, c, Wp, C_in)
+                            const inputVal = padded[pad_idx];
 
                             const kernelVal = rotatedKernels[idx4(f, kh, kw, c, KH, KW, C_k)];
 
@@ -362,8 +362,14 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
                         }
                     }
                 }
+                let outIdx = idxOut(h, w, f, oW, F);
 
-                output[idxOut(h, w, f, W, F)] = sum;
+                if (outIdx >= output.length) {
+                    throw new Error('Out of bound');
+                }
+
+
+                output[outIdx] = sum;
             }
         }
     }
@@ -388,14 +394,7 @@ exports.computeBiasGradsForConv_Float32 = (grads, delta, outH, outW, numFilters)
     return grads;
 };
 
-exports.computeKernelGradients_Float32 = (
-    input, 
-    delta,
-    weightGrads,
-    inputH, inputW, Cin,
-    H, W, Cout,
-    Kh, Kw
-) => {
+exports.computeKernelGradients_Float32 = (input, delta, weightGrads, inputH, inputW, Cin, H, W, Cout, Kh, Kw) => {
 
     const padH = Math.floor(Kh / 2);
     const padW = Math.floor(Kw / 2);
@@ -413,16 +412,11 @@ exports.computeKernelGradients_Float32 = (
                             const inH = h + kh - padH;
                             const inW = w + kw - padW;
 
-                            if (
-                                inH >= 0 && inH < inputH &&
-                                inW >= 0 && inW < inputW
-                            ) {
+                            if (inH >= 0 && inH < inputH && inW >= 0 && inW < inputW) {
 
-                                const inputIndex =
-                                    (inH * inputW + inW) * Cin + c;
+                                const inputIndex = (inH * inputW + inW) * Cin + c;
 
-                                const deltaIndex =
-                                    (h * W + w) * Cout + f;
+                                const deltaIndex = (h * W + w) * Cout + f;
 
                                 sum += input[inputIndex] * delta[deltaIndex];
                             }

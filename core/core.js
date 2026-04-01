@@ -15,7 +15,7 @@ const zlib = require('zlib');
 const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
-const color = require('../prettify');
+const color = require('../color-code');
 const { calculateTensorShape, XavierInitialization } = require('../utils');
 const Layers = require('../layers/layers');
 

@@ -1,5 +1,5 @@
 const Neurex = require('../core');
-const { red, reset, green, lime } = require('../prettify');
+const { red, reset, green, lime } = require('../color-code');
 const { load_multiple_images } = require('./imagery');
 const fs = require('fs').promises;
 const path = require('path');

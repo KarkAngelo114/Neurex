@@ -8,7 +8,7 @@
  */
 
 let path = require('path');
-const { red, reset } = require('../../prettify');
+const { red, reset } = require('../../color-code');
 const float_32 = require('./float32Ops');
 
 let addon;
@@ -22,16 +22,16 @@ catch (error) {
 
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function MatMul
- * @param {Array<Number>} inputs - 1D array of input features
- * @param {Array<Array<Number>>} weights - 2D array of weights
- * @param {Array<Number>} biases - 1D array of biases
+ * @param {Float32Array} inputs - 1D float32array of input features
+ * @param {Float32Array} weights - 1D float32array of weights
+ * @param {Float32Array} biases - 1D float32array of biases
  * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
  * @param {Number} outputSize - the layer size of this layer
  * @returns 1D array of output
  */
-const MatMul = (inputs, weights, biases, inputSize, outputSize) => float_32.MatMul_Float32(inputs, weights, biases, inputSize, outputSize);
+const MatMul = (inputs, weights, biases, inputSize, outputSize) => addon.MatMul(inputs, weights, biases, inputSize, outputSize);
 
 /**
  * "☑️"
@@ -42,87 +42,87 @@ const MatMul = (inputs, weights, biases, inputSize, outputSize) => float_32.MatM
  * @param {Number} outputSize - the layer size of this layer
  * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
  */
-const DeltaMatMul = (deltas, weights, inputSize, outputSize) => float_32.DeltaMatMul_Float32(deltas, weights, inputSize, outputSize);
+const DeltaMatMul = (deltas, weights, inputSize, outputSize) => addon.DeltaMatMul(deltas, weights, inputSize, outputSize);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function relu
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu)
  */
-const relu = (input) => float_32.relu_float32(input);
+const relu = (input) => addon.Relu(input)
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function sigmoid
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid)
  */
-const sigmoid = (input) => float_32.sigmoid_float32(input);
+const sigmoid = (input) => addon.Sigmoid(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function tanh
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh)
  */
-const tanh = (input) => float_32.tanh_float32(input);
+const tanh = (input) => addon.Tanh(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function softmax
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax)
  */
-const softmax = (input) => float_32.softmax_float32(input);
+const softmax = (input) => addon.Softmax(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function linear
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear)
  */
-const linear = (input) => float_32.linear_float32(input);
+const linear = (input) => addon.Linear(input); 
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function drelu
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu Derivative)
  */
-const drelu = (input) => float_32.drelu_float32(input);
+const drelu = (input) => addon.DReLu(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function dsigmoid
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid Derivative)
  */
-const dsigmoid = (input) => float_32.dsigmoid_float32(input);
+const dsigmoid = (input) => addon.DSigmoid(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function dtanh
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh Derivative)
  */
-const dtanh = (input) => float_32.dtanh_float32(input);
+const dtanh = (input) => addon.DTanh(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function dsoftmax
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax Derivative)
  */
-const dsoftmax = (input) => float_32.dsoftmax_float32(input);
+const dsoftmax = (input) => addon.DSoftmax(input)
 
 /**
- * "☑️"
+ * "✅☑️"
  * @function dlinear
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear Derivative)
  */
-const dlinear = (input) => float_32.dlinear_float32(input);
+const dlinear = (input) => addon.DLinear(input);
 
 /**
  * "☑️"
@@ -139,7 +139,7 @@ const dlinear = (input) => float_32.dlinear_float32(input);
 const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => float_32.ApplyPadding_Float32(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input - padded input
  * @param {Float32Array} kernels - kernels of the current layer
  * @param {Float32Array} biases - biases for each kernels of the current layer
@@ -154,7 +154,7 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {number} inputW - input widht of the padded input
  * @returns output float32 of the convolution
  */
-const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW) => float_32.Convolve_Float32(input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW);
+const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW) => addon.Convolve(input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW);
 
 
 /**
@@ -179,7 +179,7 @@ const rotate_kernels = (params, f, kh, kw, d) => float_32.RotateKernels_Float32(
 
 
 /**
- * "☑️" Perform delta convolution
+ * "✅☑️" Perform delta convolution
  * @param {Float32Array} input - padded delta
  * @param {Array<Number>} padded_delta_shape - padded delta shape
  * @param {Float32Array} kernels - rotated kernels 
@@ -187,22 +187,22 @@ const rotate_kernels = (params, f, kh, kw, d) => float_32.RotateKernels_Float32(
  * @param {Number} strides
  * @returns output delta convolution
  */
-const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => float_32.ConvolveDelta_Float32(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
+const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => addon.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
 
 
 /**
  * 
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} params - flattened array of parameters 
  * @param {Float32Array} grads - flattened array of grads 
  * @param {Number} learning_rate - learning rate value
  * @returns 
  */
-const ApplySGD = (params, grads, learning_rate ) => float_32.ApplySGD_float32(params, grads, learning_rate);
+const ApplySGD = (params, grads, learning_rate ) => addon.SGD(params, grads, learning_rate);
 
 /**
  * 
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} params - flattened array of parameters 
  * @param {Float32Array} grads - flattened array of grads
  * @param {Number} learning_rate - learning rate value 
@@ -214,22 +214,21 @@ const ApplySGD = (params, grads, learning_rate ) => float_32.ApplySGD_float32(pa
  * @param {Number} beta2 - beta2 value
  * @returns 
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => float_32.ApplyAdam_float32(params, grads, learning_rate, m, v, t, epsilon, beta1, beta2);
-
+const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => addon.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
 
 /**
  * 
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array>} activated_outputs 
  * @param {Float32Array>} delta 
  * @param {Float32Array>} weightGrads
  * @param {Array<Number>} weightShape
  * @returns float32array of accumulated weight gradients
  */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => float_32.computeWeightGradientsForWeightsInConnectedLayer_float32(activations, delta, weightGrads, inputSize, outputSize);
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => addon.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} activated_outputs - activated outputs during feedforward
  * @param {Float32Array} delta - delta outputs during backpropagation 
  * @param {Float32Array} weightGrads - initiated weight gradients for accumulation 
@@ -243,35 +242,35 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
  * @param {number} kw -kernel width
  * @returns 
  */
-const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => float_32.computeKernelGradients_Float32(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
+const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => addon.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array>} biasGrads 
  * @param {Float32Array>} delta 
  * @returns float32array of accumulated bias gradients
  */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta) => float_32.computeBiasGradsForConnected_Layer_float32(biasGrads, delta);
+const computeBiasGradsForConnected_Layer = (biasGrads, delta) => addon.computeBiasGradsForConnected_Layer(biasGrads, delta);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} grads - bias grads in float32array 
  * @param {Float32Array} deltas - float32array delta 
  * @returns Accumulated bias gradients in float32array
  */
-const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => float_32.computeBiasGradsForConv_Float32(grads, deltas, oh, ow, num_filters);
+const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => addon.computeBiasGradsForConv(grads, deltas, oh, ow, num_filters);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} grad - accumulated gradients
  * @param {Number} batchSize - batch size
  * @returns A float32 array of scaled gradients
  */
-const scaleGrads = (grad, batchSize) => float_32.scaleGrads_float32(grad, batchSize)
+const scaleGrads = (grad, batchSize) => addon.scaleGrad(grad, batchSize)
 
 /**
  * 
- * "☑️"
+ * "✅☑️"
  * @function Marix_Mul use to multiply elements inside both arrays. Requires both arrays has same length;
  * @param {Array<Number>} flat_arr_1 - a flat array input
  * @param {Array<Number>} flat_arr_2 - a flat array input
@@ -279,15 +278,10 @@ const scaleGrads = (grad, batchSize) => float_32.scaleGrads_float32(grad, batchS
  * @throws am error will occured if both array are not equal in length
  */
 const element_wise_mul = (flat_arr_1, flat_arr_2) => {
-    const output = new Float32Array(flat_arr_1.length);
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. ${reset}`);
 
-    for (let i = 0; i < flat_arr_1.length; i++) {
-        output[i] = flat_arr_1[i] * flat_arr_2[i];
-    }
-
-    return output;
+    return addon.element_wise_mul(flat_arr_1, flat_arr_2);
 }
 
 

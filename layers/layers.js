@@ -26,7 +26,6 @@ const {
 } = require('../core/bindings');
 
 const {calculateTensorShape, getPaddingSizes} = require('../utils/utils');
-const { toTensor } = require('../preprocessor/reshaper');
 const activation = require('../core/bindings');
 
 

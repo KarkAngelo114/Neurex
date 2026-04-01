@@ -1,5 +1,5 @@
 
-const { red, reset, green, lime } = require('../prettify')
+const { red, reset, green, lime } = require('../color-code')
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
