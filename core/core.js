@@ -263,7 +263,7 @@ class Neurex {
 
     /**
      * 
-     * @param {String} model - filename of the save model 
+     * @param {String} model - path to your model
      */
     loadSavedModel(model) {
         try {
@@ -278,6 +278,8 @@ class Neurex {
 
             const dir = process.cwd();
             const model_file = path.join(dir, `${model}`);
+
+            console.log(`${color.yellow}\n[INFO]------- Loading model from ${model_file}${color.reset}`)
 
             // Check extension
             if (path.extname(model_file) !== '.nrx') {
@@ -346,8 +348,7 @@ class Neurex {
             this.#recalculateShape();
             console.log(`${color.lime}\n[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
-            console.log(error.message);
-            process.exit(1);
+            console.log(error);
         }
     }
 

@@ -266,7 +266,7 @@ declare module 'neurex' {
 
         /**
         * @method loadSavedModel()
-        * @param {*} model - the trained model
+        * @param {String} model - the trained model
 
         The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
 
