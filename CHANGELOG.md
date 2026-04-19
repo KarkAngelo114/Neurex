@@ -7,7 +7,8 @@
 - allows retraining and transfer learning
 
 ### Breaking Changes
-- due to fully transition to float32array and the majpr overhaul of the codebase, models that are trained using later version of `Neurex` will no longer be supported
+- due to fully transition to float32array and the major overhaul of the codebase, models that are trained using later version of `Neurex` will no longer be supported
+- `Interpreter` class has been removed. You can now directly use the loading function with the main class.
 
 
 # v0.0.7 (latest)
