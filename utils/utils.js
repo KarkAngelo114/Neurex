@@ -120,10 +120,33 @@ const DilateInput = (input, stride) => {
 
 }
 
+const ifOneHotEndcoded = (Y_train) => {
+        /**
+        Checks if all rows in Y_train are one-hot encoded.
+        Each row must:
+        - Contain only 0s and 1s
+        - Have exactly one "1"
+        */
+        for (let i = 0; i < Y_train.length; i++) {
+            const row = Y_train[i];
+            if (!Array.isArray(row)) return false;
+
+            let onesCount = 0;
+            for (let j = 0; j < row.length; j++) {
+                if (row[j] !== 0 && row[j] !== 1) return false;
+                if (row[j] === 1) onesCount++;
+            }
+
+            if (onesCount !== 1) return false;
+        }
+        return true;
+    }
+
 
 module.exports = {
     calculateTensorShape,
     getPaddingSizes,
     DilateInput,
-    XavierInitialization
+    XavierInitialization,
+    ifOneHotEndcoded
 }

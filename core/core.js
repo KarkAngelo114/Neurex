@@ -526,55 +526,18 @@ class Neurex {
             this.batch_size = batch_size;
             const batchSize = batch_size;
             
-            
             // Infer task type based on output layer and loss/activation
             const lastLayerActivation = lastLayerObject.activation_function.name;
             const lossLower = loss.toLowerCase();
-            
-            // Regression: output_size == X, activation linear, loss mse/mae
-            if (lastLayerActivation === 'linear' && (lossLower === 'mse' || lossLower === 'mae')) {
-                this.task = 'regression';
-            }
-            // binary classification task: activation in output layer = sigmoid/tanh, loss = binary_cross_entropy
-            else if ((lastLayerActivation === "sigmoid" && lossLower === 'binary_cross_entropy') || (lastLayerActivation === "tanh" && lossLower === 'binary_cross_entropy')) {
-                this.task = 'binary_classification';
-            }
-            // multi-class classification task: activation in output layer = softmax, loss = categorical_cross_entropy (labels must be one-hot encoding)
-            else if (lastLayerActivation === 'softmax' && lossLower === 'categorical_cross_entropy') {
-                // do a loop if any of the rows of trainY is not
-                trainY.forEach(row => {
-                    if (this.output_size != row.length) {
-                        this.isfailed = true;
-                        throw new Error(`${color.red}[ERROR]------- Output shape mismatch. The size of the output layer must be the same number of classes${color.reset}`);
-                    }
-                });
 
-                // check if the Y_train is not one-hot encoded
-                const isOneHotEncoded = this.#ifOneHotEndcoded(trainY);
-                if (isOneHotEncoded) {
-                    this.task = 'multi_class_classification';
-                }
-                else {
-                    this.isfailed = true;
-                    throw new Error(`${color.red}[ERROR]------- Y_train must be one-hot encoded for the categorical_cross_entropy loss. Use 'sparse_categorical_cross_entropy' instead if the Y_train is interger-encoded labels.${color.reset}`);
-                }
-                
-            }
-            else if (lastLayerActivation === 'softmax' && lossLower === 'sparse_categorical_cross_entropy') {
-                this.task = 'multi_class_classification';
-            }
-            else {
-                this.isfailed = true;
-                throw new Error(`${color.red}[ERROR]------- Using ${lossLower} having output size of ${this.output_size} and a ${lastLayerActivation} function in the output layer is currently unavailable for this core's task.${color.reset}`);
-            }
+            // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
+            const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
+            this.task = taskType;
 
             if (!optimizerFn) {
                 this.isfailed = true;
                 throw new Error(`${color.red}Unknown optimizer: ${this.optimizer} ${color.reset}`)
             };
-
-            
-
 
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
@@ -593,7 +556,7 @@ class Neurex {
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
 
-                    this.#reinitiateWeightSBiasGrads(); // reset to grads (weights and biases grads) to 0s
+                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
                     let weightGrads = this.weightGrads;
 
@@ -612,6 +575,7 @@ class Neurex {
                         const deltas = [];
 
 
+                        // TODO: remove this function as this will be implemented on each layer that can function as the networks output layer, thus making this library versatile and flexible
                         // === STEP 1: Compute delta for output layer === //
                         let output_layer_index = this.num_layers - 1;
                         let dOutputlayer = [];
@@ -649,7 +613,7 @@ class Neurex {
                         deltas[output_layer_index] = new Float32Array(dOutputlayer);
 
 
-                        // backpropagation loop
+                        // === STEP 2: backpropagate the output layer delta === //
                         const allDeltas = this.#backpropagation(activations, zs, deltas);
 
 

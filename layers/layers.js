@@ -1,6 +1,8 @@
 /**
  * This is the Layers class, each layers (except inputShape()) has it's own:
+ * - determineInferenceType()
  * - feedforward()
+ * - getOutputLayerDelta()
  * - backpropagate()
  * - computeWeightGrads()
  * - computeBiasGrads()
@@ -25,8 +27,9 @@ const {
     ComputeGradientForKernels
 } = require('../core/bindings');
 
-const {calculateTensorShape, getPaddingSizes} = require('../utils/utils');
+const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded} = require('../utils/utils');
 const activation = require('../core/bindings');
+const { red, reset } = require('../color-code');
 
 
 class Layers {
@@ -100,6 +103,50 @@ class Layers {
                 "activation_function":activation[function_name], 
                 "derivative_activation_function":activation.derivatives[function_name],
                 "layer_size":layer_size,
+                // this function will do all the checks if the last output layer is a connected layer
+                determineInferenceType: (layerObject, lossFunc, trainY) => {
+                    
+                    let activation_function = layerObject.activation_function.name; // activation function
+                    let layer_size = layerObject.layer_size; // layer size
+
+                    /* do a loop to check if the trainY length are the same as output size if the loss is a categorical cross entropy and the activation function is softmax
+                    * Example:
+                    * output size: 3
+                    * 
+                    * The trainY should be:
+                    * [
+                    *    [0, 0, 1],
+                    *    [1, 0, 0],
+                    *    [0, 1, 0],
+                    *    ....
+                    * ]
+                    */
+
+                    if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
+                        trainY.forEach(label => {
+                            if (label.length != layer_size) throw new Error(`Output size must be the same number of classes. Number of classes: ${label.length} | Output layer size: ${layer_size}`);
+                        });
+
+                        // check also if the trainY are one hot encoded. Categorical Cross Entropy works wiht one-hot encoded labels
+                        const isOneHotEncoded = ifOneHotEndcoded(trainY);
+                        if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
+                    }
+
+                    if (activation_function === "linear" && (lossFunc === "mae" || lossFunc === "mse")) {
+                        return "regression";
+                    }
+
+                    if ((activation_function === "sigmoid" || activation_function === "tanh") && (lossFunc === "binary_cross_entropy")) {
+                        return "binary_classification";
+                    }
+
+                    if (activation_function === "softmax" && (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy")) {
+                        return "multi_class_classification";
+                    }
+
+                    //  if none satisfies the conditions above, throw an error
+                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
+                },
                 feedforward: (onGPU, current_input, weights, biases, current_layer) => {
 
                     let input = current_input;
@@ -117,6 +164,9 @@ class Layers {
                         z_values,
                         incrementor_value: 1
                     };
+                },
+                getOutputLayerDelta: () => {
+
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
                     const dActivation = activation.derivatives[function_name];
