@@ -535,8 +535,8 @@ class Neurex {
             if (lastLayerActivation === 'linear' && (lossLower === 'mse' || lossLower === 'mae')) {
                 this.task = 'regression';
             }
-            // binary classification task: activation in output layer = sigmoid, loss = binary_cross_entropy
-            else if (lastLayerActivation === "sigmoid" && lossLower === 'binary_cross_entropy') {
+            // binary classification task: activation in output layer = sigmoid/tanh, loss = binary_cross_entropy
+            else if ((lastLayerActivation === "sigmoid" && lossLower === 'binary_cross_entropy') || (lastLayerActivation === "tanh" && lossLower === 'binary_cross_entropy')) {
                 this.task = 'binary_classification';
             }
             // multi-class classification task: activation in output layer = softmax, loss = categorical_cross_entropy (labels must be one-hot encoding)
