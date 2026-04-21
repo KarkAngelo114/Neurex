@@ -1,5 +1,5 @@
 /**
- * This is the Layers class, each layers (except inputShape()) has it's own:
+ * This is the Layers class, each layers (except inputShape()) has their own:
  * - determineInferenceType()
  * - feedforward()
  * - getOutputLayerDelta()
@@ -8,6 +8,7 @@
  * - computeBiasGrads()
  * - scaleGrads()
  *
+ * Those functions are the core functions of this library to work.
  */
 
 
@@ -103,7 +104,6 @@ class Layers {
                 "activation_function":activation[function_name], 
                 "derivative_activation_function":activation.derivatives[function_name],
                 "layer_size":layer_size,
-                // this function will do all the checks if the last output layer is a connected layer
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
                     
                     let activation_function = layerObject.activation_function.name; // activation function
@@ -147,9 +147,7 @@ class Layers {
                     //  if none satisfies the conditions above, throw an error
                     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
-                feedforward: (onGPU, current_input, weights, biases, current_layer) => {
-
-                    let input = current_input;
+                feedforward: (onGPU, input, weights, biases, current_layer) => {
 
                     const z_values = MatMul(input, weights, biases, current_layer.weightShape[0], current_layer.weightShape[1]);
                     const activation_function = activation[function_name];
@@ -165,10 +163,33 @@ class Layers {
                         incrementor_value: 1
                     };
                 },
-                getOutputLayerDelta: () => {
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+                    let dActivation = activation.derivatives[function_name];
+                    let dOutputLayer = new Float32Array(preds.length); 
 
+                    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
+                        for (let i = 0; i < dOutputLayer.length; i++) {
+                            dOutputLayer[i] = preds[i] - actuals[i];
+                        }
+                    }
+                    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
+                        dOutputLayer.set(preds);
+                        dOutputLayer[actuals[0]] -= 1;
+                        
+                    }
+                    else if (tasktype === "regression") {
+                        const lastLayerZs = zs[zs.length - 1]; 
+                        const dAct = dActivation(lastLayerZs); 
+                        
+                        for (let i = 0; i < dOutputLayer.length; i++) {
+                            dOutputLayer[i] = (preds[i] - actuals[i]) * dAct[i];
+                        }
+                    }
+
+                    return dOutputLayer;
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
+                    
                     const dActivation = activation.derivatives[function_name];
                     const dAct = dActivation(zs[layer_index]);
                     const delta_res = DeltaMatMul(next_delta, next_weights, nextLayer.weightShape[0], nextLayer.weightShape[1]);
@@ -183,10 +204,7 @@ class Layers {
                     };
                 },
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
-
                 computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
-
-                // since all are in float32 1D array, we can use the function for scaling weights and biases gradients
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
             };
         }
@@ -236,7 +254,30 @@ class Layers {
                 "filters":filters,
                 "padding":padding.toLowerCase(),
                 "strides":strides,
-                // kernels are also considered weights
+                determineInferenceType: (layerObject, lossFunc, trainY) => {
+
+                    if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
+                        // check if the trainY are one hot encoded. Categorical Cross Entropy works wiht one-hot encoded labels
+                        const isOneHotEncoded = ifOneHotEndcoded(trainY);
+                        if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
+                    }
+
+                    if (activation_function === "linear" && (lossFunc === "mae" || lossFunc === "mse")) {
+                        return "regression";
+                    }
+
+                    if ((activation_function === "sigmoid" || activation_function === "tanh") && (lossFunc === "binary_cross_entropy")) {
+                        return "binary_classification";
+                    }
+
+                    if (activation_function === "softmax" && (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy")) {
+                        return "multi_class_classification";
+                    }
+
+                    /**
+                    * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
+                    */
+                },
                 feedforward: (onGPU, input, weights, biases, current_layer) => {
                     
                     let [f, kh, kw, kd] = current_layer.weightShape;
@@ -271,7 +312,17 @@ class Layers {
                         incrementor_value: 1
                     };
                 },
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+                    /**
+                    * Convolution layers has different process of getting delta of the output layer, so this is another TO DOs, but for now, throw an error 
+                    */
 
+                    throw new Error('Convolutional layer cannot be an output layer for now');
+
+                    let dOutputLayer = new Float32Array(preds.length); 
+
+                    return dOutputLayer;
+                },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
                     let input = next_delta;
                     let params = next_weights;
@@ -365,13 +416,8 @@ class Layers {
 
                     return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
                 },
-                
-                // since all are in float32 1D array, we can use the function for scaling weights and biases gradients
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
-
-
             }
-
         }
         catch (error) {
             console.error(error);

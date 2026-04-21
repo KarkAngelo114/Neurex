@@ -32,7 +32,6 @@ catch (error) {
  * @returns 1D array of output
  */
 const MatMul = (inputs, weights, biases, inputSize, outputSize) => addon.MatMul(inputs, weights, biases, inputSize, outputSize);
-
 /**
  * "☑️"
  * @function DeltaMatMul

@@ -572,45 +572,14 @@ class Neurex {
 
                         // feed forward
                         const {predictions, activations, zs} = this.#Feedforward(input);
-                        const deltas = [];
-
-
-                        // TODO: remove this function as this will be implemented on each layer that can function as the networks output layer, thus making this library versatile and flexible
-                        // === STEP 1: Compute delta for output layer === //
-                        let output_layer_index = this.num_layers - 1;
+                        let deltas = [];
                         let dOutputlayer = [];
-                        const network_output_layer = this.layers[output_layer_index];
-
                         batchLoss += loss_function(predictions, actual);
 
-                        
-                        for (let j = 0; j < network_output_layer.layer_size; j++) {
-                            if (this.task === "binary_classification") {
-                                // binary classification
-                                dOutputlayer.push(predictions[j] - actual[j]);
-                            }
-                            else if (this.task === "multi_class_classification") {
-                                if (lastLayerActivation === 'softmax' && lossLower === "categorical_cross_entropy") {
-                                    dOutputlayer.push(predictions[j] - actual[j]);
-                                }
-                                else if (lastLayerActivation === 'softmax' && lossLower === "sparse_categorical_cross_entropy") {
-                                    dOutputlayer = [...predictions];
-                                    dOutputlayer[actual[0]] -= 1; 
-                                }
-                                else {
-                                    throw new Error(`${color.red}[ERROR]------- Uknown loss function for multi-class classification loss. Loss: ${lossLower} is unknown.${color.reset}`)
-                                }
-                            }
-                            else {
-                                // regression tasks single or multi-output regression
-                                const error = predictions[j] - actual[j];
-                                //const dAct = this.derivative_functions[output_layer](zs[output_layer][j]);
-                                const dAct = network_output_layer.derivative_activation_function([zs[output_layer_index][j]]);
-                                dOutputlayer.push(error * dAct);
-                            }
-                        }
+                        // === STEP 1: Compute delta for output layer === //
+                        let output_layer_index = this.num_layers - 1;
 
-                        deltas[output_layer_index] = new Float32Array(dOutputlayer);
+                        deltas[output_layer_index] = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
 
 
                         // === STEP 2: backpropagate the output layer delta === //
@@ -718,7 +687,7 @@ class Neurex {
 
      produces predictions based on the input data
     */
-    predict(input) {
+    async predict(input) {
         this.onGPU = false;
         try {
             if (!input) {
@@ -731,6 +700,8 @@ class Neurex {
                     console.log(`${color.red}[ERROR]------- Input data must be the same shape set in the input layer${color.reset}\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${input[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
                     throw new Error(`${color.red}Shape mismatch${color.reset}`);
                 }
+
+                input[i] = input[i] instanceof Float32Array ? input[i] : new Float32Array(input[i].flat(Infinity));
             }            
 
             let outputs = [];
