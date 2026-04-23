@@ -498,8 +498,17 @@ class Neurex {
             trainX.push(inputs[i] instanceof Float32Array ? inputs[i] : new Float32Array(inputs[i].flat(Infinity)));
         }
 
-        const lastLayerObject = this.layers[this.layers.length - 1];
-        this.output_size = lastLayerObject.layer_size;
+        // Infer task type based on output layer and loss/activation
+        let lastLayer = this.layers[this.layers.length - 1];
+        this.loss_function = loss.toLowerCase();
+        const loss_function = lossFunctions[this.loss_function.toLowerCase()];
+        const optimizerFn = optimizers[this.optimizer.toLowerCase()];
+            
+        this.epoch_count = epoch;
+        this.batch_size = batch_size;
+        const batchSize = batch_size;
+            
+        const lossLower = loss.toLowerCase();
 
         try {
             if (!trainX || trainX.length == 0 || !trainY || trainY.length == 0 || !loss) {
@@ -518,18 +527,8 @@ class Neurex {
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
             }
 
-            this.loss_function = loss.toLowerCase();
-            const loss_function = lossFunctions[this.loss_function.toLowerCase()];
-            const optimizerFn = optimizers[this.optimizer.toLowerCase()];
-            
-            this.epoch_count = epoch;
-            this.batch_size = batch_size;
-            const batchSize = batch_size;
-            
             // Infer task type based on output layer and loss/activation
-            const lastLayerActivation = lastLayerObject.activation_function.name;
-            const lossLower = loss.toLowerCase();
-
+            let lastLayerObject = this.layers[this.layers.length - 1];
             // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
             const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
             this.task = taskType;
@@ -578,12 +577,13 @@ class Neurex {
 
                         // === STEP 1: Compute delta for output layer === //
                         let output_layer_index = this.num_layers - 1;
-
+                        
+                        
                         deltas[output_layer_index] = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
 
 
                         // === STEP 2: backpropagate the output layer delta === //
-                        const allDeltas = this.#backpropagation(activations, zs, deltas);
+                        const {deltas:allDeltas} = this.#backpropagation(activations, zs, deltas);
 
 
                         // === STEP 3: Accumulate Gradients === //
@@ -676,6 +676,7 @@ class Neurex {
         }
         catch (error) {
             console.log(error);
+            process.exit(1);
         }
     }
 
@@ -882,29 +883,31 @@ class Neurex {
         }
     }
 
-    // backpropagation
+    // backward propagation
     #backpropagation(activations, zs, deltas_array) {
-        // The loop should iterate from the second-to-last layer (this.num_layers - 2) down to the first layer (0).
-
         let deltas = deltas_array;
-        let delta_indexer = this.num_layers - 2;
-        for (let layer_index = delta_indexer; layer_index >= 0; layer_index--) {
-            
-            const next_weights = this.weights[layer_index + 1];
-            const nextLayer = this.layers[layer_index + 1];
-            const next_delta = deltas[layer_index + 1];
-            
-            // Get the current layer object, which now holds its backpropagation logic
-            const currentLayer = this.layers[layer_index];
+        let current_delta = deltas[this.num_layers - 1];
+        let all_deltas = [current_delta];
 
-            // Call the layer's specific backpropagation method
-            const {current_delta, decrementor_value} = currentLayer.backpropagate(this.onGPU,next_weights, next_delta, zs, layer_index, currentLayer, this.weights, activations, nextLayer, this.layers);
-            delta_indexer--;
-            
+        let weights_biases_indexer = this.num_layers - 1;
+        for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
+            const current_layer = this.layers[layer_index];
+            const next_layer = this.layers[layer_index + 1];
+            const next_weights = this.weights[weights_biases_indexer];
+            const next_delta = current_delta;
+
+            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(this.onGPU, next_weights,next_delta,zs,layer_index,current_layer,this.weights,activations,next_layer,this.layers);
+            weights_biases_indexer -= decrementor_value;
+
+            current_delta = new_delta;
             deltas[layer_index] = current_delta;
+            all_deltas.unshift(current_delta);
         }
 
-        return deltas;
+        return {
+            deltas: deltas,
+            all_deltas: all_deltas
+        };
     }
 
 
@@ -921,7 +924,7 @@ class Neurex {
             const layer_biases = this.biases[weights_biases_indexer];
 
             const { outputs, z_values, incrementor_value } = current_layer.feedforward(this.onGPU, current_input, layer_weights, layer_biases, current_layer);
-            weights_biases_indexer++;
+            weights_biases_indexer+=incrementor_value;
 
             zs.push(z_values);
             current_input = outputs;
@@ -993,28 +996,6 @@ class Neurex {
             }
         }
         return (correctPredictions / predictions.length) * 100;
-    }
-
-    #ifOneHotEndcoded(Y_train) {
-        /**
-        Checks if all rows in Y_train are one-hot encoded.
-        Each row must:
-        - Contain only 0s and 1s
-        - Have exactly one "1"
-        */
-        for (let i = 0; i < Y_train.length; i++) {
-            const row = Y_train[i];
-            if (!Array.isArray(row)) return false;
-
-            let onesCount = 0;
-            for (let j = 0; j < row.length; j++) {
-                if (row[j] !== 0 && row[j] !== 1) return false;
-                if (row[j] === 1) onesCount++;
-            }
-
-            if (onesCount !== 1) return false;
-        }
-        return true;
     }
 
     #recalculateShape() {

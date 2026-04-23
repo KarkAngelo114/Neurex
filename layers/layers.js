@@ -317,11 +317,11 @@ class Layers {
                     * Convolution layers has different process of getting delta of the output layer, so this is another TO DOs, but for now, throw an error 
                     */
 
-                    throw new Error('Convolutional layer cannot be an output layer for now');
+                    throw new Error('Convolutional layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
+                    process.exit(1);
+                    // let dOutputLayer = new Float32Array(preds.length); 
 
-                    let dOutputLayer = new Float32Array(preds.length); 
-
-                    return dOutputLayer;
+                    // return dOutputLayer;
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
                     let input = next_delta;
@@ -333,7 +333,7 @@ class Layers {
                         const [inputSize, outputSize] = next_layer.weightShape;
                         input = DeltaMatMul(input, params, inputSize, outputSize);
 
-                        if (input.some(v => Number.isNaN(v))) throw new Error('Delta coming after DeltaMatMuk() has NaNs'); 
+                        if (input.some(v => Number.isNaN(v))) throw new Error('Delta coming after DeltaMatMul() has NaNs'); 
                         
                     }
 
@@ -421,6 +421,7 @@ class Layers {
         }
         catch (error) {
             console.error(error);
+            process.exit(1);
         }
     }
 }
