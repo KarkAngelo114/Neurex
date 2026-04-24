@@ -283,6 +283,17 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
     return addon.element_wise_mul(flat_arr_1, flat_arr_2);
 }
 
+/**
+ * "✅"
+ * @function MaxPool
+ * @param {Float32Array} input - current input passed down to this layer 
+ * @param {Array<Number>} poolSize - pool size of the sliding window
+ * @param {Array<Number>} inputShape - input shape of the current tensor
+ * @param {Array<Number>} outputShape - output shape of the tensor
+ * @param {Number} strides - determines how many pixels it will skipped
+ */
+const MaxPool = (input, poolSize, inputShape, outputShape, strides) => float_32.MaxPooling_Float32(input, poolSize, inputShape, outputShape, strides);
+
 
 module.exports = {
     MatMul,
@@ -305,6 +316,7 @@ module.exports = {
     ApplySGD,
     ApplyAdam,
     element_wise_mul,
+    MaxPool,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

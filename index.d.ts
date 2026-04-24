@@ -452,55 +452,66 @@ declare module 'neurex' {
     /**
     * 
     * 
-    *
-    * Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
+    * - Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
     * 
     * 
     * available layers:
     *  - inputShape() - This will tell the network that your input layer has this X number of input neuron.
     *  - connectedLayer() - to build fully connected layers.
     *  - convolutionalLayer() - to build Convolutional layers.
-    *
-    * @class Layers
+    *  - maxPooling() - get the max value within a sliding window, use for downsampling operation greatly reducing computational load.
+    * @class Layers 
     */
     export class Layers {
         /**
         * @method inputShape
-        * @param {object} shapeConfig - specify the number of features
+        * @param {Object} shapeConfig - specify the number of features
+        *
+        * The inputShape() method allows you to get the shape of your input
         * @example
         * model.sequentialBuild([
             layer.inputShape({features: 4}),
-            // other added layers
+            layer.connectedLayer("relu", 5),
+            layer.connectedLayer("softmax", 3);
         ]);
-
-        the inputShape() method allows you to get the shape of your input.
         */
         inputShape(shapeConfig: Object): object;
 
         /**
-        *
-        * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
-        * build connected layers or multilayer perceptron
         * @method connectedLayer
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
         * @param {Number} layer_size specify the number of neuron for this layer.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
+        *
+        * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
+        * build connected layers or multilayer perceptron
         */
         connectedLayer(activation: string, layer_size: number): object;
 
         /**
-         * 
-         * Allows you to add convolutional layers in your model architecture when sequential building.
-         * @method convolutionalLayer
-         * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
-         * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
-         * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
-         * @param {String} activation_function - the activation function to be use for this layer
-         * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
-         * @throws {Error} - if any of the parameters are invalid.
-         *
-         */
+        * 
+        * @method convolutionalLayer
+        * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
+        * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
+        * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
+        * @param {String} activation_function - the activation function to be use for this layer
+        * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+        * @throws {Error} - if any of the parameters are invalid.
+        *
+        * Allows you to add convolutional layers in your model architecture in sequential building.
+        */
         convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
+
+        /**
+        * @method maxPooling
+        * @param {Array<Number>} poolSize - determines the pool size window
+        * @param {Number} strides - It determines how much the pool window slides across the input tensor. Default is `1`
+        * @param {String} padding - `same` or `valid`. Default is `same`
+        * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
+        *
+        * `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
+        */
+        maxPooling(poolSize: Number[], strides: Number, padding: String): object;
         
     }
 

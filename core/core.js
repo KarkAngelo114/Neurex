@@ -125,6 +125,12 @@ class Neurex {
      * Shows the model architecture
      */
     modelSummary() {
+        
+        if (!this.layers || this.layers.length == 0) {
+            console.error(`${color.red}[ERROR]------- An error occurred${color.reset}`);
+            throw new Error('No layers to show details');
+        }
+
         console.log("_______________________________________________________________");
         console.log("                        Model Summary                          ");
         console.log("_______________________________________________________________");
@@ -133,57 +139,28 @@ class Neurex {
         console.log("---------------------------------------------------------------");
         console.log("Layer (type)              Output Shape          Activation     ");
         console.log("===============================================================");
-        
-        // Initialize currentShape with the input shape
-        let currentShape = [...this.input_shape];
-        let [h, w, d] = currentShape;
 
+            // since 
         this.layers.forEach((layer, i) => {
             const layerType = layer.layer_name || newLayer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
 
             if (layerType === 'convolutionalLayer') {
-                const [kernelH, kernelW] = layer.kernel_size;
-                const stride = layer.strides;
-                const padding = layer.padding.toLowerCase();
-                const filters = layer.filters;
-                if (padding === 'same') {
-                    // Same padding preserves spatial size, so h and w remain unchanged
-                } else if (padding === 'valid') {
-                    h = Math.floor((h - kernelH) / stride + 1);
-                    w = Math.floor((w - kernelW) / stride + 1);
-                }
-                const newShape = [h, w, filters];
-                const warning = (h <= 0 || w <= 0) ? '⚠️ INVALID OUTPUT SHAPE' : '';
+                console.log(`Convolutional layer      (${layer.outputShape.join('x')})        ${activationName.padEnd(10)}`);
 
-                console.log(
-                    `Convolutional layer      (${newShape.join('x')})        ${activationName.padEnd(10)} ${warning}`
-                );
-
-                // Update currentShape for the next layer
-                currentShape = newShape;
-                [h, w, d] = currentShape;
             } else if (layerType === 'connected_layer') {
                 const outputShape = layer.layer_size;
-                console.log(
-                    `Connected Layer          (1x1x${outputShape})           ${activationName.padEnd(10)}`
-                );
-                currentShape = [1, 1, outputShape]; // assume flat
-                [h, w, d] = currentShape;
-            } else if (layerType === 'flatten_layer') {
-                const size = h * w * d;
-                currentShape = [1, 1, size];
-                console.log(
-                    `Flatten Layer           (1x1x${size})        None`
-                );
-                [h, w, d] = currentShape;
+                console.log(`Connected Layer          (1x1x${outputShape})           ${activationName.padEnd(10)}`);
+            } else if (layerType === 'maxPooling') {
+                const size = layer.outputShape;
+                console.log(`Max pooling             (${size.join('x')})        None`);
             }
         });
         const total_weights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
         const total_biases = this.biases.reduce((sum, arr) => sum + arr.length, 0);
         console.log("===============================================================");
         console.log("Total layers: " + this.num_layers);
-        console.log("Total Learnable parameters:",parseInt(total_weights+total_biases));
+        console.log("Total Learnable parameters:",parseInt((total_weights+total_biases)).toLocaleString());
         console.log("===============================================================");
         
     }
@@ -585,21 +562,28 @@ class Neurex {
                         // === STEP 2: backpropagate the output layer delta === //
                         const {deltas:allDeltas} = this.#backpropagation(activations, zs, deltas);
 
+                        // console.log(allDeltas);
 
                         // === STEP 3: Accumulate Gradients === //
-                        for (let l = 0; l < this.num_layers; l++) {
+                        let pointer = 0;
+                        for (let l = 0; l < this.layers.length; l++) {
                             const delta = allDeltas[l];
                             const a_prev = activations[l];
                             const layer_data_obj = this.layers[l];
 
+                            const parametric_layers = ["connected_layer","convolutionalLayer"];
+
+                            if (!parametric_layers.includes(layer_data_obj.layer_name)) {
+                                continue;
+                            }
+
 
                             // Accumulate weight gradients
-                            weightGrads[l] = layer_data_obj.computeWeightGradients(a_prev, delta, weightGrads[l], layer_data_obj);
-
+                            weightGrads[pointer] = layer_data_obj.computeWeightGradients(a_prev, delta, weightGrads[pointer], layer_data_obj);
 
                             // Accumulate bias gradients
-                            biasGrads[l] = layer_data_obj.computeBiasGradients(biasGrads[l], delta, layer_data_obj);
-
+                            biasGrads[pointer] = layer_data_obj.computeBiasGradients(biasGrads[pointer], delta, layer_data_obj);
+                            pointer++;
                         }
                     }
 
@@ -609,34 +593,42 @@ class Neurex {
                     process.stdout.write(`\r`+logMessage);
 
 
+                    let pointer = 0;
                     // Divide accumulated gradients by the actual batch size and use the optimizer function to update the paramters
                     for (let l = 0; l < this.num_layers; l++) {
                         
                         const layer_data_obj = this.layers[l];
 
+                        const parametric_layers = ["connected_layer","convolutionalLayer"];
+
+                        if (!parametric_layers.includes(layer_data_obj.layer_name)) {
+                            continue;
+                        }
+
                         // scale weight gradients
-                        weightGrads[l] = layer_data_obj.scaleGrads(weightGrads[l], actualBatchSize, layer_data_obj);
+                        weightGrads[pointer] = layer_data_obj.scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
 
                         // scale bias gradients
-                        biasGrads[l] = layer_data_obj.scaleGrads(biasGrads[l], actualBatchSize);
+                        biasGrads[pointer] = layer_data_obj.scaleGrads(biasGrads[pointer], actualBatchSize);
 
                         // update Weights
-                        const res1 = optimizerFn(this.weights[l], weightGrads[l], this.optimizerStates.weights[l], this.learning_rate);
+                        const res1 = optimizerFn(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
 
                         // Update biases
-                        const res2 = optimizerFn(this.biases[l], biasGrads[l], this.optimizerStates.biases[l], this.learning_rate);
+                        const res2 = optimizerFn(this.biases[pointer], biasGrads[pointer], this.optimizerStates.biases[pointer], this.learning_rate);
 
                         // assigned updated weights to it's current index position relative to the layer's index
-                        this.weights[l] = res1.params;
+                        this.weights[pointer] = res1.params;
 
                         // assigned updated biases to it's current index position relative to the layer's index
-                        this.biases[l] = res2.params;
+                        this.biases[pointer] = res2.params;
 
                         // assigned updated weight states to it's current index position relative to the layer's index
-                        this.optimizerStates.weights[l] = res1.state;
+                        this.optimizerStates.weights[pointer] = res1.state;
 
                         // assigned updated bias states to it's current index position relative to the layer's index
-                        this.optimizerStates.biases[l] = res2.state;
+                        this.optimizerStates.biases[pointer] = res2.state;
+                        pointer++;
                     }
 
                 }
@@ -809,6 +801,22 @@ class Neurex {
 
                     layer_data.weightShape = [filters, kH, kW, inputDepth];
                 }
+                else if (layer_data.layer_name === "maxPooling") {
+                    // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
+                    const [inputH, inputW, inputD] = this.currentShape;
+                    const [poolHeight, poolWidth] = layer_data.poolSize;
+                    const strides = layer_data.strides;
+                    const padding = layer_data.padding;
+
+                    layer_data.inputShape = [inputH, inputW, inputD]; // set the input shape to be use in the feedforward() of maxPooling() layer
+
+                    const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(inputH, inputW, poolHeight, poolWidth, inputD, strides, padding); // we get the output shape to be use as input shape for the succeeding layers
+                    layer_data.outputShape = [OutputHeight, OutputWidth, inputD]; // set the output shape
+
+                    // update the shapes
+                    this.currentShape = [OutputHeight, OutputWidth, inputD]; 
+                    this.currentSize = CalculatedTensorShape;
+                }
             });
 
             this.hasBuilt = true;
@@ -889,7 +897,7 @@ class Neurex {
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        let weights_biases_indexer = this.num_layers - 1;
+        let weights_biases_indexer = this.weights.length - 1;
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
             const next_layer = this.layers[layer_index + 1];
@@ -1030,13 +1038,17 @@ class Neurex {
     }
 
     #reinitiateWeightSBiasGrads() {
-        for (let l = 0; l < this.num_layers; l++) {
-            if (this.weightGrads[l]) {
-                this.weightGrads[l].fill(0);
+        for (let l = 0; l < this.layers.length; l++) {
+
+            if (this.layers.layer_name !== "maxPooling") {
+                if (this.weightGrads[l]) {
+                    this.weightGrads[l].fill(0);
+                }
+                if (this.biasGrads[l]) {
+                    this.biasGrads[l].fill(0);
+                }
             }
-            if (this.biasGrads[l]) {
-                this.biasGrads[l].fill(0);
-            }
+            
 
         }
     }

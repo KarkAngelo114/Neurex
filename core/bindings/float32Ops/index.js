@@ -433,3 +433,50 @@ exports.computeKernelGradients_Float32 = (input, delta, weightGrads, inputH, inp
 
     return weightGrads;
 }
+
+exports.MaxPooling_Float32 = (arr, pool_size, inputShape, outputShape, strides) => {
+    const [poolH, poolW] = pool_size;
+    const [inputH, inputW, inputD] = inputShape;
+    const [outputH, outputW, outputD] = outputShape;
+
+    const output = new Float32Array(outputH * outputW * outputD);
+    const maxIdexes = new Float32Array(outputH * outputW * outputD);
+
+    for (let d = 0; d < inputD; d++) {
+        for (let i = 0; i < outputH; i++) {
+            for (let j = 0; j < outputW; j++) {
+                let maxVal = -Infinity;
+                let maxIdx = -1;
+                // Define the window boundaries based on strides
+                const startH = i * strides;
+                const startW = j * strides;
+
+                for (let ph = 0; ph < poolH; ph++) {
+                    for (let pw = 0; pw < poolW; pw++) {
+                        const currH = startH + ph;
+                        const currW = startW + pw;
+
+                        // Check bounds to handle cases where window might exceed input dimensions
+                        if (currH < inputH && currW < inputW) {
+                            // Calculate index in the flattened 1D array
+                            const idx = (currH * inputW * inputD) + (currW * inputD) + d;
+                            const val = arr[idx];
+                            if (val > maxVal) {
+                                maxVal = val;
+                                maxIdx = idx;
+                            };
+                        }
+                    }
+                }
+                // Set the max value in the output array
+                const outIdx = (i * outputW * outputD) + (j * outputD) + d;
+                output[outIdx] = maxVal === -Infinity ? 0 : maxVal;
+                maxIdexes[outIdx] = maxIdx;
+            }
+        }
+    }
+    return {
+        output: output,
+        maxIndices: maxIdexes
+    };
+}

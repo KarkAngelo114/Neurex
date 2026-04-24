@@ -25,6 +25,7 @@ const {
     scaleGrads,
     element_wise_mul,
     computeBiasGradsForConv,
+    MaxPool,
     ComputeGradientForKernels
 } = require('../core/bindings');
 
@@ -44,6 +45,7 @@ class Layers {
     /**
      * @method inputShape
      * @param {object} shapeConfig - specify the number of features
+     * @returns {Object}
      * @example
      * model.sequentialBuild([
         layer.inputShape({features: 4}),
@@ -80,11 +82,14 @@ class Layers {
     }
 
     /**
-     * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
-     * build connected layers or multilayer perceptron
+     * @method connectedLayer
      * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
      * @param {Number} layer_size specify the number of neuron for this layer.
      * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
+     * @returns {Object}
+     *
+     * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
+     * build connected layers or multilayer perceptron
      */
     connectedLayer(activation_function = 'relu', layer_size = 5) {
         try {
@@ -148,12 +153,11 @@ class Layers {
                     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
                 feedforward: (onGPU, input, weights, biases, current_layer) => {
-
+                    
                     const z_values = MatMul(input, weights, biases, current_layer.weightShape[0], current_layer.weightShape[1]);
                     const activation_function = activation[function_name];
 
-                    let outputs;
-                    outputs = activation_function(z_values);
+                    let outputs = activation_function(z_values);
                     
                     if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
                     
@@ -189,11 +193,9 @@ class Layers {
                     return dOutputLayer;
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
-                    
                     const dActivation = activation.derivatives[function_name];
                     const dAct = dActivation(zs[layer_index]);
                     const delta_res = DeltaMatMul(next_delta, next_weights, nextLayer.weightShape[0], nextLayer.weightShape[1]);
-
                     const current_delta = element_wise_mul(dAct, delta_res);     
 
                     if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
@@ -215,7 +217,6 @@ class Layers {
 
     /**
      * 
-     * Allows you to add convolutional layers in your model architecture in sequential building.
      * @method convolutionalLayer
      * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
      * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
@@ -223,7 +224,9 @@ class Layers {
      * @param {String} activation_function - the activation function to be use for this layer
      * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
      * @throws {Error} - if any of the parameters are invalid.
+     * @returns {Object}
      *
+     * Allows you to add convolutional layers in your model architecture in sequential building.
      */
     convolutionalLayer(filters = 3, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
         try {
@@ -233,7 +236,7 @@ class Layers {
             if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
             if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
 
-            // check if the padding is valid
+            // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
                 throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
@@ -379,9 +382,6 @@ class Layers {
                     const delta_res = ConvolveDelta(data, shape, rotated_kernels, [f, kh, kw, kc], oH, oW);
                     if (delta_res.some(v => Number.isNaN(v))) throw new Error("Delta convolution result has NaNs");
 
-                    // console.log(delta_res.length);
-                    // console.log(Current_Z.length);
-
                     // perform element-wise multiplication with derivative outputs of Zs and the delta convolution results
                     const output = element_wise_mul(dActivation(Current_Z), delta_res);
                     if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
@@ -417,6 +417,98 @@ class Layers {
                     return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
                 },
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
+            }
+        }
+        catch (error) {
+            console.error(error);
+            process.exit(1);
+        }
+    }
+
+    /**
+     * @method maxPooling
+     * @param {Array<Number>} poolSize - determines the pool size window 
+     * @param {Number} strides - It determines how much the pool window slides across the input tensor.
+     * @param {String} padding - `same` or `valid`
+     * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
+     *
+     * `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
+     */
+    maxPooling(poolSize, strides = 1, padding = "same") {
+        try {
+            if (poolSize[0] <= 0 || poolSize[1] <= 0) {
+                throw new Error(`[ERROR]------- pool size value cannot be 0 or a negative value`);
+            }
+
+            // check if the padding is same/valid, otherwise throw error
+            let paddings = ["same", "valid"];
+            if (!paddings.includes(padding.toLowerCase())) {
+                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+            }
+
+            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
+
+            return {
+                "layer_name":"maxPooling",
+                "poolSize": poolSize,
+                "padding": padding,
+                "strides":strides,
+                determineInferenceType: (layerObject, lossFunc, trainY) => {
+                    throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
+                    process.exit(1);
+                },
+                feedforward: (onGPU, input, weights=null, biases=null, current_layer) => {
+                    const [inputh, inputw, inputd] = current_layer.inputShape;
+                    const [outputh, outputw, outputd] = current_layer.outputShape;
+                    const [poolHeight, poolWidth] = current_layer.poolSize;
+                    const strides = current_layer.strides;
+                
+                    let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides);
+                    current_layer.maxIndices = maxIndices;
+
+                    if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
+
+                    return {
+                        outputs:output,
+                        z_values: output,
+                        incrementor_value:0
+                    }
+                },
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+                    /**
+                    * Max pooling has different process of getting delta of the output layer, so this is another TO DOs, but for now, throw an error 
+                    */
+
+                    throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
+                    process.exit(1);
+                },
+                backpropagate: (onGPU, next_weights = null, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                    const [inputH, inputW, inputD] = currentLayer.inputShape;
+                    const [outputH, outputW, outputD] = currentLayer.outputShape;
+                    const [poolHeight, poolWidth] = currentLayer.poolSize;
+                    const strides = currentLayer.strides;
+                    const padding = currentLayer.padding;
+
+                    const delta = new Float32Array(inputH * inputW * inputD);
+                    const indices = currentLayer.maxIndices;
+
+                    for (let i = 0; i < next_delta.length; i++) {
+                        let idx = indices[i];
+                        delta[idx] += next_delta[i];
+                    }
+
+                    
+                    return {
+                        current_delta: delta,
+                        decrementor_value:0
+                    }
+                },
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
+                },
+                computeBiasGradients: (biasgrads, deltas, layer_data) => {
+                    
+                },
+                scaleGrads: () => {},
             }
         }
         catch (error) {
