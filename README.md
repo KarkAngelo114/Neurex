@@ -24,10 +24,10 @@ Checkout the documentation for full API reference and some starter examples [her
 # Neurex
 Neurex is a Javascript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications. This library supports:
 
-✅ training ANN
-✅ training CNN + ANN
-✅ both CommonJS and ES module importing
-✅ retraining and transfer learning
+-✅ training ANN
+-✅ training CNN + ANN
+-✅ both CommonJS and ES module importing
+-✅ retraining and transfer learning
 
 ## Sample usage - training a XOR 
 Here's an example on you can use `Neurex` to train on XOR problem.

@@ -4,6 +4,7 @@
 - 2x performance boost due to type arrays
 - uses native bindings written in C++ and are already precompiled so that you don't have to compile again (source code is in different repository)
 - introduced CNN layers. Now supports training Convolutional Neural Networks in the near future
+- added pooling layers
 - allows retraining and transfer learning
 
 ### Breaking Changes
