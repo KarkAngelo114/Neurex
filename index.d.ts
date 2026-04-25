@@ -252,6 +252,12 @@ declare module 'neurex' {
         * @returns the input size equivalent of number of features as innput
         */
         getInputSize(): Number;
+
+        /**
+         * get the task type. Can be use to identify what model is trained on and what it is trained for
+         * @returns the task type: regression | multi_class_classification | binary_classification
+         */
+        get_task_type(): String;
         
         /**
         * 
