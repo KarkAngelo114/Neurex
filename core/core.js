@@ -907,6 +907,22 @@ class Neurex {
             this.currentShape = [OutputHeight, OutputWidth, filters];
             this.currentSize = CalculatedTensorShape;
         }
+        else if (layer_data.layer_name === "maxPooling") {
+            // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
+            const [inputH, inputW, inputD] = this.currentShape;
+            const [poolHeight, poolWidth] = layer_data.poolSize;
+            const strides = layer_data.strides;
+            const padding = layer_data.padding;
+
+            layer_data.inputShape = [inputH, inputW, inputD]; // set the input shape to be use in the feedforward() of maxPooling() layer
+
+            const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(inputH, inputW, poolHeight, poolWidth, inputD, strides, padding); // we get the output shape to be use as input shape for the succeeding layers
+            layer_data.outputShape = [OutputHeight, OutputWidth, inputD]; // set the output shape
+
+            // update the shapes
+            this.currentShape = [OutputHeight, OutputWidth, inputD]; 
+            this.currentSize = CalculatedTensorShape;
+        }
     }
 
     // backward propagation
@@ -1055,19 +1071,21 @@ class Neurex {
         this.currentSize = H * W * D;
     }
 
-    #reinitiateWeightSBiasGrads() {
+   #reinitiateWeightSBiasGrads() {
+        let pointer = 0; // Use a separate pointer for parametric layers
         for (let l = 0; l < this.layers.length; l++) {
+            const layer_data_obj = this.layers[l];
 
-            if (this.layers.layer_name !== "maxPooling") {
-                if (this.weightGrads[l]) {
-                    this.weightGrads[l].fill(0);
+            // Only reset gradients for layers that actually HAVE weights/biases
+            if (layer_data_obj.layer_name === "connected_layer" || layer_data_obj.layer_name === "convolutionalLayer") {
+                if (this.weightGrads[pointer]) {
+                    this.weightGrads[pointer].fill(0);
                 }
-                if (this.biasGrads[l]) {
-                    this.biasGrads[l].fill(0);
+                if (this.biasGrads[pointer]) {
+                    this.biasGrads[pointer].fill(0);
                 }
+                pointer++; // Increment only when a parametric layer is found
             }
-            
-
         }
     }
 }
