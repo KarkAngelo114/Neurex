@@ -16,27 +16,32 @@
 npm install neurex
 
 ```
-4. After successful installation, you can now train ANN models and do predictions in your backend applications.
+4. After successful installation, you can now train neural network models and do predictions in your applications.
 
 ## Documentation
-Checkout the documentation for full API reference and some starter examples [here](https://neurex-documentation.vercel.app/).
+Checkout the documentation for full API reference, live demos, and some starter examples [here](https://neurex-documentation.vercel.app/).
 
 # Neurex
 Neurex is a Javascript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications. This library supports:
 
--✅ training ANN
--✅ training CNN + ANN
--✅ both CommonJS and ES module importing
--✅ retraining and transfer learning
+1. Mix and Match; train CNN + ANN or just ANN ✅
+2. Both CommonJS and ES module importing ✅
+3. Retraining and transfer learning ✅
+
+## Why use Neurex
+1. Easy implementation - intuitive API calls. No need to fight with the API design
+2. Abstracted complexities - Intuitive API that handles the heavy lifting of backpropagation and weight initialization, allowing you to focus on architecture.
+3. Educational - Good for experimenting or learning how to build Neural networks
+4. Use vs See - others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
 
 ## Sample usage - training a XOR 
-Here's an example on you can use `Neurex` to train on XOR problem.
+Here's an example on how you can use `Neurex` to train on XOR problem.
 
 ```Javascript
 const {Neurex, Layers} = require('neurex');
 
 const nrx = new Neurex();
-const layer = new layers();
+const layer = new Layers();
 
 const trainX = [
     [0, 0],
