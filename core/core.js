@@ -1058,8 +1058,17 @@ class Neurex {
                 H = OutputHeight;
                 W = OutputWidth;
                 D = filters;
-                
-            }
+            } 
+            else if (layer.layer_name === "maxPooling") {
+                const [poolHeight, poolWidth] = layer.poolSize;
+                const stride = layer.strides;
+                const padding = layer.padding;
+
+                const {OutputHeight, OutputWidth} = calculateTensorShape(H, W, poolHeight, poolWidth, D, stride, padding);
+                H = OutputHeight;
+                W = OutputWidth;
+            } 
+
             else if (layer.layer_name === "connected_layer") {
                 H = 1;
                 W = 1;
