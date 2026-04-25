@@ -16,7 +16,7 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
-const { calculateTensorShape, XavierInitialization } = require('../utils');
+const { calculateTensorShape, XavierInitialization, getTotalMB } = require('../utils');
 const Layers = require('../layers/layers');
 
 
@@ -131,37 +131,49 @@ class Neurex {
             throw new Error('No layers to show details');
         }
 
-        console.log("_______________________________________________________________");
-        console.log("                        Model Summary                          ");
-        console.log("_______________________________________________________________");
+        console.log("______________________________________________________________________________________________________");
+        console.log("                                          Model Summary                                               ");
+        console.log("______________________________________________________________________________________________________");
         console.log(`Input size: ${this.input_size}`);
         console.log(`Number of layers: ${this.num_layers}`);
-        console.log("---------------------------------------------------------------");
-        console.log("Layer (type)              Output Shape          Activation     ");
-        console.log("===============================================================");
+        console.log("------------------------------------------------------------------------------------------------------");
+        console.log("Layer (type)              Output Shape          Activation        Number of Parameters");
+        console.log("======================================================================================================");
 
-            // since 
-        this.layers.forEach((layer, i) => {
-            const layerType = layer.layer_name || newLayer.layer_name;
+        const size1 = getTotalMB(this.weights);
+        const size2 = getTotalMB(this.biases);
+        const total = size1 + size2;
+
+        let pointer = 0;
+        this.layers.forEach((layer) => {
+            const layerType = layer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
 
-            if (layerType === 'convolutionalLayer') {
-                console.log(`Convolutional layer      (${layer.outputShape.join('x')})        ${activationName.padEnd(10)}`);
+            // Layers that own weights + biases
+            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer';
 
+            let paramCount = 0;
+            if (isParametric) {
+                const w = this.weights[pointer] ? this.weights[pointer].length : 0;
+                const b = this.biases[pointer]  ? this.biases[pointer].length  : 0;
+                paramCount = w + b;
+                pointer++;
+            }
+            if (layerType === 'convolutionalLayer') {
+                console.log( `Convolutional layer      (${layer.outputShape.join('x')})        ` +`${activationName.padEnd(10)}               ${paramCount.toLocaleString()}`);
             } else if (layerType === 'connected_layer') {
-                const outputShape = layer.layer_size;
-                console.log(`Connected Layer          (1x1x${outputShape})           ${activationName.padEnd(10)}`);
+                console.log(`Connected Layer          (1x1x${layer.layer_size})           ` +`${activationName.padEnd(10)}               ${paramCount.toLocaleString()}`);
             } else if (layerType === 'maxPooling') {
-                const size = layer.outputShape;
-                console.log(`Max pooling             (${size.join('x')})        None`);
+                console.log(`Max pooling             (${layer.outputShape.join('x')})        ` +`None              0 (non-parametric layer)`);
             }
         });
         const total_weights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
         const total_biases = this.biases.reduce((sum, arr) => sum + arr.length, 0);
-        console.log("===============================================================");
+        console.log("======================================================================================================");
         console.log("Total layers: " + this.num_layers);
         console.log("Total Learnable parameters:",parseInt((total_weights+total_biases)).toLocaleString());
-        console.log("===============================================================");
+        console.log(`Total Size (in MegaBytes): ${total.toFixed(2)} MB`);
+        console.log("======================================================================================================");
         
     }
 

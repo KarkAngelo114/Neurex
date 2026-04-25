@@ -142,11 +142,19 @@ const ifOneHotEndcoded = (Y_train) => {
         return true;
     }
 
+const getTotalMB = (array) => {
+    let sum = 0;
+    for (let i = 0; i < array.length; i++) {
+        sum += array[i].byteLength / (1024 * 1024);
+    }
+    return sum;
+}
 
 module.exports = {
     calculateTensorShape,
     getPaddingSizes,
     DilateInput,
     XavierInitialization,
-    ifOneHotEndcoded
+    ifOneHotEndcoded,
+    getTotalMB
 }
