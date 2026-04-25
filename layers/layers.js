@@ -327,68 +327,42 @@ class Layers {
                     // return dOutputLayer;
                 },
                 backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
-                    let input = next_delta;
-                    let params = next_weights;
                     let Current_Z = zs[layer_index];
                     let dActivation = activation.derivatives[function_name];
+                    let dL_dActivation;
 
                     if (next_layer.layer_name === "connected_layer") {
                         const [inputSize, outputSize] = next_layer.weightShape;
-                        input = DeltaMatMul(input, params, inputSize, outputSize);
+                        dL_dActivation = DeltaMatMul(next_delta, next_weights, inputSize, outputSize);
+                    } 
+                    else if (next_layer.layer_name === "maxPooling") {
+                        dL_dActivation = next_delta;
+                    } 
+                    else if (next_layer.layer_name === "convolutionalLayer") {
+                        const [Fn, KHn, KWn, KCn] = next_layer.weightShape;
+                        const [oHn, oWn, oDn] = next_layer.outputShape;
+                        const stridesN = next_layer.strides;
+                        const paddingN = next_layer.padding;
 
-                        if (input.some(v => Number.isNaN(v))) throw new Error('Delta coming after DeltaMatMul() has NaNs'); 
-                        
+                        const rotated = rotate_kernels(next_weights, Fn, KHn, KWn, KCn);
+                        const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
+
+                        let pT, pB, pL, pR;
+                        if (paddingN === "valid") {
+                            pT = pB = KHn - 1 + 1;
+                            pL = pR = KWn - 1 + 1;
+                        } else {
+                            pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
+                            pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
+                        }
+                        const { data, shape } = applyPadding(dilated, oHn, oWn, oDn, pT, pB, pL, pR);
+
+                        // output spatial = current conv's output shape (= next conv's input shape)
+                        dL_dActivation = ConvolveDelta(data, shape, rotated, [Fn, KHn, KWn, KCn], oHn, oWn);
                     }
 
-                    const kernels = weights[layer_index];
-                    const [f, kh, kw, kc] = currentLayer.weightShape; 
-                    const [iH, iW, iD] = currentLayer.inputShape;
-                    const [oH, oW, oD] = currentLayer.outputShape;
-                    const strides = currentLayer.strides;
-                    const padding = currentLayer.padding;
-
-                    // rotate kernels
-                    const rotated_kernels = rotate_kernels(kernels, f, kh, kw, kc);
-
-                    // dilate delta
-                    const dilated = Dilate_Input(input, [oH, oW, oD], strides);
-                    if (dilated.some(v => Number.isNaN(v))) throw new Error("Input dilation has NaNs");
-
-                    let padTop, padBottom, padLeft, padRight;
-
-                    if (padding === "valid") {
-                        // FULL padding for backprop
-                        padTop = kh - 1 + 1;
-                        padBottom = kh - 1 + 1;
-                        padLeft = kw - 1 + 1;
-                        padRight = kw - 1 + 1;
-                    } else if (padding === "same") {
-                        const padAlongHeight = kh - 1;
-                        const padAlongWidth  = kw - 1;
-
-                        padTop = Math.floor(padAlongHeight / 2);
-                        padBottom = padAlongHeight - padTop;
-
-                        padLeft = Math.floor(padAlongWidth / 2);
-                        padRight = padAlongWidth - padLeft;
-                    }
-
-                    // apply padding
-                    const {data, shape} = applyPadding(dilated, oH, oW, oD, padTop, padBottom, padLeft, padRight);
-                    if (data.some(v => Number.isNaN(v))) throw new Error("Padded input has NaNs");
-
-
-                    // perform delta convolution
-                    const delta_res = ConvolveDelta(data, shape, rotated_kernels, [f, kh, kw, kc], oH, oW);
-                    if (delta_res.some(v => Number.isNaN(v))) throw new Error("Delta convolution result has NaNs");
-
-                    // perform element-wise multiplication with derivative outputs of Zs and the delta convolution results
-                    const output = element_wise_mul(dActivation(Current_Z), delta_res);
+                    const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
                     if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
-
-
-                    
-                    
 
                     return {
                         current_delta: output,
@@ -482,12 +456,18 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                backpropagate: (onGPU, next_weights = null, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                backpropagate: (onGPU, next_weights = null, prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                    let next_delta = prev_delta;
                     const [inputH, inputW, inputD] = currentLayer.inputShape;
                     const [outputH, outputW, outputD] = currentLayer.outputShape;
                     const [poolHeight, poolWidth] = currentLayer.poolSize;
                     const strides = currentLayer.strides;
                     const padding = currentLayer.padding;
+
+                    if (next_layer.layer_name === "connected_layer") {
+                        const [inputSize, outputSize] = next_layer.weightShape;
+                        next_delta = DeltaMatMul(prev_delta, next_weights, inputSize, outputSize);
+                    }
 
                     const delta = new Float32Array(inputH * inputW * inputD);
                     const indices = currentLayer.maxIndices;
@@ -504,11 +484,14 @@ class Layers {
                     }
                 },
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
+                    // max pooling layer has no params like weights and biases, so no functions here :)
                 },
                 computeBiasGradients: (biasgrads, deltas, layer_data) => {
-                    
+                    // max pooling layer has no params like weights and biases, so no functions here :)
                 },
-                scaleGrads: () => {},
+                scaleGrads: () => {
+                    // max pooling layer has no params like weights and biases, so no functions here :)
+                },
             }
         }
         catch (error) {

@@ -322,7 +322,8 @@ exports.RotateKernels_Float32 = (kernels, F, KH, KW, D) => {
 exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, kernels_shape, oH, oW) => {
 
     const [Hp, Wp, C_in] = padded_delta_shape;
-    const [F, KH, KW, C_k] = kernels_shape;
+    // const [F, KH, KW, C_k] = kernels_shape;
+    const [F, KH, KW, C_k] = kernels_shape;        // C_k == previous layer's depth
 
     // Match C++ logic
     const C = Math.min(C_in, C_k);
@@ -331,7 +332,8 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
     const H = Hp - KH + 1;
     const W = Wp - KW + 1;
 
-    const output = new Float32Array(oH * oW * F);
+    // const output = new Float32Array(oH * oW * F);
+    const output = new Float32Array(oH * oW * C_k);
 
     // ---- Index helpers ----
     const idx3 = (h, w, c, W, C) => (h * W + w) * C + c;
@@ -339,41 +341,25 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
     const idxOut = (h, w, f, W, F) => (h * W + w) * F + f;
 
     // ---- Convolution ----
-    for (let f = 0; f < F; f++) {
 
+    for (let c_out = 0; c_out < C_k; c_out++) {     // output channel = previous depth
         for (let h = 0; h < oH; h++) {
             for (let w = 0; w < oW; w++) {
-
-                let sum = 0.0;
-
-                for (let kh = 0; kh < KH; kh++) {
-                    for (let kw = 0; kw < KW; kw++) {
-
-                        const ph = h + kh;
-                        const pw = w + kw;
-
-                        for (let c = 0; c < C; c++) {
-                            const pad_idx = idx3(ph, pw, c, Wp, C_in)
-                            const inputVal = padded[pad_idx];
-
-                            const kernelVal = rotatedKernels[idx4(f, kh, kw, c, KH, KW, C_k)];
-
-                            sum += inputVal * kernelVal;
-                        }
-                    }
+            let sum = 0;
+            for (let kh = 0; kh < KH; kh++) {
+                for (let kw = 0; kw < KW; kw++) {
+                for (let f = 0; f < F; f++) {         // sum over delta's filter dim
+                    const ph = h + kh, pw = w + kw;
+                    const padIdx    = (ph * Wp + pw) * C_in + f;             // C_in here is F
+                    const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
+                    sum += padded[padIdx] * rotatedKernels[kernelIdx];
                 }
-                let outIdx = idxOut(h, w, f, oW, F);
-
-                if (outIdx >= output.length) {
-                    throw new Error('Out of bound');
                 }
-
-
-                output[outIdx] = sum;
+            }
+            output[(h * oW + w) * C_k + c_out] = sum;
             }
         }
     }
-
     return output;
 };
 

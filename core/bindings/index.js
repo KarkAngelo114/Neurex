@@ -186,7 +186,7 @@ const rotate_kernels = (params, f, kh, kw, d) => float_32.RotateKernels_Float32(
  * @param {Number} strides
  * @returns output delta convolution
  */
-const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => addon.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
+const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) =>float_32.ConvolveDelta_Float32(input, padded_delta_shape, kernels, kernel_shape, oh, ow);  // addon.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
 
 
 /**
@@ -278,7 +278,7 @@ const scaleGrads = (grad, batchSize) => addon.scaleGrad(grad, batchSize)
  */
 const element_wise_mul = (flat_arr_1, flat_arr_2) => {
 
-    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. ${reset}`);
+    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
 
     return addon.element_wise_mul(flat_arr_1, flat_arr_2);
 }

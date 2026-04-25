@@ -221,6 +221,7 @@ class Neurex {
                 weightShape: layer.weightShape || [],
                 inputShape: layer.inputShape || [],
                 outputShape: layer.outputShape || [],
+                poolSize: layer.poolSize || [],
 
             })),
             "input_size":this.input_size,
@@ -315,7 +316,12 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                } else {
+                } else if (layerData.layer_name === "maxPooling") {
+                    newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                } 
+                else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
                 
