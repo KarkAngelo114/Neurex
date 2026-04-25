@@ -426,17 +426,6 @@ declare module 'neurex' {
 
     /**
     * @async
-    * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
-    * @param {Array<Number>} flat_arr_1 - a flat array input
-    * @param {Array<Number>} flat_arr_2 - a flat array input
-    * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
-    * @throws an error will occured if both array are not equal in length
-    */
-    export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Number[];
-
-
-    /**
-    * @async
     * @function load_single_image allows you to load a single image
     * @param {String} targetDir - points to the directory of the image
     * @param {Array<Number>} resize - resize the image to [h][w][d]
@@ -563,4 +552,62 @@ declare module 'neurex' {
          */
         image_classify(): void;
     }
+
+    // ================ Math Ops ======================= //
+
+    /**
+    * @async
+    * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
+    * @param {Array<Number>} flat_arr_1 - a flat array input
+    * @param {Array<Number>} flat_arr_2 - a flat array input
+    * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
+    * @throws an error will occured if both array are not equal in length
+    */
+    export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
+
+    /**
+     * @function relu
+     * @param {Float32Array} arr Float32Array values
+     * @returns {Float32Array} relu output
+     *
+     * ReLu (Rectified Linear Unit) is an activation function where all the values are passed the same and zeroed out negative values
+     */
+    export function relu(arr: Float32Array): Float32Array;
+
+    /**
+     * @function sigmoid
+     * @param {Float32Array} arr Float32Array values
+     * @returns {Float32Array} sigmoid output
+     *
+     * Sigmoid is an activation function that squashes all values between 0 to 1. Ideal for binary classificaton tasks
+     */
+    export function sigmoid(arr: Float32Array): Float32Array;
+
+    /**
+     * @function tanh
+     * @param {Float32Array} arr Float32Array values
+     * @returns {Float32Array} tanh output
+     *
+     * Tanh (hyperbolic tangent) is an activation function that squashes all values between -1 to 1. Ideal for binary classificaton tasks
+     */
+    export function tanh(arr: Float32Array): Float32Array;
+
+    /**
+     * @function softmax
+     * @param {Float32Array} arr Float32Array values
+     * @returns {Float32Array} softmax output
+     *
+     * The softmax function is a mathematical tool that converts a vector of raw, real-numbered scores (logits) into a probability distribution, with values between 0 and 1 that sum up to exactly 1.
+     * This activation function is primarily use in output layer.
+     */
+    export function softmax(arr: Float32Array): Float32Array;
+
+    /**
+     * @function linear
+     * @param {Float32Array} arr Float32Array values
+     * @returns {Float32Array} linear output
+     *
+     * The linear activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
+     */
+    export function linear(arr: Float32Array): Float32Array;
 }

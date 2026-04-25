@@ -15,5 +15,10 @@ export const {
     load_images_from_directory,
     load_single_image,
     load_multiple_images,
-    element_wise_mul
+    element_wise_mul,
+    relu,
+    sigmoid,
+    tanh,
+    softmax,
+    linear,
 } = pkg;
