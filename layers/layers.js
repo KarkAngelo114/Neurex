@@ -341,26 +341,40 @@ class Layers {
                     else if (next_layer.layer_name === "convolutionalLayer") {
                         const [Fn, KHn, KWn, KCn] = next_layer.weightShape;
                         const [oHn, oWn, oDn] = next_layer.outputShape;
+                        const [oHcurr, oWcurr] = currentLayer.outputShape;  // backward target shape
                         const stridesN = next_layer.strides;
                         const paddingN = next_layer.padding;
 
                         const rotated = rotate_kernels(next_weights, Fn, KHn, KWn, KCn);
                         const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
+                        
+                        const dilatedH = oHn * stridesN + (oHn - 1) * (stridesN - 1);
+                        const dilatedW = oWn * stridesN + (oWn - 1) * (stridesN - 1);
 
                         let pT, pB, pL, pR;
                         if (paddingN === "valid") {
-                            pT = pB = KHn - 1 + 1;
-                            pL = pR = KWn - 1 + 1;
+                            // full conv: K-1 on every side
+                            pT = pB = KHn - 1;
+                            pL = pR = KWn - 1;
                         } else {
+                            // "same": split K-1, then top up so the result is at least oHcurr/oWcurr
                             pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
                             pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
+
+                            const needH = oHcurr + KHn - 1;          // ConvolveDelta needs Hp >= needH
+                            const needW = oWcurr + KWn - 1;
+                            const haveH = dilatedH + pT + pB;
+                            const haveW = dilatedW + pL + pR;
+                            if (haveH < needH) pB += (needH - haveH);
+                            if (haveW < needW) pR += (needW - haveW);
                         }
-                        const { data, shape } = applyPadding(dilated, oHn, oWn, oDn, pT, pB, pL, pR);
 
-                        // output spatial = current conv's output shape (= next conv's input shape)
-                        dL_dActivation = ConvolveDelta(data, shape, rotated, [Fn, KHn, KWn, KCn], oHn, oWn);
+                        // pass the REAL dilated dims, not oHn/oWn
+                        const { data, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
+
+                        dL_dActivation = ConvolveDelta(data, shape, rotated, [Fn, KHn, KWn, KCn], oHcurr, oWcurr);
                     }
-
+                    
                     const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
                     if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
 

@@ -1,5 +1,5 @@
 
-exports.relu_float32 = (arr) => {
+exports.Relu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = output[i] > 0 ? output[i] : 0;
@@ -7,7 +7,7 @@ exports.relu_float32 = (arr) => {
     return output;
 };
 
-exports.sigmoid_float32 = (arr) => {
+exports.Sigmoid = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = 1 / (1 + Math.exp(-output[i]));
@@ -15,7 +15,7 @@ exports.sigmoid_float32 = (arr) => {
     return output;
 };
 
-exports.tanh_float32 = (arr) => {
+exports.Tanh = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = Math.tanh(output[i]);
@@ -23,7 +23,7 @@ exports.tanh_float32 = (arr) => {
     return output;
 };
 
-exports.softmax_float32 = (arr) => {
+exports.Softmax = (arr) => {
     const output = new Float32Array(arr);
     const maxVal = Math.max(...output);
     let sum = 0;
@@ -40,11 +40,11 @@ exports.softmax_float32 = (arr) => {
     return output;
 };
 
-exports.linear_float32 = (arr) => {
+exports.Linear = (arr) => {
     return new Float32Array(arr);
 };
 
-exports.drelu_float32 = (arr) => {
+exports.DReLu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = output[i] > 0 ? 1 : 0;
@@ -52,7 +52,7 @@ exports.drelu_float32 = (arr) => {
     return output;
 };
 
-exports.dsigmoid_float32 = (arr) => {
+exports.DSigmoid = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         const s = 1 / (1 + Math.exp(-output[i]));
@@ -61,7 +61,7 @@ exports.dsigmoid_float32 = (arr) => {
     return output;
 };
 
-exports.dtanh_float32 = (arr) => {
+exports.DTanh = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         const t = Math.tanh(output[i]);
@@ -70,21 +70,18 @@ exports.dtanh_float32 = (arr) => {
     return output;
 };
 
-exports.dsoftmax_float32 = (arr) => {
+exports.DSoftmax = (arr) => {
 
     return new Float32Array(arr.length).fill(1);
 };
 
-exports.dlinear_float32 = (arr) => {
+exports.DLinear = (arr) => {
     const output = new Float32Array(arr.length);
     output.fill(1);
     return output;
 };
 
-
-
-
-exports.MatMul_Float32 = (input, weights, biases, inputSize, outputSize) => {
+exports.MatMul = (input, weights, biases, inputSize, outputSize) => {
     const z_values = new Float32Array(outputSize);
 
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
@@ -107,7 +104,7 @@ exports.MatMul_Float32 = (input, weights, biases, inputSize, outputSize) => {
     return z_values;
 }
 
-exports.DeltaMatMul_Float32 = (delta, weights, inputSize, outputSize) => {
+exports.DeltaMatMul = (delta, weights, inputSize, outputSize) => {
 
     const prevDelta = new Float32Array(inputSize);
 
@@ -128,7 +125,7 @@ exports.DeltaMatMul_Float32 = (delta, weights, inputSize, outputSize) => {
     return prevDelta;
 }
 
-exports.computeWeightGradientsForWeightsInConnectedLayer_float32 = (activations, delta, weightGrads, inputSize, outputSize) => {
+exports.computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => {
     const output = weightGrads;
     // We iterate through every connection
     for (let i = 0; i < inputSize; i++) {
@@ -146,7 +143,7 @@ exports.computeWeightGradientsForWeightsInConnectedLayer_float32 = (activations,
     return output;
 }
 
-exports.computeBiasGradsForConnected_Layer_float32 = (biasGrads, delta) => {
+exports.computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
     const output = biasGrads;
 
     for (let i = 0; i < delta.length; i++) {
@@ -156,7 +153,7 @@ exports.computeBiasGradsForConnected_Layer_float32 = (biasGrads, delta) => {
     return output;
 }
 
-exports.scaleGrads_float32 = (grads, batchSize) => {
+exports.scaleGrad = (grads, batchSize) => {
     const output = grads;
 
     for (let i = 0; i < grads.length; i++) {
@@ -166,7 +163,7 @@ exports.scaleGrads_float32 = (grads, batchSize) => {
     return output;
 }
 
-exports.ApplySGD_float32 = (params, grads, lr) => {
+exports.SGD = (params, grads, lr) => {
     const output = params;
 
     for (let i = 0; i < output.length; i++) {
@@ -176,7 +173,7 @@ exports.ApplySGD_float32 = (params, grads, lr) => {
     return output;
 }
 
-exports.ApplyAdam_float32 = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => {
+exports.Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
     const output = params;
     const output_M = m;
     const output_V = v;
@@ -224,7 +221,7 @@ exports.ApplyPadding_Float32 = (input, inputH, inputW, channels, padTop, padBott
 };
 
 
-exports.Convolve_Float32 = ( input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW ) => {
+exports.Convolve = ( input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW ) => {
 
     const output = new Float32Array(outputH * outputW * num_filters);
 
@@ -310,7 +307,6 @@ exports.RotateKernels_Float32 = (kernels, F, KH, KW, D) => {
     }
     return rotated;
 };
-
 /**
  * 
  * @param {Float32Array} padded 
@@ -319,7 +315,7 @@ exports.RotateKernels_Float32 = (kernels, F, KH, KW, D) => {
  * @param {Array<Number>} kernels_shape - [F, KH, KW, C]
  * @returns {Float32Array} output tensor [H, W, F]
  */
-exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, kernels_shape, oH, oW) => {
+exports.ConvolveDelta = (padded, padded_delta_shape, rotatedKernels, kernels_shape, oH, oW) => {
 
     const [Hp, Wp, C_in] = padded_delta_shape;
     // const [F, KH, KW, C_k] = kernels_shape;
@@ -348,12 +344,12 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
             let sum = 0;
             for (let kh = 0; kh < KH; kh++) {
                 for (let kw = 0; kw < KW; kw++) {
-                for (let f = 0; f < F; f++) {         // sum over delta's filter dim
-                    const ph = h + kh, pw = w + kw;
-                    const padIdx    = (ph * Wp + pw) * C_in + f;             // C_in here is F
-                    const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                    sum += padded[padIdx] * rotatedKernels[kernelIdx];
-                }
+                    for (let f = 0; f < F; f++) {         // sum over delta's filter dim
+                        const ph = h + kh, pw = w + kw;
+                        const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
+                        const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
+                        sum += padded[padIdx] * rotatedKernels[kernelIdx];
+                    }
                 }
             }
             output[(h * oW + w) * C_k + c_out] = sum;
@@ -363,7 +359,8 @@ exports.ConvolveDelta_Float32 = (padded, padded_delta_shape, rotatedKernels, ker
     return output;
 };
 
-exports.computeBiasGradsForConv_Float32 = (grads, delta, outH, outW, numFilters) => {
+
+exports.computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     for (let f = 0; f < numFilters; f++) {
         let sum = 0;
 
@@ -380,7 +377,7 @@ exports.computeBiasGradsForConv_Float32 = (grads, delta, outH, outW, numFilters)
     return grads;
 };
 
-exports.computeKernelGradients_Float32 = (input, delta, weightGrads, inputH, inputW, Cin, H, W, Cout, Kh, Kw) => {
+exports.computeKernelGradients = (input, delta, weightGrads, inputH, inputW, Cin, H, W, Cout, Kh, Kw) => {
 
     const padH = Math.floor(Kh / 2);
     const padW = Math.floor(Kw / 2);
@@ -420,7 +417,7 @@ exports.computeKernelGradients_Float32 = (input, delta, weightGrads, inputH, inp
     return weightGrads;
 }
 
-exports.MaxPooling_Float32 = (arr, pool_size, inputShape, outputShape, strides) => {
+exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
     const [poolH, poolW] = pool_size;
     const [inputH, inputW, inputD] = inputShape;
     const [outputH, outputW, outputD] = outputShape;
@@ -465,4 +462,14 @@ exports.MaxPooling_Float32 = (arr, pool_size, inputShape, outputShape, strides) 
         output: output,
         maxIndices: maxIdexes
     };
+}
+
+exports.element_wise_mul = (arr1, arr2) => {
+    let output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < arr1.length; i++) {
+        output[i] += arr1[i] * arr2[i];
+    }
+
+    return output;
 }

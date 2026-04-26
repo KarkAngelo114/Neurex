@@ -125,56 +125,99 @@ class Neurex {
      * Shows the model architecture
      */
     modelSummary() {
-        
-        if (!this.layers || this.layers.length == 0) {
+        if (!this.layers || this.layers.length === 0) {
             console.error(`${color.red}[ERROR]------- An error occurred${color.reset}`);
             throw new Error('No layers to show details');
         }
 
-        console.log("______________________________________________________________________________________________________");
-        console.log("                                          Model Summary                                               ");
-        console.log("______________________________________________________________________________________________________");
-        console.log(`Input size: ${this.input_size}`);
-        console.log(`Number of layers: ${this.num_layers}`);
-        console.log("------------------------------------------------------------------------------------------------------");
-        console.log("Layer (type)              Output Shape          Activation        Number of Parameters");
-        console.log("======================================================================================================");
+        const COLS = [
+            { title: 'Layer (type)', width: 24 },
+            { title: 'Output Shape', width: 22 },
+            { title: 'Activation',   width: 14 },
+            { title: 'Parameters',   width: 20 },
+            { title: 'Padding',      width: 12 },
+        ];
 
-        const size1 = getTotalMB(this.weights);
-        const size2 = getTotalMB(this.biases);
-        const total = size1 + size2;
+        const totalWidth = COLS.reduce((s, c) => s + c.width, 0);
+
+        const row = (cells) => cells.map((c, i) => String(c).padEnd(COLS[i].width)).join('');
+        const hr = (ch) => ch.repeat(totalWidth);
+        const center = (text) => {
+            const pad = Math.max(0, Math.floor((totalWidth - text.length) / 2));
+            return ' '.repeat(pad) + text;
+        };
+
+        console.log(hr('_'));
+        console.log(center('Model Summary'));
+        console.log(hr('_'));
+        console.log(`Input size: ${this.input_size}`);
+        console.log(`Input Shape: [${this.input_shape}]`);
+        console.log(`Number of layers: ${this.num_layers}`);
+        console.log(hr('-'));
+        console.log(row(COLS.map(c => c.title)));
+        console.log(hr('='));
 
         let pointer = 0;
         this.layers.forEach((layer) => {
             const layerType = layer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
-
-            // Layers that own weights + biases
             const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer';
 
             let paramCount = 0;
             if (isParametric) {
                 const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = this.biases[pointer]  ? this.biases[pointer].length  : 0;
+                const b = this.biases[pointer]  ? this.biases[pointer].length : 0;
                 paramCount = w + b;
                 pointer++;
             }
-            if (layerType === 'convolutionalLayer') {
-                console.log( `Convolutional layer      (${layer.outputShape.join('x')})        ` +`${activationName.padEnd(10)}               ${paramCount.toLocaleString()}`);
-            } else if (layerType === 'connected_layer') {
-                console.log(`Connected Layer          (1x1x${layer.layer_size})           ` +`${activationName.padEnd(10)}               ${paramCount.toLocaleString()}`);
-            } else if (layerType === 'maxPooling') {
-                console.log(`Max pooling             (${layer.outputShape.join('x')})        ` +`None              0 (non-parametric layer)`);
+
+            let displayName, outputShape, activation, params, padding;
+
+            switch (layerType) {
+                case 'convolutionalLayer':
+                    displayName = 'Convolutional layer';
+                    outputShape = `(${layer.outputShape.join('x')})`;
+                    activation = activationName;
+                    params = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
+                    break;
+
+                case 'connected_layer':
+                    displayName = 'Connected Layer';
+                    outputShape = `(1x1x${layer.layer_size})`;
+                    activation  = activationName;
+                    params  = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
+                    break;
+
+                case 'maxPooling':
+                    displayName = 'Max pooling';
+                    outputShape = `(${layer.outputShape.join('x')})`;
+                    activation  = 'None';
+                    params = '0 (non-param)';
+                    padding = layer.padding || 'None';
+                    break;
+
+                default:
+                    displayName = layerType;
+                    outputShape = '-';
+                    activation  = activationName;
+                    params = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
             }
+
+            console.log(row([displayName, outputShape, activation, params, padding]));
         });
-        const total_weights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
-        const total_biases = this.biases.reduce((sum, arr) => sum + arr.length, 0);
-        console.log("======================================================================================================");
-        console.log("Total layers: " + this.num_layers);
-        console.log("Total Learnable parameters:",parseInt((total_weights+total_biases)).toLocaleString());
-        console.log(`Total Size (in MegaBytes): ${total.toFixed(2)} MB`);
-        console.log("======================================================================================================");
-        
+
+        // 5) Footer block.
+        const totalWeights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
+        const totalBiases  = this.biases.reduce((sum, arr) => sum + arr.length, 0);
+        const totalSizeMB  = getTotalMB(this.weights) + getTotalMB(this.biases);
+
+        console.log(hr('='));
+        console.log(`Total learnable parameters: ${(totalWeights + totalBiases).toLocaleString()}`);
+        console.log(`Total size (MegaBytes): ${totalSizeMB.toFixed(2)} MB`);
+        console.log(hr('='));
     }
 
     /**

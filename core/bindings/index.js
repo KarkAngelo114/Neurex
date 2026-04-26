@@ -3,18 +3,30 @@
  These are collection of functions from the precompiled binary addon. 
  The function that has "✅" means it uses the function from the addon. Where as if the function has also a ☑️ means it uses float32array.
  Having both ✅ and ☑️ means that it uses the function from the addon and operates on float32
- 
 
  */
 
 let path = require('path');
 const { red, reset } = require('../../color-code');
-const float_32 = require('./float32Ops');
 
-let addon;
+
+const float32_Modules = require('./float32Ops');
+const CPU_Based_addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
+
+let functions;
 
 try {
-    addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
+
+    /* 
+    * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
+    * Ideal if on different environment and setup like:
+    * 
+    * - on different OS but the prebuilt binaries are not compiled the OS environment, so default to use "float32_Modules"
+    * - on OSes where the prebuilt binaries are compatible, but no GPU available, use the "CPU_Based_addon"
+    * - on OSes where the prebuilt binaries are compatible, and has GPU available, then use the addon 
+    */
+
+    functions = CPU_Based_addon;
 }
 catch (error) {
     console.error(error);
@@ -31,7 +43,7 @@ catch (error) {
  * @param {Number} outputSize - the layer size of this layer
  * @returns 1D array of output
  */
-const MatMul = (inputs, weights, biases, inputSize, outputSize) => addon.MatMul(inputs, weights, biases, inputSize, outputSize);
+const MatMul = (inputs, weights, biases, inputSize, outputSize) => functions.MatMul(inputs, weights, biases, inputSize, outputSize);
 /**
  * "☑️"
  * @function DeltaMatMul
@@ -41,7 +53,7 @@ const MatMul = (inputs, weights, biases, inputSize, outputSize) => addon.MatMul(
  * @param {Number} outputSize - the layer size of this layer
  * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
  */
-const DeltaMatMul = (deltas, weights, inputSize, outputSize) => addon.DeltaMatMul(deltas, weights, inputSize, outputSize);
+const DeltaMatMul = (deltas, weights, inputSize, outputSize) => functions.DeltaMatMul(deltas, weights, inputSize, outputSize);
 
 /**
  * "✅☑️"
@@ -49,7 +61,7 @@ const DeltaMatMul = (deltas, weights, inputSize, outputSize) => addon.DeltaMatMu
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu)
  */
-const relu = (input) => addon.Relu(input)
+const relu = (input) => functions.Relu(input)
 
 /**
  * "✅☑️"
@@ -57,7 +69,7 @@ const relu = (input) => addon.Relu(input)
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid)
  */
-const sigmoid = (input) => addon.Sigmoid(input);
+const sigmoid = (input) => functions.Sigmoid(input);
 
 /**
  * "✅☑️"
@@ -65,7 +77,7 @@ const sigmoid = (input) => addon.Sigmoid(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh)
  */
-const tanh = (input) => addon.Tanh(input);
+const tanh = (input) => functions.Tanh(input);
 
 /**
  * "✅☑️"
@@ -73,7 +85,7 @@ const tanh = (input) => addon.Tanh(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax)
  */
-const softmax = (input) => addon.Softmax(input);
+const softmax = (input) => functions.Softmax(input);
 
 /**
  * "✅☑️"
@@ -81,7 +93,7 @@ const softmax = (input) => addon.Softmax(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear)
  */
-const linear = (input) => addon.Linear(input); 
+const linear = (input) => functions.Linear(input); 
 
 /**
  * "✅☑️"
@@ -89,7 +101,7 @@ const linear = (input) => addon.Linear(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu Derivative)
  */
-const drelu = (input) => addon.DReLu(input);
+const drelu = (input) => functions.DReLu(input);
 
 /**
  * "✅☑️"
@@ -97,7 +109,7 @@ const drelu = (input) => addon.DReLu(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid Derivative)
  */
-const dsigmoid = (input) => addon.DSigmoid(input);
+const dsigmoid = (input) => functions.DSigmoid(input);
 
 /**
  * "✅☑️"
@@ -105,7 +117,7 @@ const dsigmoid = (input) => addon.DSigmoid(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh Derivative)
  */
-const dtanh = (input) => addon.DTanh(input);
+const dtanh = (input) => functions.DTanh(input);
 
 /**
  * "✅☑️"
@@ -113,7 +125,7 @@ const dtanh = (input) => addon.DTanh(input);
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax Derivative)
  */
-const dsoftmax = (input) => addon.DSoftmax(input)
+const dsoftmax = (input) => functions.DSoftmax(input)
 
 /**
  * "✅☑️"
@@ -121,7 +133,7 @@ const dsoftmax = (input) => addon.DSoftmax(input)
  * @param {Array<Number>} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear Derivative)
  */
-const dlinear = (input) => addon.DLinear(input);
+const dlinear = (input) => functions.DLinear(input);
 
 /**
  * "☑️"
@@ -135,7 +147,7 @@ const dlinear = (input) => addon.DLinear(input);
  * @param {Number} padRight 
  * @returns padded tensor
  */
-const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => float_32.ApplyPadding_Float32(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
+const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => float32_Modules.ApplyPadding_Float32(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
 
 /**
  * "✅☑️"
@@ -153,7 +165,7 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {number} inputW - input widht of the padded input
  * @returns output float32 of the convolution
  */
-const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW) => addon.Convolve(input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW);
+const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW) => functions.Convolve(input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW);
 
 
 /**
@@ -163,7 +175,7 @@ const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters
  * @param {Number} strides 
  * @returns Dilated delta
  */
-const Dilate_Input = (delta, shape_array, strides) => float_32.DilateDelta_Float32(delta, shape_array, strides);
+const Dilate_Input = (delta, shape_array, strides) => float32_Modules.DilateDelta_Float32(delta, shape_array, strides);
 
 /**
  * "☑️"
@@ -174,7 +186,7 @@ const Dilate_Input = (delta, shape_array, strides) => float_32.DilateDelta_Float
  * @param {Numbwe} d - depth of the kernel
  * @returns float32array of parameters
  */
-const rotate_kernels = (params, f, kh, kw, d) => float_32.RotateKernels_Float32(params, f, kh, kw, d);
+const rotate_kernels = (params, f, kh, kw, d) => float32_Modules.RotateKernels_Float32(params, f, kh, kw, d);
 
 
 /**
@@ -186,7 +198,7 @@ const rotate_kernels = (params, f, kh, kw, d) => float_32.RotateKernels_Float32(
  * @param {Number} strides
  * @returns output delta convolution
  */
-const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) =>float_32.ConvolveDelta_Float32(input, padded_delta_shape, kernels, kernel_shape, oh, ow);  // addon.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
+const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => functions.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow); // float_32.ConvolveDelta_Float32(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
 
 
 /**
@@ -197,7 +209,7 @@ const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow
  * @param {Number} learning_rate - learning rate value
  * @returns 
  */
-const ApplySGD = (params, grads, learning_rate ) => addon.SGD(params, grads, learning_rate);
+const ApplySGD = (params, grads, learning_rate ) => functions.SGD(params, grads, learning_rate);
 
 /**
  * 
@@ -213,7 +225,7 @@ const ApplySGD = (params, grads, learning_rate ) => addon.SGD(params, grads, lea
  * @param {Number} beta2 - beta2 value
  * @returns 
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => addon.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
+const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
 
 /**
  * 
@@ -224,7 +236,7 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2)
  * @param {Array<Number>} weightShape
  * @returns float32array of accumulated weight gradients
  */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => addon.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
 
 /**
  * "✅☑️"
@@ -241,7 +253,7 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
  * @param {number} kw -kernel width
  * @returns 
  */
-const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => addon.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
+const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => functions.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
 
 /**
  * "✅☑️"
@@ -249,7 +261,7 @@ const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH
  * @param {Float32Array>} delta 
  * @returns float32array of accumulated bias gradients
  */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta) => addon.computeBiasGradsForConnected_Layer(biasGrads, delta);
+const computeBiasGradsForConnected_Layer = (biasGrads, delta) => functions.computeBiasGradsForConnected_Layer(biasGrads, delta);
 
 /**
  * "✅☑️"
@@ -257,7 +269,7 @@ const computeBiasGradsForConnected_Layer = (biasGrads, delta) => addon.computeBi
  * @param {Float32Array} deltas - float32array delta 
  * @returns Accumulated bias gradients in float32array
  */
-const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => addon.computeBiasGradsForConv(grads, deltas, oh, ow, num_filters);
+const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => functions.computeBiasGradsForConv(grads, deltas, oh, ow, num_filters);
 
 /**
  * "✅☑️"
@@ -265,7 +277,7 @@ const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => addon.co
  * @param {Number} batchSize - batch size
  * @returns A float32 array of scaled gradients
  */
-const scaleGrads = (grad, batchSize) => addon.scaleGrad(grad, batchSize)
+const scaleGrads = (grad, batchSize) => functions.scaleGrad(grad, batchSize)
 
 /**
  * 
@@ -279,12 +291,12 @@ const scaleGrads = (grad, batchSize) => addon.scaleGrad(grad, batchSize)
 const element_wise_mul = (flat_arr_1, flat_arr_2) => {
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
-
-    return addon.element_wise_mul(flat_arr_1, flat_arr_2);
+    
+    return functions.element_wise_mul(flat_arr_1, flat_arr_2);
 }
 
 /**
- * "✅"
+ * "✅☑️"
  * @function MaxPool
  * @param {Float32Array} input - current input passed down to this layer 
  * @param {Array<Number>} poolSize - pool size of the sliding window
@@ -292,7 +304,7 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
  * @param {Array<Number>} outputShape - output shape of the tensor
  * @param {Number} strides - determines how many pixels it will skipped
  */
-const MaxPool = (input, poolSize, inputShape, outputShape, strides) => float_32.MaxPooling_Float32(input, poolSize, inputShape, outputShape, strides);
+const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides); // float_32.MaxPooling_Float32(input, poolSize, inputShape, outputShape, strides);
 
 
 module.exports = {
