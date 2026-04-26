@@ -306,6 +306,11 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
  */
 const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides); // float_32.MaxPooling_Float32(input, poolSize, inputShape, outputShape, strides);
 
+/**
+ * 
+ * detects a gpu
+ */
+const detectGPU = () => CPU_Based_addon.Detect_GPU();
 
 module.exports = {
     MatMul,
@@ -329,6 +334,7 @@ module.exports = {
     ApplyAdam,
     element_wise_mul,
     MaxPool,
+    detectGPU,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,
