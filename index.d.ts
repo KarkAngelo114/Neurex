@@ -202,6 +202,10 @@ declare module 'neurex' {
         optimizer?: 'sgd' | 'adam';
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
+        /** if set to true, it won't use the compiled binaries, but instead uses the JS modules */
+        onFLoat32Module?: true | false;
+        /** set mode to `cpu`, `gpu` or `auto`. Default is `cpu`*/
+        mode?: "cpu" | "gpu" | "auto";
     }
 
     /**
@@ -610,4 +614,10 @@ declare module 'neurex' {
      * The linear activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
      */
     export function linear(arr: Float32Array): Float32Array;
+
+    /**
+     * @function detectGPU
+     * - runs a quick detection test for GPU availability
+     */
+    export function detectGPU(): Object;
 }

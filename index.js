@@ -17,8 +17,10 @@ const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
 const { load_images_from_directory, load_single_image, load_multiple_images } = require('./preprocessor/imagery');
-const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, detectGPU } = require('./core/bindings');
+const { element_wise_mul, relu, sigmoid, tanh, softmax, linear  } = require('./core/bindings');
 const { Annotator } = require('./preprocessor/annotator');
+const { detectGPU } = require('./gpu/gpu_init');
+
 
 module.exports= {
     Neurex,

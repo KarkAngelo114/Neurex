@@ -7,30 +7,58 @@
  */
 
 let path = require('path');
-const { red, reset } = require('../../color-code');
-
-
+const {BooleanAvailability} = require('../../gpu/modeSelector'); 
+const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
 const CPU_Based_addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
 let functions;
 
-try {
 
-    /* 
-    * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
-    * Ideal if on different environment and setup like:
-    * 
-    * - on different OS but the prebuilt binaries are not compiled the OS environment, so default to use "float32_Modules"
-    * - on OSes where the prebuilt binaries are compatible, but no GPU available, use the "CPU_Based_addon"
-    * - on OSes where the prebuilt binaries are compatible, and has GPU available, then use the addon 
-    */
+const init = () => {    
 
-    functions = CPU_Based_addon;
+    try {
+
+        /* 
+        * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
+        * Ideal if on different environment and setup like:
+        * 
+        * - on different OS but the prebuilt binaries are not compiled to the target OS environment, so default to use "float32_Modules"
+        * - on OSes where the prebuilt binaries are compatible, but no GPU available, use the "CPU_Based_addon"
+        * - on OSes where the prebuilt binaries are compatible, and has GPU available, then use the GPU based addon 
+        */
+
+
+        const {hasGPU, force_Use_Default_JS_Float32_Module, data} = BooleanAvailability();
+
+        if (force_Use_Default_JS_Float32_Module) {
+            console.log(`${yellow}\n[INFO]${reset} Using Javascript-float32 modules`);
+            functions = float32_Modules;
+            return;
+        }
+
+        if (hasGPU) {
+            console.log(`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device ${yellow}${data.devices[0].gpu}${reset} whose vendor is ${yellow}${data.devices[0].vendor}${reset} with a memory of ${yellow}${(Number(data.devices[0].globalMemBytes) / (1024 ** 3 )).toFixed(2)} GB${reset}.`);
+            console.log(`⚡ Initializing GPU accelerated training....`);
+            // use the CPU-based library for now
+            functions = CPU_Based_addon;
+            return
+        }
+
+        if (!hasGPU) {
+            console.log(`${yellow}\n[INFO]${reset} Neurex will use the default CPU-based compiled binary.`);
+            functions = CPU_Based_addon;
+            return;
+        }
+
+        
+    }
+    catch (error) {
+        console.error(error);
+    }
 }
-catch (error) {
-    console.error(error);
-}
+
+
 
 
 /**
@@ -198,7 +226,7 @@ const rotate_kernels = (params, f, kh, kw, d) => float32_Modules.RotateKernels_F
  * @param {Number} strides
  * @returns output delta convolution
  */
-const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => functions.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow); // float_32.ConvolveDelta_Float32(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
+const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => functions.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
 
 
 /**
@@ -304,13 +332,7 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
  * @param {Array<Number>} outputShape - output shape of the tensor
  * @param {Number} strides - determines how many pixels it will skipped
  */
-const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides); // float_32.MaxPooling_Float32(input, poolSize, inputShape, outputShape, strides);
-
-/**
- * 
- * detects a gpu
- */
-const detectGPU = () => CPU_Based_addon.Detect_GPU();
+const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides);
 
 module.exports = {
     MatMul,
@@ -334,7 +356,7 @@ module.exports = {
     ApplyAdam,
     element_wise_mul,
     MaxPool,
-    detectGPU,
+    init,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

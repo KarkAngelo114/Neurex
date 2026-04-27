@@ -18,6 +18,8 @@ const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, XavierInitialization, getTotalMB } = require('../utils');
 const Layers = require('../layers/layers');
+const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
+const { init } = require('./bindings');
 
 
 
@@ -112,7 +114,13 @@ class Neurex {
             throw new Error(`${color.red}[Error]------- checkpoint cannot be less than 0. ${color.reset}`)
         }
 
-        if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch; 
+        if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch;
+
+        // mode: gpu | cpu | auto
+        // onFLoat32Module: true | false
+
+        onFloat32Module(configs.onFLoat32Module || false);
+        modeConfiguration(configs.mode || "cpu")
     }
 
     /**
@@ -518,7 +526,7 @@ class Neurex {
     */
 
     async train(inputs, trainY, loss, epoch, batch_size = 1) {
-        
+        init();
         
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
 
@@ -742,6 +750,7 @@ class Neurex {
      produces predictions based on the input data
     */
     async predict(input) {
+        init();
         this.onGPU = false;
         try {
             if (!input) {
