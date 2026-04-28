@@ -80,6 +80,7 @@ class Neurex {
         this.biasGrads = [];
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
+        this.isInit = false;
 
     }
 
@@ -120,7 +121,10 @@ class Neurex {
         // onFLoat32Module: true | false
 
         onFloat32Module(configs.onFLoat32Module || false);
-        modeConfiguration(configs.mode || "cpu")
+        modeConfiguration(configs.mode || "cpu");
+
+        init();
+        this.isInit = true;
     }
 
     /**
@@ -526,7 +530,10 @@ class Neurex {
     */
 
     async train(inputs, trainY, loss, epoch, batch_size = 1) {
-        init();
+        if (!this.isInit) {
+            init();
+            this.isInit = true;
+        }
         
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
 
@@ -750,7 +757,10 @@ class Neurex {
      produces predictions based on the input data
     */
     async predict(input) {
-        init();
+        if (!this.isInit) {
+            init();
+            this.isInit = true;
+        }
         this.onGPU = false;
         try {
             if (!input) {

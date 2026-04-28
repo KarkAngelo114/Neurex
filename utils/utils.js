@@ -22,43 +22,6 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
     };
 };
 
-// /**
-//  * Pads a 3D Tensor [H][W][C]
-//  * @param {Array} input - The 3D array
-//  * @param {number} padTop - Padding amounts
-//  * @param {number} padBottom - Padding amounts
-//  * @param {number} padLeft - Padding amounts
-//  * @param {number} padRight - Padding amounts
-//  * @returns {Array} The padded 3D array
-//  */
-// const applyPadding = (input, padTop, padBottom, padLeft, padRight) => {
-//     const inputH = input.length;
-//     const inputW = input[0].length;
-//     const channels = input[0][0].length;
-
-//     const newH = inputH + padTop + padBottom;
-//     const newW = inputW + padLeft + padRight;
-
-//     // Create a new 3D tensor filled with zeros
-//     // Using Array.from is cleaner for initializing nested arrays
-//     const output = Array.from({ length: newH }, () =>
-//         Array.from({ length: newW }, () => 
-//             new Array(channels).fill(0)
-//         )
-//     );
-
-//     // Fill the inner part with the original input data
-//     for (let i = 0; i < inputH; i++) {
-//         for (let j = 0; j < inputW; j++) {
-//             output[i + padTop][j + padLeft] = input[i][j];
-//         }
-//     }
-
-//     return output;
-// }
-
-
-
 /**
  * 
  * @param {Number} inputH - height of the input
@@ -88,36 +51,6 @@ const getPaddingSizes = (inputH, inputW, kernelH, kernelW, stride, padding) => {
         left: Math.floor(padW / 2),
         right: padW - Math.floor(padW / 2)
     };
-};
-
-/**
- * 
- * @param {Array<Array<Array<Number>>>} input - delta tensor map as input
- * @param {Number} stride - strides given for how much the kernel moves across the input tensor 
- * @returns Dilated output
- */
-const DilateInput = (input, stride) => {
-    if (stride <= 1) return input;
-
-    const inputH = input.length;
-    const inputW = input[0].length;
-    const inputD = input[0][0].length;
-
-    
-
-    const newH = inputH + (inputH - 1) * (stride - 1);
-    const newW = inputW + (inputW - 1) * (stride  - 1);
-
-    const output = Array.from({length: newH},() => Array.from({length: newW}, () => Array.from({length: inputD}).fill(0)));
-
-    for (let i = 0; i < inputH; i++) {
-        for (let j = 0; j < inputW; j++) {
-            output[i * stride][j * stride] = input[i][j];
-        }
-    }
-
-    return output;
-
 }
 
 const ifOneHotEndcoded = (Y_train) => {
@@ -153,7 +86,6 @@ const getTotalMB = (array) => {
 module.exports = {
     calculateTensorShape,
     getPaddingSizes,
-    DilateInput,
     XavierInitialization,
     ifOneHotEndcoded,
     getTotalMB

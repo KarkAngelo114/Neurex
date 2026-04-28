@@ -200,7 +200,7 @@ exports.Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) =>
 
 }
 
-exports.ApplyPadding_Float32 = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
+exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
     const newH = inputH + padTop + padBottom;
     const newW = inputW + padLeft + padRight;
     const output = new Float32Array(newH * newW * channels);
@@ -263,7 +263,7 @@ exports.Convolve = ( input, kernels, biases, strides, outputH, outputW, num_filt
     return output;
 };
 
-exports.DilateDelta_Float32 = (input, shape, stride) => {
+exports.DilateDelta = (input, shape, stride) => {
     const [H, W, C] = shape;
     const dilatedH = H * stride + (H - 1) * (stride - 1);
     const dilatedW = W * stride + (W - 1) * (stride - 1);
@@ -285,7 +285,7 @@ exports.DilateDelta_Float32 = (input, shape, stride) => {
     return dilated;
 };
 
-exports.RotateKernels_Float32 = (kernels, F, KH, KW, D) => {
+exports.RotateKernels = (kernels, F, KH, KW, D) => {
     const rotated = new Float32Array(kernels.length);
 
     for (let f = 0; f < F; f++) {

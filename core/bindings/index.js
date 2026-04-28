@@ -164,7 +164,7 @@ const dsoftmax = (input) => functions.DSoftmax(input)
 const dlinear = (input) => functions.DLinear(input);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Number} inputH 
  * @param {Number} inputW 
@@ -175,7 +175,7 @@ const dlinear = (input) => functions.DLinear(input);
  * @param {Number} padRight 
  * @returns padded tensor
  */
-const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => float32_Modules.ApplyPadding_Float32(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
+const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
 
 /**
  * "✅☑️"
@@ -197,16 +197,16 @@ const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters
 
 
 /**
- * "☑️" dilate the input inserting 0s
+ * "✅☑️" dilate the input inserting 0s
  * @param {Float32Array} delta 
  * @param {Array<Number>} shape_array 
  * @param {Number} strides 
  * @returns Dilated delta
  */
-const Dilate_Input = (delta, shape_array, strides) => float32_Modules.DilateDelta_Float32(delta, shape_array, strides);
+const Dilate_Input = (delta, shape_array, strides) => functions.DilateDelta(delta, shape_array, strides);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} params - the kernels 
  * @param {Numnber} f - number of filters 
  * @param {Number} kh - kernel height
@@ -214,7 +214,7 @@ const Dilate_Input = (delta, shape_array, strides) => float32_Modules.DilateDelt
  * @param {Numbwe} d - depth of the kernel
  * @returns float32array of parameters
  */
-const rotate_kernels = (params, f, kh, kw, d) => float32_Modules.RotateKernels_Float32(params, f, kh, kw, d);
+const rotate_kernels = (params, f, kh, kw, d) => functions.RotateKernels(params, f, kh, kw, d);
 
 
 /**
