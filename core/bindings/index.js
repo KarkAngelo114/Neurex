@@ -10,7 +10,7 @@ let path = require('path');
 const {BooleanAvailability} = require('../../gpu/modeSelector'); 
 const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
-const CPU_Based_addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
+const addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
 let functions;
 
@@ -40,14 +40,21 @@ const init = () => {
         if (hasGPU) {
             console.log(`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device ${yellow}${data.devices[0].gpu}${reset} whose vendor is ${yellow}${data.devices[0].vendor}${reset} with a memory of ${yellow}${(Number(data.devices[0].globalMemBytes) / (1024 ** 3 )).toFixed(2)} GB${reset}.`);
             console.log(`⚡ Initializing GPU accelerated training....`);
-            // use the CPU-based library for now
-            functions = CPU_Based_addon;
+            
+            const res = addon.Init_GPU();
+
+            if (!res.ok) {
+                console.warn(`\n${yellow}[WARN]${reset} GPU Kernel initialization failed. Failing back to CPU`);
+                console.log(res.error);
+            }
+            
+            functions = addon;
             return
         }
 
         if (!hasGPU) {
-            console.log(`${yellow}\n[INFO]${reset} Neurex will use the default CPU-based compiled binary.`);
-            functions = CPU_Based_addon;
+            console.log(`${yellow}\n[INFO]${reset} Neurex will use the optimized CPU functions`);
+            functions = addon;
             return;
         }
 
@@ -73,7 +80,7 @@ const init = () => {
  */
 const MatMul = (inputs, weights, biases, inputSize, outputSize) => functions.MatMul(inputs, weights, biases, inputSize, outputSize);
 /**
- * "☑️"
+ * "✅☑️"
  * @function DeltaMatMul
  * @param {Float32Array} deltas - Float32Array array of output deltas from the previous layer
  * @param {Float32Array} weights - Float32Array array of weights

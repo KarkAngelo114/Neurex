@@ -1,12 +1,12 @@
 const { reset, yellow, red } = require('../color-code');
 const {detectGPU} = require('../gpu/gpu_init');
-const data = detectGPU();
+
 let hasGPU = false;
 let force_Use_Default_JS_Float32_Module = false;
 
 
 exports.modeConfiguration = (value) => {
-    
+    const data = detectGPU();
 
     // if auto
     if (value.toLowerCase() === "auto") {
@@ -17,6 +17,8 @@ exports.modeConfiguration = (value) => {
         }
 
         hasGPU = true;
+
+        return;
     }
 
     if (value.toLowerCase() === "gpu") {
@@ -54,6 +56,7 @@ exports.onFloat32Module = (value) => {
 
 
 exports.BooleanAvailability = () => {
+    const data = detectGPU();
     return {
         hasGPU, 
         force_Use_Default_JS_Float32_Module,

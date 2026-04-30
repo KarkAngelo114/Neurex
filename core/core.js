@@ -20,6 +20,7 @@ const { calculateTensorShape, XavierInitialization, getTotalMB } = require('../u
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init } = require('./bindings');
+const { setGlobalParams } = require('../gpu/globals');
 
 
 
@@ -900,6 +901,7 @@ class Neurex {
             });
 
             this.hasBuilt = true;
+            setGlobalParams(this.weights, this.biases);
         } catch (error) {
             console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
             throw error;
