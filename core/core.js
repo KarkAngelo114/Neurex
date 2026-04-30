@@ -75,7 +75,6 @@ class Neurex {
             biases: []
         };
 
-        this.onGPU = false;
         this.isfailed = false;
         this.weightGrads = [];
         this.biasGrads = [];
@@ -1002,7 +1001,7 @@ class Neurex {
             const next_weights = this.weights[weights_biases_indexer];
             const next_delta = current_delta;
 
-            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(this.onGPU, next_weights,next_delta,zs,layer_index,current_layer,this.weights,activations,next_layer,this.layers);
+            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_weights,next_delta,zs,layer_index,current_layer,this.weights,activations,next_layer,this.layers);
             weights_biases_indexer -= decrementor_value;
 
             current_delta = new_delta;
@@ -1029,7 +1028,7 @@ class Neurex {
             const layer_weights = this.weights[weights_biases_indexer];
             const layer_biases = this.biases[weights_biases_indexer];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(this.onGPU, current_input, layer_weights, layer_biases, current_layer);
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, layer_weights, layer_biases, current_layer);
             weights_biases_indexer+=incrementor_value;
 
             zs.push(z_values);

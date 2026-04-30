@@ -152,7 +152,7 @@ class Layers {
                     //  if none satisfies the conditions above, throw an error
                     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
-                feedforward: (onGPU, input, weights, biases, current_layer) => {
+                feedforward: (input, weights, biases, current_layer) => {
                     
                     const z_values = MatMul(input, weights, biases, current_layer.weightShape[0], current_layer.weightShape[1]);
                     const activation_function = activation[function_name];
@@ -192,7 +192,7 @@ class Layers {
 
                     return dOutputLayer;
                 },
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
+                backpropagate: (next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
                     const dActivation = activation.derivatives[function_name];
                     const dAct = dActivation(zs[layer_index]);
                     const delta_res = DeltaMatMul(next_delta, next_weights, nextLayer.weightShape[0], nextLayer.weightShape[1]);
@@ -281,7 +281,7 @@ class Layers {
                     * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
                     */
                 },
-                feedforward: (onGPU, input, weights, biases, current_layer) => {
+                feedforward: (input, weights, biases, current_layer) => {
                     
                     let [f, kh, kw, kd] = current_layer.weightShape;
                     let [input_H, input_W, input_D] = current_layer.inputShape; 
@@ -326,7 +326,7 @@ class Layers {
 
                     // return dOutputLayer;
                 },
-                backpropagate: (onGPU, next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                backpropagate: (next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
                     let Current_Z = zs[layer_index];
                     let dActivation = activation.derivatives[function_name];
                     let dL_dActivation;
@@ -445,7 +445,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                feedforward: (onGPU, input, weights=null, biases=null, current_layer) => {
+                feedforward: (input, weights=null, biases=null, current_layer) => {
                     const [inputh, inputw, inputd] = current_layer.inputShape;
                     const [outputh, outputw, outputd] = current_layer.outputShape;
                     const [poolHeight, poolWidth] = current_layer.poolSize;
@@ -470,7 +470,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                backpropagate: (onGPU, next_weights = null, prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                backpropagate: (next_weights = null, prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
                     let next_delta = prev_delta;
                     const [inputH, inputW, inputD] = currentLayer.inputShape;
                     const [outputH, outputW, outputD] = currentLayer.outputShape;
