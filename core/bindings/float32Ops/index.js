@@ -82,11 +82,11 @@ exports.DLinear = (arr) => {
     return output;
 };
 
-exports.MatMul = (input, inputSize, outputSize, pointer) => {
+exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) => {
 
-    const {globalWeights, globalBiases} = getGlobalParams();
-
-    const z_values = new Float32Array(outputSize);
+    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
+    
+    const z_values = globalOutputTensorTemplate[outputTemplatePointer];
 
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
     z_values.set(globalBiases[pointer]);
@@ -226,11 +226,11 @@ exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padL
 };
 
 
-exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer ) => {
+exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer ) => {
 
-    const {globalWeights, globalBiases} = getGlobalParams();
+    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
 
-    const output = new Float32Array(outputH * outputW * num_filters);
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
 
     for (let f = 0; f < num_filters; f++) {
 
@@ -421,13 +421,14 @@ exports.computeKernelGradients = (input, delta, weightGrads, inputH, inputW, Cin
     return weightGrads;
 }
 
-exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
+exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
+    const {globalOutputTensorTemplate} = getGlobalParams();
     const [poolH, poolW] = pool_size;
     const [inputH, inputW, inputD] = inputShape;
     const [outputH, outputW, outputD] = outputShape;
 
-    const output = new Float32Array(outputH * outputW * outputD);
-    const maxIdexes = new Float32Array(outputH * outputW * outputD);
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const maxIdexes = globalOutputTensorTemplate[outputTemplatePointer];
 
     for (let d = 0; d < inputD; d++) {
         for (let i = 0; i < outputH; i++) {

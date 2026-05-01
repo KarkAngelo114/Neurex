@@ -152,10 +152,10 @@ class Layers {
                     //  if none satisfies the conditions above, throw an error
                     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
-                feedforward: (input, current_layer, pointer) => {
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
 
                     const [inputSize, outputSize] = current_layer.weightShape;
-                    const z_values = MatMul(input, inputSize, outputSize, pointer);
+                    const z_values = MatMul(input, inputSize, outputSize, pointer, outputTemplatePointer);
                     const activation_function = activation[function_name];
 
                     let outputs = activation_function(z_values);
@@ -283,7 +283,7 @@ class Layers {
                     * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
                     */
                 },
-                feedforward: (input, current_layer, pointer) => {
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
                     
                     let [f, kh, kw, kd] = current_layer.weightShape;
                     let [input_H, input_W, input_D] = current_layer.inputShape; 
@@ -300,7 +300,7 @@ class Layers {
                     const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
                     // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const convolve_result = Convolve(data,current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1], pointer);
+                    const convolve_result = Convolve(data,current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1], pointer, outputTemplatePointer);
 
                     if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
@@ -447,13 +447,13 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                feedforward: (input, current_layer, pointer) => {
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
                     const [inputh, inputw, inputd] = current_layer.inputShape;
                     const [outputh, outputw, outputd] = current_layer.outputShape;
                     const [poolHeight, poolWidth] = current_layer.poolSize;
                     const strides = current_layer.strides;
                 
-                    let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides);
+                    let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides, outputTemplatePointer);
                     current_layer.maxIndices = maxIndices;
 
                     if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
@@ -472,7 +472,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                backpropagate: (prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer) => {
+                backpropagate: (prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer, outputTemplatePointer) => {
                     let next_delta = prev_delta;
                     const [inputH, inputW, inputD] = currentLayer.inputShape;
                     const [outputH, outputW, outputD] = currentLayer.outputShape;

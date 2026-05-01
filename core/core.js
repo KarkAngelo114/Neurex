@@ -47,6 +47,7 @@ class Neurex {
     constructor () {
         this.weights = [];
         this.biases = [];
+        this.output_layers_templates = [];
         this.num_layers = 0;
         this.input_size = 0;
         this.input_shape = null;
@@ -708,7 +709,7 @@ class Neurex {
                     }
 
                     // update global params
-                    setGlobalParams(this.weights, this.biases);
+                    setGlobalParams(this.weights, this.biases, this.output_layers_templates);
 
                 }
 
@@ -834,6 +835,7 @@ class Neurex {
                     this.currentSize = outputSize;
                     
                     layer_data.weightShape = [inputSize, outputSize];
+                    this.output_layers_templates.push(new Float32Array(outputSize));
                 } 
                 
                 else if (layer_data.layer_name === "convolutionalLayer") {
@@ -883,6 +885,7 @@ class Neurex {
                     this.currentSize = CalculatedTensorShape;
 
                     layer_data.weightShape = [filters, kH, kW, inputDepth];
+                    this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
                 }
                 else if (layer_data.layer_name === "maxPooling") {
                     // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
@@ -899,11 +902,12 @@ class Neurex {
                     // update the shapes
                     this.currentShape = [OutputHeight, OutputWidth, inputD]; 
                     this.currentSize = CalculatedTensorShape;
+                    this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
                 }
             });
 
             this.hasBuilt = true;
-            setGlobalParams(this.weights, this.biases);
+            setGlobalParams(this.weights, this.biases, this.output_layers_templates);
         } catch (error) {
             console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
             throw error;
@@ -1024,15 +1028,17 @@ class Neurex {
         let current_input = input
         let all_layer_outputs = [input];
         let zs = [];
-
+        
+        let outputTemplatePointer = 0
         let pointer = 0;
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
             // const layer_weights = this.weights[pointer];
             // const layer_biases = this.biases[pointer];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer, outputTemplatePointer);
             pointer+=incrementor_value;
+            outputTemplatePointer++;
 
             zs.push(z_values);
             current_input = outputs;

@@ -79,7 +79,7 @@ const init = () => {
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output
  */
-const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(inputs, inputSize, outputSize, pointer);
+const MatMul = (inputs, inputSize, outputSize, pointer, outputTemplatePointer) => functions.MatMul(inputs, inputSize, outputSize, pointer, outputTemplatePointer);
 /**
  * "✅☑️"
  * @function DeltaMatMul
@@ -202,7 +202,7 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {number} inputW - input widht of the padded input
  * @returns output float32 of the convolution
  */
-const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer);
+const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer);
 
 
 /**
@@ -341,7 +341,7 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
  * @param {Array<Number>} outputShape - output shape of the tensor
  * @param {Number} strides - determines how many pixels it will skipped
  */
-const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides);
+const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTemplatePointer) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides, outputTemplatePointer);
 
 module.exports = {
     MatMul,
