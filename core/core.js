@@ -707,6 +707,9 @@ class Neurex {
                         pointer++;
                     }
 
+                    // update global params
+                    setGlobalParams(this.weights, this.biases);
+
                 }
 
                 let AverageEpochLoss = totalepochLoss / numBatches; 
@@ -761,7 +764,7 @@ class Neurex {
             init();
             this.isInit = true;
         }
-        this.onGPU = false;
+
         try {
             if (!input) {
                 throw new Error("\n[ERROR]-------No inputs")
@@ -994,15 +997,15 @@ class Neurex {
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        let weights_biases_indexer = this.weights.length - 1;
+        let pointer = this.weights.length - 1;
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
             const next_layer = this.layers[layer_index + 1];
-            const next_weights = this.weights[weights_biases_indexer];
+            // const next_weights = this.weights[weights_biases_indexer];
             const next_delta = current_delta;
 
-            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_weights,next_delta,zs,layer_index,current_layer,this.weights,activations,next_layer,this.layers);
-            weights_biases_indexer -= decrementor_value;
+            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_delta, zs, layer_index, current_layer, this.weights, activations, next_layer, pointer);
+            pointer -= decrementor_value;
 
             current_delta = new_delta;
             deltas[layer_index] = current_delta;
@@ -1022,14 +1025,14 @@ class Neurex {
         let all_layer_outputs = [input];
         let zs = [];
 
-        let weights_biases_indexer = 0;
+        let pointer = 0;
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
-            const layer_weights = this.weights[weights_biases_indexer];
-            const layer_biases = this.biases[weights_biases_indexer];
+            // const layer_weights = this.weights[pointer];
+            // const layer_biases = this.biases[pointer];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, layer_weights, layer_biases, current_layer);
-            weights_biases_indexer+=incrementor_value;
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
+            pointer+=incrementor_value;
 
             zs.push(z_values);
             current_input = outputs;

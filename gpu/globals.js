@@ -13,3 +13,7 @@ exports.getGlobalParams = () => {
         globalBiases: globalBiases
     }
 }
+
+exports.indexWeights = (param, pointer) => {
+    globalWeights[pointer] = param;
+}

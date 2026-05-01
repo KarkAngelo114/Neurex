@@ -76,9 +76,10 @@ const init = () => {
  * @param {Float32Array} biases - 1D float32array of biases
  * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
  * @param {Number} outputSize - the layer size of this layer
+ * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output
  */
-const MatMul = (inputs, weights, biases, inputSize, outputSize) => functions.MatMul(inputs, weights, biases, inputSize, outputSize);
+const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(inputs, inputSize, outputSize, pointer);
 /**
  * "✅☑️"
  * @function DeltaMatMul
@@ -86,9 +87,10 @@ const MatMul = (inputs, weights, biases, inputSize, outputSize) => functions.Mat
  * @param {Float32Array} weights - Float32Array array of weights
  * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
  * @param {Number} outputSize - the layer size of this layer
+ * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
  */
-const DeltaMatMul = (deltas, weights, inputSize, outputSize) => functions.DeltaMatMul(deltas, weights, inputSize, outputSize);
+const DeltaMatMul = (deltas, inputSize, outputSize, pointer) => functions.DeltaMatMul(deltas, inputSize, outputSize, pointer);
 
 /**
  * "✅☑️"
@@ -200,7 +202,7 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {number} inputW - input widht of the padded input
  * @returns output float32 of the convolution
  */
-const Convolve = (input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW) => functions.Convolve(input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW);
+const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer);
 
 
 /**
@@ -221,7 +223,7 @@ const Dilate_Input = (delta, shape_array, strides) => functions.DilateDelta(delt
  * @param {Numbwe} d - depth of the kernel
  * @returns float32array of parameters
  */
-const rotate_kernels = (params, f, kh, kw, d) => functions.RotateKernels(params, f, kh, kw, d);
+const rotate_kernels = (f, kh, kw, d, pointer) => functions.RotateKernels(f, kh, kw, d, pointer);
 
 
 /**
@@ -233,7 +235,7 @@ const rotate_kernels = (params, f, kh, kw, d) => functions.RotateKernels(params,
  * @param {Number} strides
  * @returns output delta convolution
  */
-const ConvolveDelta = (input, padded_delta_shape,  kernels, kernel_shape, oh, ow) => functions.ConvolveDelta(input, padded_delta_shape, kernels, kernel_shape, oh, ow);
+const ConvolveDelta = (input, padded_delta_shape, kernel_shape, oh, ow, pointer) => functions.ConvolveDelta(input, padded_delta_shape, kernel_shape, oh, ow, pointer);
 
 
 /**

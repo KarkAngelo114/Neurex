@@ -1,3 +1,4 @@
+const { getGlobalParams } = require("../../../gpu/globals");
 
 exports.Relu = (arr) => {
     const output = new Float32Array(arr);
@@ -81,11 +82,14 @@ exports.DLinear = (arr) => {
     return output;
 };
 
-exports.MatMul = (input, weights, biases, inputSize, outputSize) => {
+exports.MatMul = (input, inputSize, outputSize, pointer) => {
+
+    const {globalWeights, globalBiases} = getGlobalParams();
+
     const z_values = new Float32Array(outputSize);
 
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
-    z_values.set(biases);
+    z_values.set(globalBiases[pointer]);
 
     // 2. Perform Weighted Sum
     // We iterate through each input neuron
@@ -97,14 +101,15 @@ exports.MatMul = (input, weights, biases, inputSize, outputSize) => {
 
         // Multiply the input by every weight connecting to output neurons
         for (let j = 0; j < outputSize; j++) {
-            z_values[j] += inputVal * weights[offset + j];
+            z_values[j] += inputVal * globalWeights[pointer][offset + j];
         }
     }
 
     return z_values;
 }
 
-exports.DeltaMatMul = (delta, weights, inputSize, outputSize) => {
+exports.DeltaMatMul = (delta, inputSize, outputSize, pointer) => {
+    const { globalWeights } = getGlobalParams();
 
     const prevDelta = new Float32Array(inputSize);
 
@@ -117,7 +122,7 @@ exports.DeltaMatMul = (delta, weights, inputSize, outputSize) => {
 
         for (let j = 0; j < outputSize; j++) {
             // We multiply the j-th delta by the weight connecting input i to output j
-            sum += weights[offset + j]  * delta[j];
+            sum += globalWeights[pointer][offset + j]  * delta[j];
         }
         prevDelta[i] = sum;
     }
@@ -221,13 +226,15 @@ exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padL
 };
 
 
-exports.Convolve = ( input, kernels, biases, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW ) => {
+exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer ) => {
+
+    const {globalWeights, globalBiases} = getGlobalParams();
 
     const output = new Float32Array(outputH * outputW * num_filters);
 
     for (let f = 0; f < num_filters; f++) {
 
-        const bias = biases[f];
+        const bias = globalBiases[pointer][f];
 
         for (let y = 0; y < outputH; y++) {
             for (let x = 0; x < outputW; x++) {
@@ -247,7 +254,7 @@ exports.Convolve = ( input, kernels, biases, strides, outputH, outputW, num_filt
 
                                 const kernelIndex = (((f * kernel_height + ky) * kernel_width + kx) * depth + c);
 
-                                sum += input[inputIndex] * kernels[kernelIndex];
+                                sum += input[inputIndex] * globalWeights[pointer][kernelIndex];
                             }
                         }
                     }
@@ -285,8 +292,9 @@ exports.DilateDelta = (input, shape, stride) => {
     return dilated;
 };
 
-exports.RotateKernels = (kernels, F, KH, KW, D) => {
-    const rotated = new Float32Array(kernels.length);
+exports.RotateKernels = (F, KH, KW, D, pointer) => {
+    const {globalWeights} = getGlobalParams();
+    const rotated = new Float32Array(globalWeights[pointer].length);
 
     for (let f = 0; f < F; f++) {
         for (let kh = 0; kh < KH; kh++) {
@@ -300,7 +308,7 @@ exports.RotateKernels = (kernels, F, KH, KW, D) => {
                     const newKw = KW - 1 - kw;
                     const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
                     
-                    rotated[newIdx] = kernels[oldIdx];
+                    rotated[newIdx] = globalWeights[pointer][oldIdx];
                 }
             }
         }
@@ -315,8 +323,9 @@ exports.RotateKernels = (kernels, F, KH, KW, D) => {
  * @param {Array<Number>} kernels_shape - [F, KH, KW, C]
  * @returns {Float32Array} output tensor [H, W, F]
  */
-exports.ConvolveDelta = (padded, padded_delta_shape, rotatedKernels, kernels_shape, oH, oW) => {
+exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, pointer) => {
 
+    const {globalWeights} = getGlobalParams();
     const [Hp, Wp, C_in] = padded_delta_shape;
     // const [F, KH, KW, C_k] = kernels_shape;
     const [F, KH, KW, C_k] = kernels_shape;        // C_k == previous layer's depth
@@ -331,11 +340,6 @@ exports.ConvolveDelta = (padded, padded_delta_shape, rotatedKernels, kernels_sha
     // const output = new Float32Array(oH * oW * F);
     const output = new Float32Array(oH * oW * C_k);
 
-    // ---- Index helpers ----
-    const idx3 = (h, w, c, W, C) => (h * W + w) * C + c;
-    const idx4 = (f, kh, kw, c, KH, KW, C) => ((f * KH + kh) * KW + kw) * C + c;
-    const idxOut = (h, w, f, W, F) => (h * W + w) * F + f;
-
     // ---- Convolution ----
 
     for (let c_out = 0; c_out < C_k; c_out++) {     // output channel = previous depth
@@ -348,7 +352,7 @@ exports.ConvolveDelta = (padded, padded_delta_shape, rotatedKernels, kernels_sha
                         const ph = h + kh, pw = w + kw;
                         const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
                         const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                        sum += padded[padIdx] * rotatedKernels[kernelIdx];
+                        sum += padded[padIdx] * globalWeights[pointer][kernelIdx];
                     }
                 }
             }

@@ -152,9 +152,10 @@ class Layers {
                     //  if none satisfies the conditions above, throw an error
                     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
-                feedforward: (input, weights, biases, current_layer) => {
-                    
-                    const z_values = MatMul(input, weights, biases, current_layer.weightShape[0], current_layer.weightShape[1]);
+                feedforward: (input, current_layer, pointer) => {
+
+                    const [inputSize, outputSize] = current_layer.weightShape;
+                    const z_values = MatMul(input, inputSize, outputSize, pointer);
                     const activation_function = activation[function_name];
 
                     let outputs = activation_function(z_values);
@@ -192,10 +193,11 @@ class Layers {
 
                     return dOutputLayer;
                 },
-                backpropagate: (next_weights, next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer) => {
+                backpropagate: (next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
                     const dActivation = activation.derivatives[function_name];
+                    const [inputSize, outputSize] = nextLayer.weightShape;
                     const dAct = dActivation(zs[layer_index]);
-                    const delta_res = DeltaMatMul(next_delta, next_weights, nextLayer.weightShape[0], nextLayer.weightShape[1]);
+                    const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
                     const current_delta = element_wise_mul(dAct, delta_res);     
 
                     if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
@@ -281,7 +283,7 @@ class Layers {
                     * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
                     */
                 },
-                feedforward: (input, weights, biases, current_layer) => {
+                feedforward: (input, current_layer, pointer) => {
                     
                     let [f, kh, kw, kd] = current_layer.weightShape;
                     let [input_H, input_W, input_D] = current_layer.inputShape; 
@@ -298,7 +300,7 @@ class Layers {
                     const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
                     // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const convolve_result = Convolve(data, weights, biases, current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1]);
+                    const convolve_result = Convolve(data,current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1], pointer);
 
                     if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
@@ -326,14 +328,14 @@ class Layers {
 
                     // return dOutputLayer;
                 },
-                backpropagate: (next_weights, next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                backpropagate: (next_delta, zs, layer_index, currentLayer, weights, activations, next_layer,pointer) => {
                     let Current_Z = zs[layer_index];
                     let dActivation = activation.derivatives[function_name];
                     let dL_dActivation;
 
                     if (next_layer.layer_name === "connected_layer") {
                         const [inputSize, outputSize] = next_layer.weightShape;
-                        dL_dActivation = DeltaMatMul(next_delta, next_weights, inputSize, outputSize);
+                        dL_dActivation = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
                     } 
                     else if (next_layer.layer_name === "maxPooling") {
                         dL_dActivation = next_delta;
@@ -345,7 +347,7 @@ class Layers {
                         const stridesN = next_layer.strides;
                         const paddingN = next_layer.padding;
 
-                        const rotated = rotate_kernels(next_weights, Fn, KHn, KWn, KCn);
+                        rotate_kernels(Fn, KHn, KWn, KCn, pointer);
                         const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
                         
                         const dilatedH = oHn * stridesN + (oHn - 1) * (stridesN - 1);
@@ -372,7 +374,7 @@ class Layers {
                         // pass the REAL dilated dims, not oHn/oWn
                         const { data, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
-                        dL_dActivation = ConvolveDelta(data, shape, rotated, [Fn, KHn, KWn, KCn], oHcurr, oWcurr);
+                        dL_dActivation = ConvolveDelta(data, shape, [Fn, KHn, KWn, KCn], oHcurr, oWcurr, pointer);
                     }
                     
                     const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
@@ -445,7 +447,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                feedforward: (input, weights=null, biases=null, current_layer) => {
+                feedforward: (input, current_layer, pointer) => {
                     const [inputh, inputw, inputd] = current_layer.inputShape;
                     const [outputh, outputw, outputd] = current_layer.outputShape;
                     const [poolHeight, poolWidth] = current_layer.poolSize;
@@ -470,7 +472,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                backpropagate: (next_weights = null, prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, allLayers) => {
+                backpropagate: (prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer) => {
                     let next_delta = prev_delta;
                     const [inputH, inputW, inputD] = currentLayer.inputShape;
                     const [outputH, outputW, outputD] = currentLayer.outputShape;
@@ -478,9 +480,11 @@ class Layers {
                     const strides = currentLayer.strides;
                     const padding = currentLayer.padding;
 
+
+
                     if (next_layer.layer_name === "connected_layer") {
                         const [inputSize, outputSize] = next_layer.weightShape;
-                        next_delta = DeltaMatMul(prev_delta, next_weights, inputSize, outputSize);
+                        next_delta = DeltaMatMul(prev_delta, inputSize, outputSize, pointer);
                     }
 
                     const delta = new Float32Array(inputH * inputW * inputD);
