@@ -347,7 +347,7 @@ class Layers {
                         const stridesN = next_layer.strides;
                         const paddingN = next_layer.padding;
 
-                        rotate_kernels(Fn, KHn, KWn, KCn, pointer);
+                        // rotate_kernels(Fn, KHn, KWn, KCn, pointer);
                         const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
                         
                         const dilatedH = oHn * stridesN + (oHn - 1) * (stridesN - 1);

@@ -10,7 +10,8 @@ let path = require('path');
 const {BooleanAvailability} = require('../../gpu/modeSelector'); 
 const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
-const addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
+const { getGlobalParams } = require('../../gpu/globals');
+let addon;
 
 let functions;
 
@@ -18,6 +19,8 @@ let functions;
 const init = () => {    
 
     try {
+        
+        addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
         /* 
         * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
@@ -39,21 +42,27 @@ const init = () => {
 
         if (hasGPU) {
             console.log(`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device ${yellow}${data.devices[0].gpu}${reset} whose vendor is ${yellow}${data.devices[0].vendor}${reset} with a memory of ${yellow}${(Number(data.devices[0].globalMemBytes) / (1024 ** 3 )).toFixed(2)} GB${reset}.`);
-            console.log(`⚡ Initializing GPU accelerated training....`);
+            const kernelSource = path.join(__dirname, "..", "..", "gpu", "kernels");
             
-            const res = addon.Init_GPU();
+            console.log("Compiling kernels...");
+            const res = addon.Init_GPU(kernelSource);
 
             if (!res.ok) {
                 console.warn(`\n${yellow}[WARN]${reset} GPU Kernel initialization failed. Failing back to CPU`);
                 console.log(res.error);
+                // if "failed", we need to set the global boolean state on C++ to false to use CPU-based functions.
+                addon.setOnGPU(false);
             }
             
+            console.log("Kernels successfully compiled...");
+            addon.setOnGPU(true);
             functions = addon;
             return
         }
 
         if (!hasGPU) {
             console.log(`${yellow}\n[INFO]${reset} Neurex will use the optimized CPU functions`);
+            addon.setOnGPU(false);
             functions = addon;
             return;
         }
@@ -215,18 +224,6 @@ const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, 
 const Dilate_Input = (delta, shape_array, strides) => functions.DilateDelta(delta, shape_array, strides);
 
 /**
- * "✅☑️"
- * @param {Float32Array} params - the kernels 
- * @param {Numnber} f - number of filters 
- * @param {Number} kh - kernel height
- * @param {Number} kw - kernel width 
- * @param {Numbwe} d - depth of the kernel
- * @returns float32array of parameters
- */
-const rotate_kernels = (f, kh, kw, d, pointer) => functions.RotateKernels(f, kh, kw, d, pointer);
-
-
-/**
  * "✅☑️" Perform delta convolution
  * @param {Float32Array} input - padded delta
  * @param {Array<Number>} padded_delta_shape - padded delta shape
@@ -354,7 +351,6 @@ module.exports = {
     applyPadding,
     Convolve,
     Dilate_Input,
-    rotate_kernels,
     ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,

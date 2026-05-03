@@ -83,10 +83,30 @@ const getTotalMB = (array) => {
     return sum;
 }
 
+const formatDuration = (totalSeconds) => {
+    const d = Math.floor(totalSeconds / (3600 * 24));
+    const h = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60; 
+
+    const parts = [];
+    if (d > 0) parts.push(`${d}d`);
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    
+    // Use .toFixed(1) for one decimal place (e.g., 0.2s)
+    if (s > 0 || parts.length === 0) {
+        parts.push(`${s.toFixed(3)}s`);
+    }
+
+    return parts.join(' ');
+}
+
 module.exports = {
     calculateTensorShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,
-    getTotalMB
+    getTotalMB,
+    formatDuration
 }

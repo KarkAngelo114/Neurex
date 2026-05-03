@@ -16,11 +16,11 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
-const { calculateTensorShape, XavierInitialization, getTotalMB } = require('../utils');
+const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init } = require('./bindings');
-const { setGlobalParams } = require('../gpu/globals');
+const { setGlobalParams, replaceWeightParamByIndex, replaceBiasParamByIndex } = require('../gpu/globals');
 
 
 
@@ -536,6 +536,9 @@ class Neurex {
             this.isInit = true;
         }
         
+        console.log('\nUploading parameters...');
+        setGlobalParams(this.weights, this.biases, this.output_layers_templates);
+
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
 
         let trainX = [];
@@ -596,8 +599,10 @@ class Neurex {
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
             let logMessage;
+            let startTime;
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
+                startTime = performance.now();
                 let totalepochLoss = 0;
                 let numBatches = 0; // Added to count batches
 
@@ -705,6 +710,10 @@ class Neurex {
 
                         // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[pointer] = res2.state;
+
+                        // replaceWeightParamByIndex(res1.params, pointer);
+                        // replaceBiasParamByIndex(res2.params, pointer);
+
                         pointer++;
                     }
 
@@ -718,8 +727,16 @@ class Neurex {
                                 AverageEpochLoss > 0.5 ? color.orange :
                                 AverageEpochLoss > 0.1 ? color.yellow :
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
+                let end = performance.now();
+                let totalDuration = (end - startTime) / 1000;
                 
                 logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
+
+                if (this.task === 'regression') {
+                    let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
+                    logMessage += duration;
+                }
+
 
                 if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                     let epochPredictions = [];
@@ -734,6 +751,8 @@ class Neurex {
                                     accuracy >= 60 ? color.orange : color.red;
 
                     logMessage += ` | [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
+                    let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
+                    logMessage += duration;
                 }
                 process.stdout.write('\r'+logMessage);
                 // if the checkpoint is not 0 (assume it was configured), proceed to saving the model after showing the latest training information
@@ -907,7 +926,6 @@ class Neurex {
             });
 
             this.hasBuilt = true;
-            setGlobalParams(this.weights, this.biases, this.output_layers_templates);
         } catch (error) {
             console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
             throw error;

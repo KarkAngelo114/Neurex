@@ -1,4 +1,4 @@
-const { getGlobalParams } = require("../../../gpu/globals");
+const { getGlobalParams, replaceWeightParamByIndex } = require("../../../gpu/globals");
 
 exports.Relu = (arr) => {
     const output = new Float32Array(arr);
@@ -84,9 +84,13 @@ exports.DLinear = (arr) => {
 
 exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) => {
 
+    /**
+     * since there's no weights and biases being passed to this function, we use the pointer to reference the parameters
+     */
+
     const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
     
-    const z_values = globalOutputTensorTemplate[outputTemplatePointer];
+    const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
     z_values.set(globalBiases[pointer]);
@@ -292,7 +296,7 @@ exports.DilateDelta = (input, shape, stride) => {
     return dilated;
 };
 
-exports.RotateKernels = (F, KH, KW, D, pointer) => {
+const RotateKernels = (F, KH, KW, D, pointer) => {
     const {globalWeights} = getGlobalParams();
     const rotated = new Float32Array(globalWeights[pointer].length);
 
@@ -300,10 +304,7 @@ exports.RotateKernels = (F, KH, KW, D, pointer) => {
         for (let kh = 0; kh < KH; kh++) {
             for (let kw = 0; kw < KW; kw++) {
                 for (let d = 0; d < D; d++) {
-                    // Original Index
                     const oldIdx = (f * KH * KW * D) + (kh * KW * D) + (kw * D) + d;
-                    
-                    // Rotated Index (Flip KH and KW)
                     const newKh = KH - 1 - kh;
                     const newKw = KW - 1 - kw;
                     const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
@@ -313,7 +314,8 @@ exports.RotateKernels = (F, KH, KW, D, pointer) => {
             }
         }
     }
-    return rotated;
+    // Return the rotated array for temporary use[cite: 1]
+    return rotated; 
 };
 /**
  * 
@@ -325,10 +327,12 @@ exports.RotateKernels = (F, KH, KW, D, pointer) => {
  */
 exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, pointer) => {
 
-    const {globalWeights} = getGlobalParams();
     const [Hp, Wp, C_in] = padded_delta_shape;
     // const [F, KH, KW, C_k] = kernels_shape;
-    const [F, KH, KW, C_k] = kernels_shape;        // C_k == previous layer's depth
+    const [F, KH, KW, C_k] = kernels_shape; // C_k == previous layer's depth
+
+    // rotate kernels
+    const rotated_kernel = RotateKernels(F, KH, KW, C_k, pointer);
 
     // Match C++ logic
     const C = Math.min(C_in, C_k);
@@ -352,7 +356,7 @@ exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, poin
                         const ph = h + kh, pw = w + kw;
                         const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
                         const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                        sum += padded[padIdx] * globalWeights[pointer][kernelIdx];
+                        sum += padded[padIdx] * rotated_kernel[kernelIdx];
                     }
                 }
             }
@@ -428,7 +432,7 @@ exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTe
     const [outputH, outputW, outputD] = outputShape;
 
     const output = globalOutputTensorTemplate[outputTemplatePointer];
-    const maxIdexes = globalOutputTensorTemplate[outputTemplatePointer];
+    const maxIdexes = new Int32Array(outputH * outputW * outputD);
 
     for (let d = 0; d < inputD; d++) {
         for (let i = 0; i < outputH; i++) {

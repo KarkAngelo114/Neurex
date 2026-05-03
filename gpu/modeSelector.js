@@ -10,6 +10,11 @@ exports.modeConfiguration = (value) => {
 
     // if auto
     if (value.toLowerCase() === "auto") {
+        if (!data || data.devices.length == 0) {
+            console.warn(`\n${yellow}[INFO]${reset} GPU compute is not available on this environment. Switching to CPU fallback...`);
+            hasGPU = false;
+            return;
+        }
         if (data.devices[0].hostUnifiedMemory) {
             console.warn(`\n${yellow}[INFO]${reset} GPU compute is not available on this environment. Switching to CPU fallback...`);
             hasGPU = false;
@@ -24,6 +29,10 @@ exports.modeConfiguration = (value) => {
     if (value.toLowerCase() === "gpu") {
         if (force_Use_Default_JS_Float32_Module) {
             throw new Error("[ERROR] Cannot detect if 'force_Use_Default_JS_Float32_Module' is true. In your configure(), ensure that 'onFloat32Module' is false");
+        }
+
+        if (!data || data.devices.length == 0) {
+            throw new Error(`${red}[ERROR]${reset} No devices found for mode:"gpu". Use mode:"cpu" or mode:"auto"`);
         }
 
         if (data.devices[0].hostUnifiedMemory && value.toLowerCase() === "gpu") {
