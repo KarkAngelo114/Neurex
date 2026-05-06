@@ -347,11 +347,11 @@ class Layers {
                         const stridesN = next_layer.strides;
                         const paddingN = next_layer.padding;
 
-                        // rotate_kernels(Fn, KHn, KWn, KCn, pointer);
+                        // dilate input
                         const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
                         
-                        const dilatedH = oHn * stridesN + (oHn - 1) * (stridesN - 1);
-                        const dilatedW = oWn * stridesN + (oWn - 1) * (stridesN - 1);
+                        const dilatedH = (oHn - 1) * stridesN + 1;
+                        const dilatedW = (oWn - 1) * stridesN + 1;
 
                         let pT, pB, pL, pR;
                         if (paddingN === "valid") {

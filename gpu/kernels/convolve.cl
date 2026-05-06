@@ -13,15 +13,12 @@ __kernel void convolve(
     const int input_height,
     const int input_width
 ) {
-    int gid = get_global_id(0);
+    int oh = get_global_id(0);
+    int ow = get_global_id(1);
+    int f  = get_global_id(2);
 
-    int total = output_height * output_width * num_filters;
-    if (gid >= total) return;
-
-    // Decode gid → (oh, ow, f)
-    int f  = gid % num_filters;
-    int ow = (gid / num_filters) % output_width;
-    int oh = gid / (num_filters * output_width);
+    if (ow >= output_width || oh >= output_height || f >= num_filters)
+        return;
 
     float sum = 0.0f;
 

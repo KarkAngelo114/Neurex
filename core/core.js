@@ -121,8 +121,9 @@ class Neurex {
         // mode: gpu | cpu | auto
         // onFLoat32Module: true | false
 
-        onFloat32Module(configs.onFLoat32Module || false);
         modeConfiguration(configs.mode || "cpu");
+        onFloat32Module(configs.onFLoat32Module || false);
+        
 
         init();
         this.isInit = true;
@@ -711,14 +712,11 @@ class Neurex {
                         // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[pointer] = res2.state;
 
-                        // replaceWeightParamByIndex(res1.params, pointer);
-                        // replaceBiasParamByIndex(res2.params, pointer);
+                        replaceWeightParamByIndex(res1.params, pointer);
+                        replaceBiasParamByIndex(res2.params, pointer);
 
                         pointer++;
                     }
-
-                    // update global params
-                    setGlobalParams(this.weights, this.biases, this.output_layers_templates);
 
                 }
 
@@ -1014,30 +1012,65 @@ class Neurex {
     }
 
     // backward propagation
+    // #backpropagation(activations, zs, deltas_array) {
+    //     let deltas = deltas_array;
+    //     let current_delta = deltas[this.num_layers - 1];
+    //     let all_deltas = [current_delta];
+
+    //     let pointer = this.weights.length - 1;
+    //     for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
+    //         const current_layer = this.layers[layer_index];
+    //         const next_layer = this.layers[layer_index + 1];
+    //         // const next_weights = this.weights[weights_biases_indexer];
+    //         const next_delta = current_delta;
+
+    //         const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_delta, zs, layer_index, current_layer, this.weights, activations, next_layer, pointer);
+    //         pointer -= decrementor_value;
+
+    //         current_delta = new_delta;
+    //         deltas[layer_index] = current_delta;
+    //         all_deltas.unshift(current_delta);
+    //     }
+
+    //     return {
+    //         deltas: deltas,
+    //         all_deltas: all_deltas
+    //     };
+    // }
+
     #backpropagation(activations, zs, deltas_array) {
         let deltas = deltas_array;
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        let pointer = this.weights.length - 1;
+        // Build a map: layer_index → weight pointer
+        // (same pointer logic as feedforward)
+        const layerPointers = [];
+        let p = 0;
+        const parametric = ["connected_layer", "convolutionalLayer"];
+        for (let i = 0; i < this.layers.length; i++) {
+            layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
+        }
+
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
             const next_layer = this.layers[layer_index + 1];
-            // const next_weights = this.weights[weights_biases_indexer];
             const next_delta = current_delta;
 
-            const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_delta, zs, layer_index, current_layer, this.weights, activations, next_layer, pointer);
-            pointer -= decrementor_value;
+            // pointer for the NEXT layer (what backprop needs to un-do)
+            const pointer = layerPointers[layer_index + 1];
+
+            const { current_delta: new_delta } = current_layer.backpropagate(
+                next_delta, zs, layer_index, current_layer,
+                this.weights, activations, next_layer, pointer
+            );
 
             current_delta = new_delta;
             deltas[layer_index] = current_delta;
             all_deltas.unshift(current_delta);
         }
 
-        return {
-            deltas: deltas,
-            all_deltas: all_deltas
-        };
+        return { deltas, all_deltas };
     }
 
 

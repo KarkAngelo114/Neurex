@@ -11,19 +11,19 @@ __kernel void delta_convolve(
     const int oH,
     const int oW
 ) {
-    int gid = get_global_id(0);
-    if (gid >= oH * oW * C_k) return;
+    int h = get_global_id(0);
+    int w = get_global_id(1);
+    int c_out = get_global_id(2);
 
-    int c_out = gid % C_k;
-    int hw = gid / C_k;
-    int w = hw  % oW;
-    int h = hw  / oW;
+    if (h >= oH || w >= oW || c_out >= C_k) return;
 
     float sum = 0.0f;
 
+    // ===== convolution accumulation =====
     for (int kh = 0; kh < KH; kh++) {
         for (int kw = 0; kw < KW; kw++) {
             for (int f = 0; f < F; f++) {
+
                 int ph = h + kh;
                 int pw = w + kw;
 

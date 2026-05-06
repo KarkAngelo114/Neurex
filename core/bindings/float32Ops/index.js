@@ -276,8 +276,9 @@ exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_heigh
 
 exports.DilateDelta = (input, shape, stride) => {
     const [H, W, C] = shape;
-    const dilatedH = H * stride + (H - 1) * (stride - 1);
-    const dilatedW = W * stride + (W - 1) * (stride - 1);
+    const dilatedH = (H - 1) * stride + 1;
+    const dilatedW = (W - 1) * stride + 1;
+    
     const dilatedSize = dilatedH * dilatedW * C;
     const dilated = new Float32Array(dilatedSize);
 
@@ -349,18 +350,18 @@ exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, poin
     for (let c_out = 0; c_out < C_k; c_out++) {     // output channel = previous depth
         for (let h = 0; h < oH; h++) {
             for (let w = 0; w < oW; w++) {
-            let sum = 0;
-            for (let kh = 0; kh < KH; kh++) {
-                for (let kw = 0; kw < KW; kw++) {
-                    for (let f = 0; f < F; f++) {         // sum over delta's filter dim
-                        const ph = h + kh, pw = w + kw;
-                        const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
-                        const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                        sum += padded[padIdx] * rotated_kernel[kernelIdx];
+                let sum = 0;
+                for (let kh = 0; kh < KH; kh++) {
+                    for (let kw = 0; kw < KW; kw++) {
+                        for (let f = 0; f < F; f++) {         // sum over delta's filter dim
+                            const ph = h + kh, pw = w + kw;
+                            const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
+                            const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
+                            sum += padded[padIdx] * rotated_kernel[kernelIdx];
+                        }
                     }
                 }
-            }
-            output[(h * oW + w) * C_k + c_out] = sum;
+                output[(h * oW + w) * C_k + c_out] = sum;
             }
         }
     }

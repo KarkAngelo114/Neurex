@@ -39,12 +39,17 @@ exports.modeConfiguration = (value) => {
             throw new Error(`${red}[ERROR]${reset} Cannot use mode:"gpu" if host unified memory is true. This error can be avoided if you will only set mode:"gpu" if GPU is actually available, otherwise set mode:"cpu" or mode:"auto"`);
         }
 
-        if (!data.devices[0].hostUnifiedMemory && value.toLowerCase() === "gpu") hasGPU = true;
+        if (!data.devices[0].hostUnifiedMemory && value.toLowerCase() === "gpu") {
+            force_Use_Default_JS_Float32_Module = false;
+            hasGPU = true;
+            return;
+        };
 
         return;
     }
 
     if (value.toLowerCase() === "cpu") {
+        force_Use_Default_JS_Float32_Module = false;
         hasGPU = false;
         return;
     }
@@ -54,7 +59,7 @@ exports.modeConfiguration = (value) => {
 
 exports.onFloat32Module = (value) => {
 
-    if (value && hasGPU) {
+    if (value) {
         console.log(`${yellow}\n[WARN] Forcing to use default float32 module on JS${reset}`);
         hasGPU = false;
     }
