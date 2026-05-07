@@ -712,11 +712,10 @@ class Neurex {
                         // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[pointer] = res2.state;
 
-                        replaceWeightParamByIndex(res1.params, pointer);
-                        replaceBiasParamByIndex(res2.params, pointer);
-
                         pointer++;
                     }
+
+                    setGlobalParams(this.weights, this.biases, this.output_layers_templates);
 
                 }
 
@@ -1010,33 +1009,6 @@ class Neurex {
             this.currentSize = CalculatedTensorShape;
         }
     }
-
-    // backward propagation
-    // #backpropagation(activations, zs, deltas_array) {
-    //     let deltas = deltas_array;
-    //     let current_delta = deltas[this.num_layers - 1];
-    //     let all_deltas = [current_delta];
-
-    //     let pointer = this.weights.length - 1;
-    //     for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
-    //         const current_layer = this.layers[layer_index];
-    //         const next_layer = this.layers[layer_index + 1];
-    //         // const next_weights = this.weights[weights_biases_indexer];
-    //         const next_delta = current_delta;
-
-    //         const { current_delta: new_delta, decrementor_value } = current_layer.backpropagate(next_delta, zs, layer_index, current_layer, this.weights, activations, next_layer, pointer);
-    //         pointer -= decrementor_value;
-
-    //         current_delta = new_delta;
-    //         deltas[layer_index] = current_delta;
-    //         all_deltas.unshift(current_delta);
-    //     }
-
-    //     return {
-    //         deltas: deltas,
-    //         all_deltas: all_deltas
-    //     };
-    // }
 
     #backpropagation(activations, zs, deltas_array) {
         let deltas = deltas_array;

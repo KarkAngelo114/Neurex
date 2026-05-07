@@ -30,17 +30,3 @@ exports.getGlobalParams = () => {
         globalOutputTensorTemplate: globalOutputTensorTemplate
     }
 }
-
-exports.replaceWeightParamByIndex = (param, pointer) => {
-    globalWeights[pointer] = param;
-    if (addon && addon.replaceWeight) {
-        addon.replaceWeight(param, pointer);
-    }
-}
-
-exports.replaceBiasParamByIndex = (param, pointer) => {
-    globalBiases[pointer] = param;
-    if (addon && addon.replaceBiases) {
-        addon.replaceBiases(param, pointer);
-    }
-}
