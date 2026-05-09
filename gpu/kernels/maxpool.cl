@@ -9,7 +9,8 @@ __kernel void maxpool(
     const int poolW,
     const int outputH,
     const int outputW,
-    const int outputD
+    const int outputD,
+    const int strides
 ) {
     int i = get_global_id(0);
     int j = get_global_id(1);
@@ -20,8 +21,8 @@ __kernel void maxpool(
     float maxVal = -INFINITY;
     int maxIdx = -1;
 
-    int startH = i * poolH;
-    int startW = j * poolW;
+    int startH = i * strides;
+    int startW = j * strides;
 
     for (int ph = 0; ph < poolH; ph++) {
         for (int pw = 0; pw < poolW; pw++) {

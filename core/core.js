@@ -538,7 +538,14 @@ class Neurex {
         }
         
         console.log('\nUploading parameters...');
-        setGlobalParams(this.weights, this.biases, this.output_layers_templates);
+
+        setGlobalParams(
+            this.weights, 
+            this.biases, 
+            this.output_layers_templates,
+            this.weightGrads,
+            this.biasGrads
+        );
 
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
 
@@ -615,8 +622,6 @@ class Neurex {
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
 
-                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
-
                     let weightGrads = this.weightGrads;
 
                     let biasGrads = this.biasGrads;
@@ -638,9 +643,7 @@ class Neurex {
                         // === STEP 1: Compute delta for output layer === //
                         let output_layer_index = this.num_layers - 1;
                         
-                        
                         deltas[output_layer_index] = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
-
 
                         // === STEP 2: backpropagate the output layer delta === //
                         const {deltas:allDeltas} = this.#backpropagation(activations, zs, deltas);
@@ -715,7 +718,15 @@ class Neurex {
                         pointer++;
                     }
 
-                    setGlobalParams(this.weights, this.biases, this.output_layers_templates);
+                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
+
+                    setGlobalParams(
+                        this.weights, 
+                        this.biases, 
+                        this.output_layers_templates,
+                        this.weightGrads,
+                        this.biasGrads
+                    );
 
                 }
 
