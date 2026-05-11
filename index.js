@@ -20,6 +20,7 @@ const { load_images_from_directory, load_single_image, load_multiple_images } = 
 const { element_wise_mul, relu, sigmoid, tanh, softmax, linear  } = require('./core/bindings');
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
+const { simpleNeuralNetwork, simpleCNN } = require('./applications/templates/templates');
 
 
 module.exports= {
@@ -43,5 +44,9 @@ module.exports= {
     tanh,
     softmax,
     linear,
-    detectGPU
+    detectGPU,
+    templates: {
+        simpleNeuralNetwork,
+        simpleCNN
+    }
 }

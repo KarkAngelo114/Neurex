@@ -16,23 +16,23 @@
 npm install neurex
 
 ```
-4. After successful installation, you can now train neural network models and do predictions in your applications.
 
 ## Documentation
 Checkout the documentation for full API reference, live demos, and some starter examples [here](https://neurex-documentation.vercel.app/).
 
 # Neurex
-Neurex is a Javascript-based neural network library for Node.js, designed to be fully trainable and easy to integrate into your applications. This library supports:
+Neurex is a Javascript-based, GPU-Accelerated, deep learning library for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
 
-1. Mix and Match; train CNN + ANN or just ANN ✅
-2. Both CommonJS and ES module importing ✅
-3. Retraining and transfer learning ✅
+1. 🧠 Mix and Match; train CNN + ANN or just ANN ✅
+2. 🛠️ Both CommonJS and ES module importing ✅
+3. 🔃 Retraining and transfer learning ✅
+4. ⚡ GPU acceleration for faster training ✅
 
 ## Why use Neurex
 1. Easy implementation - intuitive API calls. No need to fight with the API design
 2. Abstracted complexities - Intuitive API that handles the heavy lifting of backpropagation and weight initialization, allowing you to focus on architecture.
 3. Educational - Good for experimenting or learning how to build Neural networks
-4. Use vs See - others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
+4. Use vs See - Others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
 
 ## Sample usage - training a XOR 
 Here's an example on how you can use `Neurex` to train on XOR problem.
@@ -60,7 +60,9 @@ const trainY = [
 // configurations
 nrx.configure({
     optimizer:'adam',
-    learning_rate:0.1
+    learning_rate:0.1,
+    checkpoint_per_epoch: 100, // if you want to save the model for every N epochs (let's say every 100 epochs like in this example)
+    mode:"cpu", /* "gpu" or "auto" */
 });
 
 // stack layers in sequential order
@@ -85,3 +87,28 @@ trainX.forEach((input, i) => {
 });
 
 ```
+
+You can also used predefined neural network templates which you can drop in to the `sequentialBuild()`
+
+```Javascript
+
+const { Neurex, Layers, templates } = require('neurex');
+
+(() => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    nrx.sequentialBuild([
+        layer.inputShape({features: 2}),
+        // drop in a connected network having 3 hidden layers, 5 neurons each
+        ...templates.simpleNeuralNetwork(),
+        layer.connectedLayer('sigmoid',1)
+    ])
+})();
+```
+
+Learn more about neural network templates [here](https://neurex-documentation.vercel.app/).
+
+
+> [!NOTE]
+> Everything described above applies to the upcoming latest version of `Neurex` and may differ from the current stable NPM release.

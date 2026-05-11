@@ -189,7 +189,7 @@ class Neurex {
 
             switch (layerType) {
                 case 'convolutionalLayer':
-                    displayName = 'Convolutional layer';
+                    displayName = 'Convolutional Layer';
                     outputShape = `(${layer.outputShape.join('x')})`;
                     activation = activationName;
                     params = paramCount.toLocaleString();
@@ -205,7 +205,7 @@ class Neurex {
                     break;
 
                 case 'maxPooling':
-                    displayName = 'Max pooling';
+                    displayName = 'Max Pooling';
                     outputShape = `(${layer.outputShape.join('x')})`;
                     activation  = 'None';
                     params = '0 (non-param)';
@@ -543,8 +543,6 @@ class Neurex {
             this.weights, 
             this.biases, 
             this.output_layers_templates,
-            this.weightGrads,
-            this.biasGrads
         );
 
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
@@ -724,8 +722,6 @@ class Neurex {
                         this.weights, 
                         this.biases, 
                         this.output_layers_templates,
-                        this.weightGrads,
-                        this.biasGrads
                     );
 
                 }

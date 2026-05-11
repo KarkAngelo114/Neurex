@@ -616,8 +616,59 @@ declare module 'neurex' {
     export function linear(arr: Float32Array): Float32Array;
 
     /**
-     * @function detectGPU
-     * - runs a quick detection test for GPU availability
+     * @function detectGPU() 
+     
+     * - Runs a quick detection test for GPU availability. This is also used internally for CPU/GPU branching
+     * 
+     * Example output:
+     * ```bash
+     *   {
+     *       ok: true,
+     *       error: '',
+     *       platformCount: 1,
+     *       devices: [
+     *           {
+     *               gpu: 'Intel(R) UHD Graphics',
+     *               vendor: 'Intel(R) Corporation',
+     *               platform: 'Intel(R) OpenCL Graphics',
+     *               driverVersion: '32.0.101.6127',
+     *               openclVersion: 'OpenCL 3.0 NEO ',
+     *               deviceType: 'gpu',
+     *               globalMemBytes: 3378651136n,
+     *               computeUnits: 32,
+     *               maxClockMHz: 1250,
+     *               hostUnifiedMemory: true
+     *           }
+     *       ]
+     *   }
+     *```
      */
     export function detectGPU(): Object;
+
+    /**
+     * provides some predefined network templates which can be drop in the `sequentialBuild()`. The templates doesn't have input layer nor a predefined output layer so that you can add your own.
+     * The templates returns an array of layer configuration objects. To add them in the `sequentialBuild()`, you must use an spread operator (`...`)
+     *
+     * @example
+     * 
+     * nrx.sequentialBuild([
+     *      layer.inputShape({features: 4}),
+     *      ...templates.simpleNeuralNetwork(),
+     *      layer.connectedLayer('linear', 1),
+     * ]);
+     * 
+    */
+    export module templates {
+        /**
+         * A simple neural network having 3 hidden connected layers, having 5 neurons each layer. All uses `relu` activation function
+         */
+        export function simpleNeuralNetwork(): Array<Object>;
+    
+        /**
+         *  A simple CNN having a two convolutional layers each having different number of filters, same strides and kernel sizes. Both uses `same` padding and `relu` activation functions.
+         * After each convolutional layers comes with max pooling layer having `2x2` pool sizes, 2 strides and uses `valid` padding. Then it uses 3 connected layers having a
+         * "funnel" shape architecture 
+         */
+        export function simpleCNN(): Array<Object>; 
+    }
 }

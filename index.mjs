@@ -21,5 +21,6 @@ export const {
     tanh,
     softmax,
     linear,
-    detectGPU
+    detectGPU,
+    templates
 } = pkg;
