@@ -398,6 +398,20 @@ class Neurex {
             });
             
             this.#recalculateShape();
+            
+            // Rebuild output layer templates based on loaded layer information
+            this.output_layers_templates = [];
+            for (let i = 0; i < this.layers.length; i++) {
+                const layer = this.layers[i];
+                if (layer.layer_name === "connected_layer") {
+                    this.output_layers_templates.push(new Float32Array(layer.layer_size));
+                } else if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling") {
+                    const [H, W, D] = layer.outputShape;
+                    const totalSize = H * W * D;
+                    this.output_layers_templates.push(new Float32Array(totalSize));
+                }
+            }
+            
             console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
             console.log(error);
@@ -787,6 +801,12 @@ class Neurex {
         if (!this.isInit) {
             init();
             this.isInit = true;
+        }
+
+        setGlobalParams(this.weights, this.biases, this.output_layers_templates);
+
+        if (!this.weights || !this.biases || !this.output_layers_templates) {
+            throw new Error("Parameters are missing");
         }
 
         try {
