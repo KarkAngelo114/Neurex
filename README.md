@@ -17,6 +17,7 @@ npm install neurex
 
 ```
 
+
 ## Documentation
 Checkout the documentation for full API reference, live demos, and some starter examples [here](https://neurex-documentation.vercel.app/).
 
@@ -109,6 +110,34 @@ const { Neurex, Layers, templates } = require('neurex');
 
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/).
 
+# Test the Experimental Upcoming Updates 🔥
+> ⚠️ This version is currently under active development and may contain breaking changes, bugs, or incomplete features.
+
+If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.
+
+## Install from GitHub
+
+```bash
+npm install git+https://github.com/KarkAngelo114/Neurex.git
+```
+## Notes
+
+* APIs may change without notice
+* Some features may be incomplete
+* Documentation may lag behind implementation
+* Expect frequent updates and fixes
+
+This is mainly intended for:
+
+* early adopters
+* contributors
+* testers
+* developers who want access to the newest features
+
+Feedback and bug reports are highly appreciated 🙌
+
+
 
 > [!NOTE]
 > Everything described above applies to the upcoming latest version of `Neurex` and may differ from the current stable NPM release.
+

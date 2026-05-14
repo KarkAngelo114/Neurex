@@ -376,6 +376,7 @@ class Neurex {
                     // Recreate the connected layer with the correct activation and size
                     newLayer = layerBuilder.connectedLayer(layerData.activation_function_name, layerData.layer_size);
                     newLayer.weightShape = layerData.weightShape;
+                    this.output_layers_templates.push(new Float32Array(layerData.layer_size));
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
@@ -385,10 +386,16 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
+                    const [H, W, D] = layerData.outputShape;
+                    const totalSize = H * W * D;
+                    this.output_layers_templates.push(new Float32Array(totalSize));
                 } else if (layerData.layer_name === "maxPooling") {
                     newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
+                    const [H, W, D] = layerData.outputShape;
+                    const totalSize = H * W * D;
+                    this.output_layers_templates.push(new Float32Array(totalSize));
                 } 
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
@@ -398,19 +405,6 @@ class Neurex {
             });
             
             this.#recalculateShape();
-            
-            // Rebuild output layer templates based on loaded layer information
-            this.output_layers_templates = [];
-            for (let i = 0; i < this.layers.length; i++) {
-                const layer = this.layers[i];
-                if (layer.layer_name === "connected_layer") {
-                    this.output_layers_templates.push(new Float32Array(layer.layer_size));
-                } else if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling") {
-                    const [H, W, D] = layer.outputShape;
-                    const totalSize = H * W * D;
-                    this.output_layers_templates.push(new Float32Array(totalSize));
-                }
-            }
             
             console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
