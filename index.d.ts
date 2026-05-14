@@ -647,7 +647,7 @@ declare module 'neurex' {
 
     /**
      * provides some predefined network templates which can be drop in the `sequentialBuild()`. The templates doesn't have input layer nor a predefined output layer so that you can add your own.
-     * The templates returns an array of layer configuration objects. To add them in the `sequentialBuild()`, you must use an spread operator (`...`)
+     * The templates returns an array of layer configuration objects. To add them in the `sequentialBuild()`, you must use a spread operator (`...`)
      *
      * @example
      * 
@@ -669,6 +669,22 @@ declare module 'neurex' {
          * After each convolutional layers comes with max pooling layer having `2x2` pool sizes, 2 strides and uses `valid` padding. Then it uses 3 connected layers having a
          * "funnel" shape architecture 
          */
-        export function simpleCNN(): Array<Object>; 
+        export function simpleCNN(): Array<Object>;
+
+        /**
+         * 
+         * A deep convolutional neural network model consisting of 16 layers. This template allows to train VGG16 without manually placing the layers piece by piece in the `sequentialBuild()`
+         */
+        export function VGG16(): Array<Object>; 
+
+        /**
+         * A lightweight, deep convolutional neural network model. This template allows you to use `LiteNet` architecture where you can drop in the `sequentialBuild()`
+         */
+        export function LiteNet():Array<Object>;
+
+        /**
+         * A type of neural network which has an decoding and encoding parts
+         */
+        export function AutoEncoder(): Array<Object>;
     }
 }
