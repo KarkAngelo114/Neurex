@@ -20,7 +20,6 @@ const {
     applyPadding,
     Convolve, 
     Dilate_Input,
-    rotate_kernels,
     ConvolveDelta,
     scaleGrads,
     element_wise_mul,
