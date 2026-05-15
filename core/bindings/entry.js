@@ -19,8 +19,6 @@ let functions;
 const init = () => {    
 
     try {
-        
-        addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
         /* 
         * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
@@ -39,6 +37,8 @@ const init = () => {
             functions = float32_Modules;
             return;
         }
+
+        addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
         if (hasGPU) {
             console.log(`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device ${yellow}${data.devices[0].gpu}${reset} whose vendor is ${yellow}${data.devices[0].vendor}${reset} with a memory of ${yellow}${(Number(data.devices[0].globalMemBytes) / (1024 ** 3 )).toFixed(2)} GB${reset}.`);
