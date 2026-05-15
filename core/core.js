@@ -471,19 +471,24 @@ class Neurex {
      * @throws {Error} - if there are no layers
      */
     pop() {
-        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]-------- No layers has been added${color.reset}`);
+        if (this.layers.length === 0) throw new Error(`${color.red}[ERROR]-------- No layers has been added${color.reset}`);
 
-        // get the last index
         const index = this.layers.length - 1;
+        const removedLayer = this.layers[index];
 
         this.layers.splice(index, 1);
-        this.weights.splice(index, 1);
-        this.weightGrads.splice(index, 1);
-        this.biases.splice(index, 1);
-        this.biasGrads.splice(index, 1);
-
+        this.output_layers_templates.splice(index, 1);
         this.num_layers--;
         this.#recalculateShape();
+
+        const parametric = ["connected_layer", "convolutionalLayer"];
+        if (parametric.includes(removedLayer.layer_name)) {
+            const weightIndex = this.layers.filter(l => parametric.includes(l.layer_name)).length;
+            this.weights.splice(weightIndex, 1);
+            this.weightGrads.splice(weightIndex, 1);
+            this.biases.splice(weightIndex, 1);
+            this.biasGrads.splice(weightIndex, 1);
+        }
     }
 
 
@@ -973,6 +978,7 @@ class Neurex {
             this.biases.push(biases);
             this.weightGrads.push(weightGrads);
             this.biasGrads.push(biasGrads);
+            this.output_layers_templates.push(new Float32Array(outputSize));
 
             layer_data.weightShape = [inputSize, outputSize];
             this.currentShape = [1, 1, outputSize];
@@ -1012,6 +1018,7 @@ class Neurex {
 
             this.currentShape = [OutputHeight, OutputWidth, filters];
             this.currentSize = CalculatedTensorShape;
+            this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
         }
         else if (layer_data.layer_name === "maxPooling") {
             // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
@@ -1028,6 +1035,7 @@ class Neurex {
             // update the shapes
             this.currentShape = [OutputHeight, OutputWidth, inputD]; 
             this.currentSize = CalculatedTensorShape;
+            this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
         }
     }
 
