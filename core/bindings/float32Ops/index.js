@@ -474,11 +474,43 @@ exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTe
     };
 }
 
+exports.MaxPoolDelta = (delta, indices, H, W, D) => {
+    const output = new Float32Array(H * W * D);
+
+    for (let i = 0; i < indices.length; i++) {
+        let idx = indices[i];
+        output[idx] += delta[i];
+    }
+
+    return output;
+
+}
+
 exports.element_wise_mul = (arr1, arr2) => {
     let output = new Float32Array(arr1.length);
 
     for (let i = 0; i < arr1.length; i++) {
-        output[i] += arr1[i] * arr2[i];
+        output[i] = arr1[i] * arr2[i];
+    }
+
+    return output;
+}
+
+exports.scaleDiff = (arr1, arr2, arr3) => {
+    let output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < output.length; i++) {
+        output[i] = (arr1[i] - arr2[i]) * arr3[i];
+    }
+
+    return output;
+}
+
+exports.element_wise_sub = (arr1, arr2) => {
+    let output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < output.length; i++) {
+        output[i] = arr1[i] - arr2[i];
     }
 
     return output;

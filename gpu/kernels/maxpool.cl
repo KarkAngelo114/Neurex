@@ -47,3 +47,18 @@ __kernel void maxpool(
     outputTensor[outIdx] = (maxVal == -INFINITY) ? 0.0f : maxVal;
     maxIndexTensor[outIdx] = maxIdx;
 }
+
+
+__kernel void maxpooldelta(
+    __global const float* delta,
+    __global const int* indices,
+    __global float* outputTensor,
+    const int size
+) {
+    int i = get_global_id(0);
+
+    if (i >= size) return;
+
+    int idx = indices[i];
+    if (idx >= 0) outputTensor[idx] += delta[i];
+}

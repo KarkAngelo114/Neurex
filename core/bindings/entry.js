@@ -316,7 +316,7 @@ const scaleGrads = (grad, batchSize) => functions.scaleGrad(grad, batchSize)
 /**
  * 
  * "✅☑️"
- * @function Marix_Mul use to multiply elements inside both arrays. Requires both arrays has same length;
+ * @function 
  * @param {Array<Number>} flat_arr_1 - a flat array input
  * @param {Array<Number>} flat_arr_2 - a flat array input
  * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
@@ -329,6 +329,38 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
     return functions.element_wise_mul(flat_arr_1, flat_arr_2);
 }
 
+
+/**
+ * 
+ * "✅☑️"
+ * @function
+ * @param {Array<Number>} flat_arr_1 - a flat array input
+ * @param {Array<Number>} flat_arr_2 - a flat array input
+ * @returns A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
+ * @throws am error will occured if both array are not equal in length
+ */
+const element_wise_sub = (flat_arr_1, flat_arr_2) => {
+
+    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
+    return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2));
+}
+
+/**
+ * "✅☑️"
+ * @param {Foat32Array} arr1 a flat array input
+ * @param {Foat32Array} arr2 a flat array input
+ * @param {Foat32Array} arr3 a flat array input
+ * @returns a flat array after performing `(arr1[i] - arr2[i]) * arr3[i]`
+ * @throws {Error} - if any of the input array are not equal in length
+ */
+const scaleDiff = (arr1, arr2, arr3) => {
+    if (arr1.length !== arr2.length || arr2.length !== arr3.length || arr1.length !== arr3.length) {
+        throw new Error(`${red}[ERROR]------- Error: All arrays must be equal in length. array1: ${arr1.length} | array2: ${arr2.length} | array3: ${arr3.length} ${reset}`);
+    }
+
+    return functions.scaleDiff(new Float32Array(arr1), new Float32Array(arr2), new Float32Array(arr3));
+}
+
 /**
  * "✅☑️"
  * @function MaxPool
@@ -339,6 +371,17 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
  * @param {Number} strides - determines how many pixels it will skipped
  */
 const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTemplatePointer) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides, outputTemplatePointer);
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} delta incoming 
+ * @param {Int32Array} indices an array containing the index corresponding to the max pooled value
+ * @param {Number} h height of the input tensor
+ * @param {*} w width of the input tensor
+ * @param {*} d depth of the input tensor
+ * @returns 
+ */
+const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
 
 module.exports = {
     MatMul,
@@ -360,8 +403,11 @@ module.exports = {
     ApplySGD,
     ApplyAdam,
     element_wise_mul,
+    element_wise_sub,
     MaxPool,
+    MaxPoolDelta,
     init,
+    scaleDiff,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

@@ -23,9 +23,12 @@ const {
     ConvolveDelta,
     scaleGrads,
     element_wise_mul,
+    element_wise_sub,
     computeBiasGradsForConv,
     MaxPool,
-    ComputeGradientForKernels
+    MaxPoolDelta,
+    ComputeGradientForKernels,
+    scaleDiff
 } = require('../core/bindings');
 
 const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded} = require('../utils/utils');
@@ -172,9 +175,7 @@ class Layers {
                     let dOutputLayer = new Float32Array(preds.length); 
 
                     if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
-                        for (let i = 0; i < dOutputLayer.length; i++) {
-                            dOutputLayer[i] = preds[i] - actuals[i];
-                        }
+                        dOutputLayer = element_wise_sub(preds, actuals);
                     }
                     else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
                         dOutputLayer.set(preds);
@@ -184,10 +185,8 @@ class Layers {
                     else if (tasktype === "regression") {
                         const lastLayerZs = zs[zs.length - 1]; 
                         const dAct = dActivation(lastLayerZs); 
-                        
-                        for (let i = 0; i < dOutputLayer.length; i++) {
-                            dOutputLayer[i] = (preds[i] - actuals[i]) * dAct[i];
-                        }
+
+                        dOutputLayer = scaleDiff(preds, actuals, dAct);
                     }
 
                     return dOutputLayer;
@@ -453,6 +452,7 @@ class Layers {
                     const strides = current_layer.strides;
                 
                     let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides, outputTemplatePointer);
+
                     current_layer.maxIndices = maxIndices;
 
                     if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
@@ -479,22 +479,15 @@ class Layers {
                     const strides = currentLayer.strides;
                     const padding = currentLayer.padding;
 
-
-
                     if (next_layer.layer_name === "connected_layer") {
                         const [inputSize, outputSize] = next_layer.weightShape;
                         next_delta = DeltaMatMul(prev_delta, inputSize, outputSize, pointer);
                     }
 
-                    const delta = new Float32Array(inputH * inputW * inputD);
                     const indices = currentLayer.maxIndices;
 
-                    for (let i = 0; i < next_delta.length; i++) {
-                        let idx = indices[i];
-                        delta[idx] += next_delta[i];
-                    }
+                    const delta = MaxPoolDelta(new Float32Array(next_delta), indices, inputH, inputW, inputD);
 
-                    
                     return {
                         current_delta: delta,
                         decrementor_value:0

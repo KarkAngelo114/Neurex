@@ -560,7 +560,6 @@ declare module 'neurex' {
     // ================ Math Ops ======================= //
 
     /**
-    * @async
     * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
     * @param {Array<Number>} flat_arr_1 - a flat array input
     * @param {Array<Number>} flat_arr_2 - a flat array input
@@ -568,6 +567,26 @@ declare module 'neurex' {
     * @throws an error will occured if both array are not equal in length
     */
     export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
+
+
+    /**
+    * @function element_wise_sub use to subtract elements inside both arrays. Requires both arrays has same length;
+    * @param {Array<Number>} flat_arr_1 - a flat array input
+    * @param {Array<Number>} flat_arr_2 - a flat array input
+    * @returns A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
+    * @throws an error will occured if both array are not equal in length
+    */
+    export function element_wise_sub(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
+
+    /**
+     * @function scaleDiff a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
+     * @param arr1 - a flat array input
+     * @param arr2 - a flat array input
+     * @param arr3 - a flat array input
+     * @returns A flat array output after performing `(arr1[i] - arr2[i]) * arr3[i]`
+     * @throws an error will occured if both array are not equal in length
+     */
+    export function scaleDiff(arr1: Number[], arr2: Number[], arr3: Number[]): Float32Array;
 
     /**
      * @function relu

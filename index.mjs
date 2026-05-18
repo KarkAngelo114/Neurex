@@ -16,6 +16,8 @@ export const {
     load_single_image,
     load_multiple_images,
     element_wise_mul,
+    element_wise_sub,
+    scaleDiff,
     relu,
     sigmoid,
     tanh,

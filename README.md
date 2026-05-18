@@ -135,9 +135,3 @@ This is mainly intended for:
 * developers who want access to the newest features
 
 Feedback and bug reports are highly appreciated 🙌
-
-
-
-> [!NOTE]
-> Everything described above applies to the upcoming latest version of `Neurex` and may differ from the current stable NPM release.
-

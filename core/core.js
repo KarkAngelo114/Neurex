@@ -549,9 +549,7 @@ class Neurex {
             init();
             this.isInit = true;
         }
-        
-        console.log('\nUploading parameters...');
-
+    
         setGlobalParams(
             this.weights, 
             this.biases, 
