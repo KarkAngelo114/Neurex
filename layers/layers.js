@@ -1,5 +1,6 @@
 /**
  * This is the Layers class, each layers (except inputShape()) has their own:
+ * - initParams()
  * - determineInferenceType()
  * - feedforward()
  * - getOutputLayerDelta()
@@ -8,7 +9,10 @@
  * - computeBiasGrads()
  * - scaleGrads()
  *
- * Those functions are the core functions of this library to work.
+ * They'll be called during build time, feedforward, backpropagation, gradient accumulation and scaling gradients.
+ * This is because Neurex follows a Plugin-style architecture where in modifications on the core engine (the core file) are minimal and the logic are exposed by these methods of the Layers class.
+ * This allows the library to be extensible, flexible, and clean separation of concern without touching the core engine
+ * Read here about Plugin-style architecture: https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800
  */
 
 
@@ -31,7 +35,7 @@ const {
     scaleDiff
 } = require('../core/bindings');
 
-const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded} = require('../utils/utils');
+const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization} = require('../utils/utils');
 const activation = require('../core/bindings');
 const { red, reset } = require('../color-code');
 
@@ -111,6 +115,43 @@ class Layers {
                 "activation_function":activation[function_name], 
                 "derivative_activation_function":activation.derivatives[function_name],
                 "layer_size":layer_size,
+                initParams: (size, shape, layer_data) => {
+                    const inputSize = size;
+                    const outputSize = layer_data.layer_size;
+                    const TotalWeightSize = outputSize * inputSize;
+                    
+                    const weights = new Float32Array(TotalWeightSize);
+                    const weightGrads = new Float32Array(TotalWeightSize);
+                    const biases = new Float32Array(outputSize);
+                    const biasGrads = new Float32Array(outputSize);
+                    const output_template = new Float32Array(outputSize);
+                    
+                    const limit = XavierInitialization(inputSize, outputSize);
+
+                    for (let i = 0; i < TotalWeightSize; i++) {
+                        weights[i] = (Math.random() * 2 - 1) * limit;
+                    }
+                    
+                    for (let i = 0; i < outputSize; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    const weightShape = [inputSize, outputSize];
+                    const updatedShape = [1, 1, outputSize]
+
+                    return {
+                        updatedSize: outputSize,
+                        updatedShape: updatedShape,
+                        weights: weights,
+                        biases: biases,
+                        weightGrads: weightGrads,
+                        biasGrads: biasGrads,
+                        outputTensors: output_template,
+                        inputShape: [],
+                        outputShape: updatedShape,
+                        paramShape: weightShape
+                    }
+                },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
                     
                     let activation_function = layerObject.activation_function.name; // activation function
@@ -257,6 +298,58 @@ class Layers {
                 "filters":filters,
                 "padding":padding.toLowerCase(),
                 "strides":strides,
+                initParams: (size, shape, layer_data) => {
+                    const filters = layer_data.filters;
+                    const [kH, kW] = layer_data.kernel_size;
+                    const stride = layer_data.strides || 1;
+                    const padding = layer_data.padding || "same";
+
+                    const inputH = shape[0];
+                    const inputW = shape[1];
+                    const inputDepth = shape[2];
+
+                    const inputShape = [inputH, inputW, inputDepth];
+
+                    const TotalSize = filters * kH * kW * inputDepth;
+
+                    let kernels = new Float32Array(TotalSize);
+                    let kernelGrads = new Float32Array(TotalSize);
+                    let biases = new Float32Array(filters);
+                    let biasGrads = new Float32Array(filters);
+
+                    const fanIn = kH * kW * inputDepth;
+                    const fanOut = kH * kW * filters;
+                    const limit = XavierInitialization(fanIn, fanOut);
+
+                    for (let i = 0; i < TotalSize; i++) {
+                        kernels[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    for (let i = 0; i < filters; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    // Calculate output shape
+                    const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(inputH, inputW, kH, kW, filters, stride, padding);
+                    const output_template = new Float32Array(CalculatedTensorShape)
+                    // store output shape too
+                    const outputShape = [OutputHeight, OutputWidth, filters];
+
+                    const weightShape = [filters, kH, kW, inputDepth];
+                    
+                    return {
+                        updatedSize: CalculatedTensorShape,
+                        updatedShape: outputShape,
+                        weights: kernels,
+                        biases: biases,
+                        weightGrads: kernelGrads,
+                        biasGrads: biasGrads,
+                        outputTensors: output_template,
+                        inputShape: inputShape,
+                        outputShape: outputShape,
+                        paramShape: weightShape
+                    }
+                },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
 
                     if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
@@ -441,6 +534,34 @@ class Layers {
                 "poolSize": poolSize,
                 "padding": padding,
                 "strides":strides,
+                initParams: (size, shape, layer_data) => {
+                    
+                    // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
+                    const [inputH, inputW, inputD] = shape;
+                    const [poolHeight, poolWidth] = layer_data.poolSize;
+                    const strides = layer_data.strides || 1;
+                    const padding = layer_data.padding || "same";
+
+                    const inputShape = [inputH, inputW, inputD]; // set the input shape to be use in the feedforward() of maxPooling() layer
+
+                    const weightShape = null;
+                    const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(inputH, inputW, poolHeight, poolWidth, inputD, strides, padding); // we get the output shape to be use as input shape for the succeeding layers
+                    const outputShape = [OutputHeight, OutputWidth, inputD]; // set the output shape
+                    const output_template = new Float32Array(CalculatedTensorShape)
+
+                    return {
+                        updatedSize: CalculatedTensorShape,
+                        updatedShape: outputShape,
+                        weights: [],
+                        biases: [],
+                        weightGrads: [],
+                        biasGrads: [],
+                        outputTensors: output_template,
+                        inputShape: inputShape,
+                        outputShape: outputShape,
+                        paramShape: weightShape
+                    }
+                },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
