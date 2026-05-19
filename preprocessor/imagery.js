@@ -1,4 +1,5 @@
 
+const path = require('path');
 const { red, reset, green, lime } = require('../color-code')
 const fs = require('fs').promises;
 const sharp = require('sharp');
@@ -95,8 +96,10 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
 const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale") => {
 
     try {
+        
         console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
 
+        const filename = path.basename(file_path, path.extname(file_path));
         const stat = await fs.stat(file_path);
 
         if (!stat.isFile()) {
@@ -123,7 +126,8 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
 
         return {
             datasets: [new Float32Array(normalized)],
-            shape: [height, width, channels]
+            shape: [height, width, channels],
+            filename:filename
         };
 
     } catch (error) {
@@ -144,6 +148,7 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
 
     const datasets = [];
     const paths = [];
+    const filenames = [];
 
     try {
         console.log(`\n${green}[Task]------- Loading images from "${file_path}" ${reset}`);
@@ -152,7 +157,9 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
 
         for (const img of items) {
             const imagePath = `${file_path}/${img}`;
+            const filename = path.basename(imagePath, path.extname(imagePath));
 
+            filenames.push(filename);
             paths.push(imagePath);
 
             let image = sharp(imagePath).resize(resize[1], resize[0]);
@@ -177,7 +184,8 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
 
         return {
             datasets: datasets,
-            paths: paths
+            paths: paths,
+            filenames: filenames
         }
     }
     catch (error) {
