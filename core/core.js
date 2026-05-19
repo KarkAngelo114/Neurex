@@ -818,7 +818,6 @@ class Neurex {
     // ========= Private methods =======
     #build() {
         try {
-            // Start from the base input state
             let [H, W, D] = this.input_shape;
             this.currentShape = [H, W, D];
             this.currentSize = H * W * D;
@@ -858,87 +857,30 @@ class Neurex {
     }
 
     #buildSingle(layer_data) {
-        const layer_index = this.layers.length - 1;
-
-        if (layer_data.layer_name === "connected_layer") {
-            const inputSize = this.currentSize;
-            const outputSize = layer_data.layer_size;
-            const totalWeightSize = inputSize * outputSize;
-
-            // Initialize flat Float32Arrays
-            const weights = new Float32Array(totalWeightSize);
-            const weightGrads = new Float32Array(totalWeightSize);
-            const biases = new Float32Array(outputSize);
-            const biasGrads = new Float32Array(outputSize);
-
-            const limit = XavierInitialization(inputSize, outputSize);
-            for (let i = 0; i < totalWeightSize; i++) {
-                weights[i] = (Math.random() * 2 - 1) * limit;
-            }
-
-            this.weights.push(weights);
-            this.biases.push(biases);
-            this.weightGrads.push(weightGrads);
-            this.biasGrads.push(biasGrads);
-            this.output_layers_templates.push(new Float32Array(outputSize));
-
-            layer_data.weightShape = [inputSize, outputSize];
-            this.currentShape = [1, 1, outputSize];
-            this.currentSize = outputSize;
-        } 
         
-        else if (layer_data.layer_name === "convolutionalLayer") {
-            const [H, W, D] = this.currentShape;
-            const filters = layer_data.filters;
-            const [kH, kW] = layer_data.kernel_size;
-            const stride = layer_data.strides || 1;
-            const padding = layer_data.padding || "same";
+        const {
+            updatedSize, 
+            updatedShape, 
+            weights, 
+            biases, 
+            weightGrads, 
+            biasGrads, 
+            outputTensors, 
+            inputShape, 
+            outputShape, 
+            paramShape } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
-            const totalSize = filters * kH * kW * D;
-            const kernels = new Float32Array(totalSize);
-            const kernelGrads = new Float32Array(totalSize);
-            const biases = new Float32Array(filters);
-            const biasGrads = new Float32Array(filters);
+        this.currentSize = updatedSize;
+        this.currentShape = updatedShape;
 
-            // Initialization
-            const limit = XavierInitialization(kH * kW * D, kH * kW * filters);
-            for (let i = 0; i < totalSize; i++) {
-                kernels[i] = (Math.random() * 2 - 1) * limit;
-            }
-
-            this.weights.push(kernels);
-            this.biases.push(biases);
-            this.weightGrads.push(kernelGrads);
-            this.biasGrads.push(biasGrads);
-
-            // Calculate output shape
-            const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(H, W, kH, kW, filters, stride, padding);
-            
-            layer_data.inputShape = [H, W, D];
-            layer_data.outputShape = [OutputHeight, OutputWidth, filters];
-            layer_data.weightShape = [filters, kH, kW, D];
-
-            this.currentShape = [OutputHeight, OutputWidth, filters];
-            this.currentSize = CalculatedTensorShape;
-            this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
-        }
-        else if (layer_data.layer_name === "maxPooling") {
-            // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
-            const [inputH, inputW, inputD] = this.currentShape;
-            const [poolHeight, poolWidth] = layer_data.poolSize;
-            const strides = layer_data.strides;
-            const padding = layer_data.padding;
-
-            layer_data.inputShape = [inputH, inputW, inputD]; // set the input shape to be use in the feedforward() of maxPooling() layer
-
-            const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(inputH, inputW, poolHeight, poolWidth, inputD, strides, padding); // we get the output shape to be use as input shape for the succeeding layers
-            layer_data.outputShape = [OutputHeight, OutputWidth, inputD]; // set the output shape
-
-            // update the shapes
-            this.currentShape = [OutputHeight, OutputWidth, inputD]; 
-            this.currentSize = CalculatedTensorShape;
-            this.output_layers_templates.push(new Float32Array(CalculatedTensorShape));
-        }
+        if (weights.length > 0) this.weights.push(weights);
+        if (biases.length > 0) this.biases.push(biases);
+        if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
+        if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
+        if (outputTensors.length > 0) this.output_layers_templates.push(outputTensors);
+        layer_data.weightShape = paramShape || [];
+        layer_data.inputShape = inputShape || [];
+        layer_data.outputShape = outputShape || [];
     }
 
     #backpropagation(activations, zs, deltas_array) {
