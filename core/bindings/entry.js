@@ -75,7 +75,16 @@ const init = () => {
 }
 
 
-
+/**
+ *  "☑️"
+ * @function getEmbeddings
+ * @param {Array<Number>} tokenVector an array of token vector 
+ * @param {Number} embeddingDim embedding dim value
+ * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
+ * @param {Number} outputTemplatePointer pointer value correspondind to the output template tensor 
+ * @returns {Float32Array} flattened embeddings
+ */
+const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => float32_Modules.getEmbeddings(tokenVector, embeddingDim, pointer, outputTemplatePointer);
 
 /**
  * "✅☑️"
@@ -384,6 +393,7 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTempla
 const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
 
 module.exports = {
+    getEmbeddings,
     MatMul,
     DeltaMatMul,
     relu,

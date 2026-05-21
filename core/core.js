@@ -28,8 +28,8 @@ class Neurex {
         this.biases = [];
         this.output_layers_templates = [];
         this.num_layers = 0;
-        this.input_size = 0;
-        this.input_shape = null;
+        this.input_size = 1;
+        this.input_shape = [1, 1, 1];
         this.output_shape = [];
         this.currentShape = null;
         this.currentSize = null;
@@ -154,12 +154,12 @@ class Neurex {
         this.layers.forEach((layer) => {
             const layerType = layer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
-            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer';
+            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer' || layerType === "EmbeddingLayer";
 
             let paramCount = 0;
             if (isParametric) {
                 const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = this.biases[pointer]  ? this.biases[pointer].length : 0;
+                const b = this.biases[pointer] && !this.biases[pointer].every(v => v == 0)  ? this.biases[pointer].length : 0;
                 paramCount = w + b;
                 pointer++;
             }
@@ -189,6 +189,13 @@ class Neurex {
                     activation  = 'None';
                     params = '0 (non-param)';
                     padding = layer.padding || 'None';
+                    break;
+                case "EmbeddingLayer":
+                    displayName = "Embedding Layer";
+                    outputShape = `(${layer.outputShape.join('x')})`;
+                    activation = 'None';
+                    params = paramCount.toLocaleString();
+                    padding = "None"
                     break;
 
                 default:
@@ -270,6 +277,9 @@ class Neurex {
                 inputShape: layer.inputShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
+                embeddingDim: layer.embeddingDim,
+                vocabSize: layer.vocabSize,
+                maxSequenceLength: layer.maxSequenceLength
 
             })),
             "input_size":this.input_size,
@@ -375,7 +385,19 @@ class Neurex {
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
                     this.output_layers_templates.push(new Float32Array(totalSize));
-                } 
+                }
+                else if (layerData.layer_name === "EmbeddingLayer") {
+                    const vocabSize = layerData.vocabSize;
+                    const embeddingDim = layerData.embeddingDim;
+                    const sequence_length = layerData.maxSequenceLength;
+                    const outputSize = sequence_length * embeddingDim;
+                    newLayer = layerBuilder.emebeddingLayer(vocabSize, embeddingDim, sequence_length);
+                    newLayer.inputShape = [];
+                    newLayer.outputShape = [1, 1, outputSize];
+                    newLayer.weightShape = [vocabSize, embeddingDim];
+                    newLayer.outputSize = outputSize;
+                    this.output_layers_templates.push(new Float32Array(outputSize));
+                }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
@@ -433,7 +455,7 @@ class Neurex {
 
             this.hasSequentiallyBuild = true;
             this.num_layers = this.layers.length;
-            this.#recalculateShape();
+            
             this.#build();
             
             return layer_data; 
@@ -614,7 +636,7 @@ class Neurex {
 
                     let biasGrads = this.biasGrads;
 
-                    let batchLoss = 0;                    
+                    let batchLoss = 0;                  
 
                     // Accumulate gradients for each sample in the batch
                     for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
@@ -626,6 +648,8 @@ class Neurex {
                         const {predictions, activations, zs} = this.#Feedforward(input);
                         let deltas = [];
                         let dOutputlayer = [];
+                        
+
                         batchLoss += loss_function(predictions, actual);
 
                         // === STEP 1: Compute delta for output layer === //
@@ -645,7 +669,7 @@ class Neurex {
                             const a_prev = activations[l];
                             const layer_data_obj = this.layers[l];
 
-                            const parametric_layers = ["connected_layer","convolutionalLayer"];
+                            const parametric_layers = ["connected_layer","convolutionalLayer", "EmbeddingLayer"];
 
                             if (!parametric_layers.includes(layer_data_obj.layer_name)) {
                                 continue;
@@ -673,7 +697,7 @@ class Neurex {
                         
                         const layer_data_obj = this.layers[l];
 
-                        const parametric_layers = ["connected_layer","convolutionalLayer"];
+                        const parametric_layers = ["connected_layer","convolutionalLayer", "EmbeddingLayer"];
 
                         if (!parametric_layers.includes(layer_data_obj.layer_name)) {
                             continue;
@@ -834,7 +858,7 @@ class Neurex {
                     outputTensors, 
                     inputShape, 
                     outputShape, 
-                    paramShape } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
+                    paramShape, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
                 this.currentSize = updatedSize;
                 this.currentShape = updatedShape;
@@ -847,6 +871,10 @@ class Neurex {
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
                 layer_data.outputShape = outputShape || [];
+                if (overrides) {
+                    this.input_shape = overrides.input_shape; // to override the default `this.input_shape` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
+                    this.input_size = overrides.input_size; // to override the default `this.input_size` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
+                }
             });
 
             this.hasBuilt = true;
@@ -892,7 +920,7 @@ class Neurex {
         // (same pointer logic as feedforward)
         const layerPointers = [];
         let p = 0;
-        const parametric = ["connected_layer", "convolutionalLayer"];
+        const parametric = ["connected_layer", "convolutionalLayer", "EmbeddingLayer"];
         for (let i = 0; i < this.layers.length; i++) {
             layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
         }
@@ -1041,6 +1069,11 @@ class Neurex {
                 H = 1;
                 W = 1;
                 D = layer.layer_size;
+            }
+            else if (layer.layer_name === "EmbeddingLayer") {
+                H = 1;
+                W = 1;
+                D = layer.maxSequenceLength * layer.embeddingDim;
             }
         }
 
