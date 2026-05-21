@@ -288,9 +288,6 @@ class Neurex {
             "num_layers":this.num_layers,
             "weights":this.weights.map(w => Array.from(w)),
             "biases":this.biases.map(b => Array.from(b)),
-            "weightGrads":this.weightGrads.map(wg => Array.from(wg)),
-            "biasGrads":this.biasGrads.map(bg => Array.from(bg)),
-            
         };
 
         this.#save(data, fileName);
@@ -355,8 +352,6 @@ class Neurex {
             this.weights = modelData.weights.map(w => new Float32Array(w));
             this.biases = modelData.biases.map(b => new Float32Array(b));
             this.optimizer = modelData.optimizer;
-            this.weightGrads = modelData.weightGrads.map(wg => new Float32Array(wg));
-            this.biasGrads = modelData.biasGrads.map(bg => new Float32Array(bg));
             this.input_shape = modelData.input_shape
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
@@ -406,6 +401,11 @@ class Neurex {
             });
             
             this.#recalculateShape();
+
+            for (let i = 0; i < this.weights.length; i++) {
+                this.weightGrads.push(new Float32Array(this.weights[i].length).fill(0));
+                this.biasGrads.push(new Float32Array(this.biases[i].length).fill(0));
+            }
             
             console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {

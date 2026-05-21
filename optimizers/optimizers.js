@@ -15,8 +15,9 @@ const SGD = (params, grads, state = {}, lr) => {
 
 const Adam = (params, grads, state = {}, lr, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8) => {
     
-
+    
     if (params.length !== grads.length) {
+        console.log(grads, params);
         throw new Error("Adam: Params and grads size mismatch");
     }
 
