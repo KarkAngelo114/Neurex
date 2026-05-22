@@ -116,8 +116,8 @@ class Layers {
                 const updatedShape = [1, 1,  maxSequenceLength * embeddingDim]; // this will be use for the next layer
                 const updatedSize = maxSequenceLength * embeddingDim; // this will be use for the next layer
 
-                // use Xavier Initialization: arg1 is the expected token length and; arg2 is the expected output size which is `maxSequenceLength` * `embeddingDim`
-                const limit = XavierInitialization(maxSequenceLength, maxSequenceLength * embeddingDim);
+                // use Xavier Initialization: arg1 is the 'vocabSize' and; arg2 is the 'embeddingDim'
+                const limit = XavierInitialization(vocabSize, embeddingDim);
 
                 // creates a physical look up table to adjust where to put the <PAD> and <UNK>, this is row-major
                 const lookUp = Array.from({length: vocabSize}, (_, i) => 
