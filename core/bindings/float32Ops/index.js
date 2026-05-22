@@ -105,7 +105,25 @@ exports.getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePoint
     }
 
     return output;
+}
 
+exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
+    const embeddingDim = dim;
+    
+    for (let i = 0; i < activation_outputs.length; i++) {
+        const tokenId = activation_outputs[i];
+    
+        if (tokenId === 0) continue;  // skip whos IDs are reserved index which is 0s <PAD>
+    
+        const gradOffset = tokenId * embeddingDim;
+        const deltaOffset = i * embeddingDim;
+    
+        for (let d = 0; d < embeddingDim; d++) {
+            weightGrads[gradOffset + d] += delta[deltaOffset + d];
+        }
+    }
+    
+    return weightGrads;
 }
 
 exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) => {

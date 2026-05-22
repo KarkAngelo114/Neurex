@@ -18,6 +18,7 @@
 
 const {
     getEmbeddings,
+    returnEmbeddings,
     MatMul, 
     DeltaMatMul, 
     computeWeightGradientsForWeightsInConnectedLayer, 
@@ -190,28 +191,7 @@ class Layers {
                     incrementor_value: 1
                 }
             },
-            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => {
-                // activation_outputs here is the original token ID array
-                // delta is Float32Array(max_length * embeddingDim)
-                // weightGrads is flat Float32Array(vocabSize * embeddingDim)
-
-                const embeddingDim = layer_data.embeddingDim;
-
-                for (let i = 0; i < activation_outputs.length; i++) {
-                    const tokenId = activation_outputs[i];
-
-                    if (tokenId === 0) continue;  // skip whos IDs are reserved index which is 0s <PAD>
-
-                    const gradOffset = tokenId * embeddingDim;
-                    const deltaOffset = i * embeddingDim;
-
-                    for (let d = 0; d < embeddingDim; d++) {
-                        weightGrads[gradOffset + d] += delta[deltaOffset + d];
-                    }
-                }
-
-                return weightGrads;
-            },
+            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => returnEmbeddings(activation_outputs, delta, weightGrads, layer_data.embeddingDim),
             computeBiasGradients: (biasGrads, delta, layer_data) => {
                 // Embedding has no real biases — we used dummy zeros
                 // Just return as-is, nothing to compute
