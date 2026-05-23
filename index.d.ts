@@ -426,7 +426,7 @@ declare module 'neurex' {
     * @param {Number} limit_per_class - limit the number of items per class. Default is 0.
     * @returns an object that contains the datasets, labels, and classes
     */
-    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): object;
+    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): Object;
 
     /**
     * @async
@@ -436,7 +436,7 @@ declare module 'neurex' {
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
     * @returns a normalized tensor map
     */
-    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String): Number[][][];
+    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String): Object;
 
     /**
     * 
@@ -446,7 +446,13 @@ declare module 'neurex' {
     * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
     * @returns an array of normalized tensor maps
     */
-    export function load_multiple_images(targetDir: String, resize: Number[], pixelFormat: String): Number[][][][];
+    export function load_multiple_images(targetDir: String, resize: Number[], pixelFormat: String): Object;
+
+    export function buildVocab(sentences: Array<String>): Array<String>;
+
+    export function buildWord2Id(vocab: Array<String>): Object;
+
+    export function Encode(sentence: String, buildWord2Id_output: Object, max_length: Number): Array<Number>;
 
     /**
     * 
@@ -475,6 +481,16 @@ declare module 'neurex' {
         ]);
         */
         inputShape(shapeConfig: Object): object;
+
+        /**
+        * Creates an embedding layer for token encoding.
+        *
+        * @param {Number} vocabSize - The size of the vocabulary.
+        * @param {Number} embeddingDim - The size of the dense vector used to represent each token.
+        * @param {Number} maxSequenceLength - The length of the encoded token containing token IDs.
+        * @returns {Object} - The embedding layer object configuration
+        */
+        emebeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number): Object;
 
         /**
         * @method connectedLayer

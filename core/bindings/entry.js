@@ -75,7 +75,26 @@ const init = () => {
 }
 
 
+/**
+ *  "☑️"
+ * @function getEmbeddings
+ * @param {Array<Number>} tokenVector an array of token vector 
+ * @param {Number} embeddingDim embedding dim value
+ * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
+ * @param {Number} outputTemplatePointer pointer value correspondind to the output template tensor 
+ * @returns {Float32Array} flattened embeddings
+ */
+const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, pointer, outputTemplatePointer);
 
+/**
+ * "☑️"
+ * @param {Array<Number>} activated_outputs activation outputs. During feedfoward, the activation outputs before going to the embedding layer is actually the raw token array
+ * @param {Float32Array} delta float32array delta 
+ * @param {Float32Array} weightGrads initialized 0s
+ * @param {Number} dim - Embedding Dim
+ * @returns {Float32Array} 
+ */
+const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functions.returnEmbeddings(Array.from(activated_outputs), delta, weightGrads, dim);
 
 /**
  * "✅☑️"
@@ -384,6 +403,8 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTempla
 const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
 
 module.exports = {
+    getEmbeddings,
+    returnEmbeddings,
     MatMul,
     DeltaMatMul,
     relu,

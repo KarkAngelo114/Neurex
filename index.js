@@ -21,6 +21,7 @@ const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, element_wise_sub
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
 const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder } = require('./applications/templates');
+const { Encode, buildVocab, buildWord2Id } = require('./preprocessor/tokenizer');
 
 
 module.exports= {
@@ -47,6 +48,9 @@ module.exports= {
     softmax,
     linear,
     detectGPU,
+    buildWord2Id,
+    buildVocab,
+    Encode,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,

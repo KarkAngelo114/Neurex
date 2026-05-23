@@ -6,28 +6,14 @@
 // loss.js
 
 const mse = (predictions, actual) => {
-    if (Array.isArray(predictions) && Array.isArray(actual)) {
+    // Handle both regular arrays AND typed arrays (Float32Array)
+    const isArrayLike = (v) => Array.isArray(v) || ArrayBuffer.isView(v);
+
+    if (isArrayLike(predictions) && isArrayLike(actual)) {
         let sum = 0;
         for (let i = 0; i < predictions.length; i++) {
-            const p = predictions[i];
-            const a = actual[i];
-            if (Array.isArray(p) && Array.isArray(a)) { 
-                // Handle batch of multi-output samples
-                let innerSum = 0;
-                for (let j = 0; j < p.length; j++) {
-                    innerSum += Math.pow(p[j] - a[j], 2);
-                }
-                sum += innerSum / p.length;
-            } else {
-                sum += Math.pow(p - a, 2);
-            }
-        }
-        return sum / predictions.length;
-    } else if (Array.isArray(predictions) && !Array.isArray(actual)) {
-        // predictions is vector, actual is scalar repeated
-        let sum = 0;
-        for (let i = 0; i < predictions.length; i++) {
-            sum += Math.pow(predictions[i] - actual, 2);
+            const diff = predictions[i] - actual[i];
+            sum += diff * diff;
         }
         return sum / predictions.length;
     } else {

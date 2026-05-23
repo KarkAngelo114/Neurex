@@ -15,15 +15,12 @@ exports.setGlobalParams = (weights, biases, outputTemplates) => {
     if (addon) {
         addon.setGlobalParams(weights, biases, outputTemplates);
     }
-
 }
 
+/** 
+ * @returns {Object}
+*/
 exports.getGlobalParams = () => {
-    const {hasGPU} = BooleanAvailability;
-    if (hasGPU) {
-        // call the native functions
-        return;
-    }
     return {
         globalWeights: globalWeights,
         globalBiases: globalBiases,

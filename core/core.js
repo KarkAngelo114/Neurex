@@ -28,8 +28,8 @@ class Neurex {
         this.biases = [];
         this.output_layers_templates = [];
         this.num_layers = 0;
-        this.input_size = 0;
-        this.input_shape = null;
+        this.input_size = 1;
+        this.input_shape = [1, 1, 1];
         this.output_shape = [];
         this.currentShape = null;
         this.currentSize = null;
@@ -62,6 +62,7 @@ class Neurex {
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
         this.isInit = false;
 
+        this.parametric_layers = []; 
     }
 
     /**
@@ -154,12 +155,12 @@ class Neurex {
         this.layers.forEach((layer) => {
             const layerType = layer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
-            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer';
+            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer' || layerType === "EmbeddingLayer";
 
             let paramCount = 0;
             if (isParametric) {
                 const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = this.biases[pointer]  ? this.biases[pointer].length : 0;
+                const b = this.biases[pointer] && !this.biases[pointer].every(v => v == 0)  ? this.biases[pointer].length : 0;
                 paramCount = w + b;
                 pointer++;
             }
@@ -189,6 +190,13 @@ class Neurex {
                     activation  = 'None';
                     params = '0 (non-param)';
                     padding = layer.padding || 'None';
+                    break;
+                case "EmbeddingLayer":
+                    displayName = "Embedding Layer";
+                    outputShape = `(${layer.outputShape.join('x')})`;
+                    activation = 'None';
+                    params = paramCount.toLocaleString();
+                    padding = "None"
                     break;
 
                 default:
@@ -270,6 +278,10 @@ class Neurex {
                 inputShape: layer.inputShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
+                embeddingDim: layer.embeddingDim,
+                vocabSize: layer.vocabSize,
+                maxSequenceLength: layer.maxSequenceLength,
+                isParametric: layer.isParametric
 
             })),
             "input_size":this.input_size,
@@ -278,9 +290,6 @@ class Neurex {
             "num_layers":this.num_layers,
             "weights":this.weights.map(w => Array.from(w)),
             "biases":this.biases.map(b => Array.from(b)),
-            "weightGrads":this.weightGrads.map(wg => Array.from(wg)),
-            "biasGrads":this.biasGrads.map(bg => Array.from(bg)),
-            
         };
 
         this.#save(data, fileName);
@@ -345,8 +354,6 @@ class Neurex {
             this.weights = modelData.weights.map(w => new Float32Array(w));
             this.biases = modelData.biases.map(b => new Float32Array(b));
             this.optimizer = modelData.optimizer;
-            this.weightGrads = modelData.weightGrads.map(wg => new Float32Array(wg));
-            this.biasGrads = modelData.biasGrads.map(bg => new Float32Array(bg));
             this.input_shape = modelData.input_shape
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
@@ -356,6 +363,7 @@ class Neurex {
                     newLayer = layerBuilder.connectedLayer(layerData.activation_function_name, layerData.layer_size);
                     newLayer.weightShape = layerData.weightShape;
                     this.output_layers_templates.push(new Float32Array(layerData.layer_size));
+                    this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
@@ -368,6 +376,7 @@ class Neurex {
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
                     this.output_layers_templates.push(new Float32Array(totalSize));
+                    this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "maxPooling") {
                     newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
                     newLayer.inputShape = layerData.inputShape;
@@ -375,7 +384,20 @@ class Neurex {
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
                     this.output_layers_templates.push(new Float32Array(totalSize));
-                } 
+                }
+                else if (layerData.layer_name === "EmbeddingLayer") {
+                    const vocabSize = layerData.vocabSize;
+                    const embeddingDim = layerData.embeddingDim;
+                    const sequence_length = layerData.maxSequenceLength;
+                    const outputSize = sequence_length * embeddingDim;
+                    newLayer = layerBuilder.emebeddingLayer(vocabSize, embeddingDim, sequence_length);
+                    newLayer.inputShape = [];
+                    newLayer.outputShape = [1, 1, outputSize];
+                    newLayer.weightShape = [vocabSize, embeddingDim];
+                    newLayer.outputSize = outputSize;
+                    this.output_layers_templates.push(new Float32Array(outputSize));
+                    this.parametric_layers.push(layerData.layer_name);
+                }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
@@ -384,6 +406,11 @@ class Neurex {
             });
             
             this.#recalculateShape();
+
+            for (let i = 0; i < this.weights.length; i++) {
+                this.weightGrads.push(new Float32Array(this.weights[i].length).fill(0));
+                this.biasGrads.push(new Float32Array(this.biases[i].length).fill(0));
+            }
             
             console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
         } catch (error) {
@@ -433,7 +460,7 @@ class Neurex {
 
             this.hasSequentiallyBuild = true;
             this.num_layers = this.layers.length;
-            this.#recalculateShape();
+            
             this.#build();
             
             return layer_data; 
@@ -460,7 +487,7 @@ class Neurex {
         this.num_layers--;
         this.#recalculateShape();
 
-        const parametric = ["connected_layer", "convolutionalLayer"];
+        const parametric = this.parametric_layers;
         if (parametric.includes(removedLayer.layer_name)) {
             const weightIndex = this.layers.filter(l => parametric.includes(l.layer_name)).length;
             this.weights.splice(weightIndex, 1);
@@ -614,7 +641,7 @@ class Neurex {
 
                     let biasGrads = this.biasGrads;
 
-                    let batchLoss = 0;                    
+                    let batchLoss = 0;                  
 
                     // Accumulate gradients for each sample in the batch
                     for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
@@ -626,6 +653,8 @@ class Neurex {
                         const {predictions, activations, zs} = this.#Feedforward(input);
                         let deltas = [];
                         let dOutputlayer = [];
+                        
+
                         batchLoss += loss_function(predictions, actual);
 
                         // === STEP 1: Compute delta for output layer === //
@@ -645,7 +674,7 @@ class Neurex {
                             const a_prev = activations[l];
                             const layer_data_obj = this.layers[l];
 
-                            const parametric_layers = ["connected_layer","convolutionalLayer"];
+                            const parametric_layers = this.parametric_layers;
 
                             if (!parametric_layers.includes(layer_data_obj.layer_name)) {
                                 continue;
@@ -673,7 +702,7 @@ class Neurex {
                         
                         const layer_data_obj = this.layers[l];
 
-                        const parametric_layers = ["connected_layer","convolutionalLayer"];
+                        const parametric_layers = this.parametric_layers;
 
                         if (!parametric_layers.includes(layer_data_obj.layer_name)) {
                             continue;
@@ -834,7 +863,7 @@ class Neurex {
                     outputTensors, 
                     inputShape, 
                     outputShape, 
-                    paramShape } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
+                    paramShape, isParametric, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
                 this.currentSize = updatedSize;
                 this.currentShape = updatedShape;
@@ -844,9 +873,14 @@ class Neurex {
                 if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
                 if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
                 if (outputTensors.length > 0) this.output_layers_templates.push(outputTensors);
+                if (isParametric) this.parametric_layers.push(layer_data.layer_name);
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
                 layer_data.outputShape = outputShape || [];
+                if (overrides) {
+                    this.input_shape = overrides.input_shape; // to override the default `this.input_shape` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
+                    this.input_size = overrides.input_size; // to override the default `this.input_size` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
+                }
             });
 
             this.hasBuilt = true;
@@ -868,6 +902,7 @@ class Neurex {
             outputTensors, 
             inputShape, 
             outputShape, 
+            isParametric,
             paramShape } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
         this.currentSize = updatedSize;
@@ -878,6 +913,7 @@ class Neurex {
         if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
         if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
         if (outputTensors.length > 0) this.output_layers_templates.push(outputTensors);
+        if (isParametric) this.parametric_layers.push(layer_data.layer_name); 
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
         layer_data.outputShape = outputShape || [];
@@ -892,7 +928,7 @@ class Neurex {
         // (same pointer logic as feedforward)
         const layerPointers = [];
         let p = 0;
-        const parametric = ["connected_layer", "convolutionalLayer"];
+        const parametric = this.parametric_layers;
         for (let i = 0; i < this.layers.length; i++) {
             layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
         }
@@ -1042,6 +1078,11 @@ class Neurex {
                 W = 1;
                 D = layer.layer_size;
             }
+            else if (layer.layer_name === "EmbeddingLayer") {
+                H = 1;
+                W = 1;
+                D = layer.maxSequenceLength * layer.embeddingDim;
+            }
         }
 
         this.currentShape = [H, W, D];
@@ -1054,7 +1095,7 @@ class Neurex {
             const layer_data_obj = this.layers[l];
 
             // Only reset gradients for layers that actually HAVE weights/biases
-            if (layer_data_obj.layer_name === "connected_layer" || layer_data_obj.layer_name === "convolutionalLayer") {
+            if (this.parametric_layers.includes(layer_data_obj.layer_name)) {
                 if (this.weightGrads[pointer]) {
                     this.weightGrads[pointer].fill(0);
                 }

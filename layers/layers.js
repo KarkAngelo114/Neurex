@@ -17,6 +17,8 @@
 
 
 const {
+    getEmbeddings,
+    returnEmbeddings,
     MatMul, 
     DeltaMatMul, 
     computeWeightGradientsForWeightsInConnectedLayer, 
@@ -88,6 +90,119 @@ class Layers {
     }
 
     /**
+    * Creates an embedding layer for token encoding.
+    *
+    * @param {Number} vocabSize - The size of the vocabulary.
+    * @param {Number} embeddingDim - The size of the dense vector used to represent each token.
+    * @param {Number} maxSequenceLength - The length of the encoded token containing token IDs.
+    * @returns {Object} - The embedding layer object configuration
+    */
+    emebeddingLayer(vocabSize, embeddingDim, maxSequenceLength) {
+        if (vocabSize <= 0 || embeddingDim <= 0 || maxSequenceLength <= 0) throw new Error(`VocabSize or embeddingDim should not be a negative number or 0. vocabSize: ${vocabSize} | embeddingDim: ${embeddingDim} | maxSequenceLength: ${maxSequenceLength}`);
+
+        return {
+            layer_name:"EmbeddingLayer",
+            vocabSize: vocabSize,
+            embeddingDim: embeddingDim,
+            maxSequenceLength: maxSequenceLength,
+            initParams: (size, shape, layer_data) => {
+                
+                // Embedding layer can be added without input shape. So, we don't need to rely on the initial `size` and `shape` as it is just the default values from the constructor
+
+                // the embedding layer will determine the input size and shape for the next layer
+                const vocabSize = layer_data.vocabSize;
+                const embeddingDim = layer_data.embeddingDim;
+
+                const weightShape = [vocabSize, embeddingDim];
+                const updatedShape = [1, 1,  maxSequenceLength * embeddingDim]; // this will be use for the next layer
+                const updatedSize = maxSequenceLength * embeddingDim; // this will be use for the next layer
+
+                // use Xavier Initialization: arg1 is the 'vocabSize' and; arg2 is the 'embeddingDim'
+                const limit = XavierInitialization(vocabSize, embeddingDim);
+
+                // creates a physical look up table to adjust where to put the <PAD> and <UNK>, this is row-major
+                const lookUp = Array.from({length: vocabSize}, (_, i) => 
+                    // the index 0 row is reserved for <PAD> and must be filled with 0s, same for <UNK> which is index as 1
+                    i == 0 || i == 1 ? Array.from({length: embeddingDim}).fill(0) : Array.from({length: embeddingDim}, () => 
+                        (Math.random() * 2 - 1) * limit
+                    )
+                )
+
+                // flatten all to make it a 1D float32Array. Well index manually later on during feedforward and backprop (and gradient accumulation if it has to)
+                const weights = new Float32Array(lookUp.flat(Infinity));
+
+                // it has no biases, but since the core engine index weights and biases as well its corresponding zeroed initialized gradients together (meaning, if pointer index is 3, it will get the corresponding indexed weights and biases), 
+                // we just initialize it with 0s equal to embedding size so that the weights and biases has no decrepancy when indexing and still match together
+                const biases = new Float32Array(embeddingDim).fill(0);
+                
+                const weightGrads = new Float32Array(vocabSize * embeddingDim).fill(0);
+
+                const biasGrads = new Float32Array(embeddingDim).fill(0);
+
+                const output_template = new Float32Array(maxSequenceLength * embeddingDim);
+
+                return {
+                    updatedSize: updatedSize,
+                    updatedShape: updatedShape,
+                    weights: weights,
+                    biases: biases,
+                    weightGrads: weightGrads,
+                    biasGrads: biasGrads,
+                    outputTensors: output_template,
+                    inputShape: [],
+                    outputShape: updatedShape,
+                    paramShape: weightShape,
+                    isParametric: true,
+                    overrides: {
+                        // on core.js, the this.input_shape and this.input_size will be overwritten by these values
+                        input_shape: [1, 1, maxSequenceLength], // this tells that the input vector going to the embedding layer is 1 * 1 * maxSequenceLength. The length of the input vector must match the max sequence length
+                        input_size: maxSequenceLength
+                    }
+                }
+            },
+            determineInferenceType: () => {
+                throw new Error('Embedding layer cannot be an output layer.');
+                process.exit(1);
+            },
+            feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
+                const embeddingDim = current_layer.embeddingDim;
+
+                const output = getEmbeddings(input, embeddingDim, pointer, outputTemplatePointer);
+                return {
+                    outputs: output, 
+                    z_values: output,
+                    incrementor_value: 1
+                };
+            },
+            getOutputLayerDelta: () => {
+                throw new Error('Embedding layer cannot be an output layer.');
+                process.exit(1);
+            },
+            backpropagate: (next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
+                
+                let delta = next_delta;
+
+                if (nextLayer.layer_name === "connected_layer") {
+                    const [inputSize, outputSize] = nextLayer.weightShape;
+                    delta = DeltaMatMul(delta, inputSize, outputSize, pointer);
+                }
+
+                return {
+                    current_delta: delta,
+                    incrementor_value: 1
+                }
+            },
+            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => returnEmbeddings(activation_outputs, delta, weightGrads, layer_data.embeddingDim),
+            computeBiasGradients: (biasGrads, delta, layer_data) => {
+                // Embedding has no real biases — we used dummy zeros
+                // Just return as-is, nothing to compute
+                return biasGrads;
+            },
+            scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
+        }
+    }
+
+    /**
      * @method connectedLayer
      * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
      * @param {Number} layer_size specify the number of neuron for this layer.
@@ -149,7 +264,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: [],
                         outputShape: updatedShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: true,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -180,15 +296,15 @@ class Layers {
                         if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
                     }
 
-                    if (activation_function === "linear" && (lossFunc === "mae" || lossFunc === "mse")) {
+                    if (lossFunc === "mae" || lossFunc === "mse") {
                         return "regression";
                     }
 
-                    if ((activation_function === "sigmoid" || activation_function === "tanh") && (lossFunc === "binary_cross_entropy")) {
+                    if (lossFunc === "binary_cross_entropy") {
                         return "binary_classification";
                     }
 
-                    if (activation_function === "softmax" && (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy")) {
+                    if (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy") {
                         return "multi_class_classification";
                     }
 
@@ -224,10 +340,17 @@ class Layers {
                         
                     }
                     else if (tasktype === "regression") {
+                        if (preds.length != actuals.length) {
+                            throw new Error("Predictions array is not equal to actuals array");
+                        }
+
                         const lastLayerZs = zs[zs.length - 1]; 
                         const dAct = dActivation(lastLayerZs); 
 
                         dOutputLayer = scaleDiff(preds, actuals, dAct);
+
+                        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
+
                     }
 
                     return dOutputLayer;
@@ -237,7 +360,7 @@ class Layers {
                     const [inputSize, outputSize] = nextLayer.weightShape;
                     const dAct = dActivation(zs[layer_index]);
                     const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                    const current_delta = element_wise_mul(dAct, delta_res);     
+                    const current_delta = element_wise_mul(dAct, delta_res);
 
                     if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
 
@@ -269,7 +392,7 @@ class Layers {
      *
      * Allows you to add convolutional layers in your model architecture in sequential building.
      */
-    convolutionalLayer(filters = 3, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
+    convolutionalLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -347,7 +470,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: inputShape,
                         outputShape: outputShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: true,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -559,7 +683,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: inputShape,
                         outputShape: outputShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: false,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -631,5 +756,7 @@ class Layers {
         }
     }
 }
+
+
 
 module.exports = Layers;

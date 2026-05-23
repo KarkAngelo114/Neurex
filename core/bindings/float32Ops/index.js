@@ -82,6 +82,50 @@ exports.DLinear = (arr) => {
     return output;
 };
 
+
+exports.getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => {
+    const {globalWeights, globalOutputTensorTemplate} = getGlobalParams();
+
+    const lookup = globalWeights[pointer];
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    // helper function
+    const getRow = (tokenID) => {
+        const start = tokenID * embeddingDim;
+
+        return lookup.subarray(start, start + embeddingDim);
+    }
+
+    const sequence_length = tokenVector.length;
+
+    for (let i = 0; i < sequence_length; i++) {
+        const row = getRow(tokenVector[i]);
+
+        output.set(row, i * embeddingDim);
+    }
+
+    return output;
+}
+
+exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
+    const embeddingDim = dim;
+    
+    for (let i = 0; i < activation_outputs.length; i++) {
+        const tokenId = activation_outputs[i];
+    
+        if (tokenId === 0) continue;  // skip whos IDs are reserved index which is 0s <PAD>
+    
+        const gradOffset = tokenId * embeddingDim;
+        const deltaOffset = i * embeddingDim;
+    
+        for (let d = 0; d < embeddingDim; d++) {
+            weightGrads[gradOffset + d] += delta[deltaOffset + d];
+        }
+    }
+    
+    return weightGrads;
+}
+
 exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) => {
 
     /**
@@ -92,6 +136,7 @@ exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) 
     
     const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
+    
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
     z_values.set(globalBiases[pointer]);
 
