@@ -152,6 +152,7 @@ class Layers {
                     inputShape: [],
                     outputShape: updatedShape,
                     paramShape: weightShape,
+                    isParametric: true,
                     overrides: {
                         // on core.js, the this.input_shape and this.input_size will be overwritten by these values
                         input_shape: [1, 1, maxSequenceLength], // this tells that the input vector going to the embedding layer is 1 * 1 * maxSequenceLength. The length of the input vector must match the max sequence length
@@ -263,7 +264,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: [],
                         outputShape: updatedShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: true,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -390,7 +392,7 @@ class Layers {
      *
      * Allows you to add convolutional layers in your model architecture in sequential building.
      */
-    convolutionalLayer(filters = 3, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
+    convolutionalLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -468,7 +470,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: inputShape,
                         outputShape: outputShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: true,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -680,7 +683,8 @@ class Layers {
                         outputTensors: output_template,
                         inputShape: inputShape,
                         outputShape: outputShape,
-                        paramShape: weightShape
+                        paramShape: weightShape,
+                        isParametric: false,
                     }
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
@@ -751,8 +755,8 @@ class Layers {
             process.exit(1);
         }
     }
-
-    
 }
+
+
 
 module.exports = Layers;
