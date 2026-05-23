@@ -280,7 +280,8 @@ class Neurex {
                 poolSize: layer.poolSize || [],
                 embeddingDim: layer.embeddingDim,
                 vocabSize: layer.vocabSize,
-                maxSequenceLength: layer.maxSequenceLength
+                maxSequenceLength: layer.maxSequenceLength,
+                isParametric: layer.isParametric
 
             })),
             "input_size":this.input_size,
