@@ -480,7 +480,7 @@ declare module 'neurex' {
             layer.connectedLayer("softmax", 3);
         ]);
         */
-        inputShape(shapeConfig: Object): object;
+        inputShape(shapeConfig: Object): Object;
 
         /**
         * Creates an embedding layer for token encoding.
@@ -493,40 +493,47 @@ declare module 'neurex' {
         emebeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number): Object;
 
         /**
-        * @method connectedLayer
+        * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
         * @param {Number} layer_size specify the number of neuron for this layer.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
-        *
-        * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
-        * build connected layers or multilayer perceptron
         */
-        connectedLayer(activation: string, layer_size: number): object;
+        connectedLayer(activation: string, layer_size: number): Object;
 
         /**
         * 
-        * @method convolutionalLayer
+        * @method convolutionalLayer Allows you to add convolutional layers in your model architecture in sequential building.
         * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
         * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
         * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
         * @param {String} activation_function - the activation function to be use for this layer
         * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
         * @throws {Error} - if any of the parameters are invalid.
-        *
-        * Allows you to add convolutional layers in your model architecture in sequential building.
         */
-        convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): object;
+        convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): Object;
 
         /**
-        * @method maxPooling
+        * @method maxPooling `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
         * @param {Array<Number>} poolSize - determines the pool size window
         * @param {Number} strides - It determines how much the pool window slides across the input tensor. Default is `1`
         * @param {String} padding - `same` or `valid`. Default is `same`
         * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
-        *
-        * `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
         */
-        maxPooling(poolSize: Number[], strides: Number, padding: String): object;
+        maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
+
+        /**
+        * 
+        * @method transConvLayer `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
+        * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
+        * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
+        * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
+        * @param {String} activation_function the activation function to be use for this layer
+        * @param {Number} padding adds N amount of padding on all sides. Default is 0
+        * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize]) 
+        * @return {Object} transConv layer configs
+        * @throws {Error} if any of the parameters are invalid.
+        */
+        transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: Number, inputShape: Number[]): Object;
         
     }
 

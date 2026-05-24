@@ -155,7 +155,8 @@ class Neurex {
         this.layers.forEach((layer) => {
             const layerType = layer.layer_name;
             const activationName = layer.activation_function ? layer.activation_function.name : 'None';
-            const isParametric = layerType === 'convolutionalLayer' || layerType === 'connected_layer' || layerType === "EmbeddingLayer";
+
+            const isParametric = this.parametric_layers.includes(layerType);
 
             let paramCount = 0;
             if (isParametric) {
@@ -197,6 +198,14 @@ class Neurex {
                     activation = 'None';
                     params = paramCount.toLocaleString();
                     padding = "None"
+                    break;
+                
+                case "transConv":
+                    displayName = "Trans Conv Layer";
+                    outputShape = `(${layer.outputShape.join('x')})`;
+                    activation = activationName;
+                    params = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
                     break;
 
                 default:

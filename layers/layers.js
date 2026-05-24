@@ -24,7 +24,8 @@ const {
     computeWeightGradientsForWeightsInConnectedLayer, 
     computeBiasGradsForConnected_Layer,
     applyPadding,
-    Convolve, 
+    Convolve,
+    TransConvolve,
     Dilate_Input,
     ConvolveDelta,
     scaleGrads,
@@ -37,7 +38,7 @@ const {
     scaleDiff
 } = require('../core/bindings');
 
-const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization} = require('../utils/utils');
+const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization, calculateTransConvOutputShape} = require('../utils/utils');
 const activation = require('../core/bindings');
 const { red, reset } = require('../color-code');
 
@@ -563,10 +564,10 @@ class Layers {
                         const paddingN = next_layer.padding;
 
                         // dilate input
-                        const dilated = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
+                        const {data: dilated, dilatedH, dilatedW} = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
                         
-                        const dilatedH = (oHn - 1) * stridesN + 1;
-                        const dilatedW = (oWn - 1) * stridesN + 1;
+                        // const dilatedH = (oHn - 1) * stridesN + 1;
+                        // const dilatedW = (oWn - 1) * stridesN + 1;
 
                         let pT, pB, pL, pR;
                         if (paddingN === "valid") {
@@ -748,6 +749,211 @@ class Layers {
                 scaleGrads: () => {
                     // max pooling layer has no params like weights and biases, so no functions here :)
                 },
+            }
+        }
+        catch (error) {
+            console.error(error);
+            process.exit(1);
+        }
+    }
+
+    /**
+     * 
+     * @method transConvLayer
+     * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
+     * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
+     * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
+     * @param {String} activation_function the activation function to be use for this layer
+     * @param {Number} padding adds N amount of padding on all sides. Default is 0
+     * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize]) 
+     * @return {Object} transConv layer configs
+     * @throws {Error} if any of the parameters are invalid.
+     */
+    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 0, inputShape = [28, 28, 3]) {
+        try {
+            if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
+            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
+            if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
+            if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
+            if (!padding || padding <= 0) throw new Error(`[ERROR]-------- Padding cannot be empty, null, undefined, or a negative value: ${padding}`);
+            if (inputShape.length < 3) throw new Error(`[ERROR]------- [H, W, D] must be specified in the inputShape argumment: ${inputShape}`);
+            if (inputShape[0] <=0 || inputShape[1] <= 0 || inputShape[2] <= 0) throw new Error(`[ERROR]------- Input shape values cannot be 0 or a negative number: ${inputShape}`);
+
+            // check if the activation function is valid
+            const function_name = activation_function.toLowerCase();
+
+            if (!activation[function_name] || !activation.derivatives[function_name]) {
+                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
+            }
+
+            return {
+                layer_name: "transConv",
+                activation_function: activation[function_name],
+                derivative_activation_function: activation.derivatives[function_name],
+                kernel_size: kernel_size,
+                filters: filters,
+                padding: padding,
+                strides: strides,
+                initParams: (size, shape, layer_data) => {
+                    const [inputHeight, inputWidth, inputDepth] = inputShape;
+                    const expectedSize = inputHeight * inputWidth * inputDepth;
+                    if (size != expectedSize) throw new Error(`Previous layer size: ${size}. But transpose convolution having input shape ${inputShape} requires expected size: ${expectedSize}. `);
+
+                    const filters = layer_data.filters
+                    const [kernelHeight, kernelWidth] = layer_data.kernel_size;
+                    const S = layer_data.strides;
+                    const P = layer_data.padding;
+
+                    const {OutputHeight, OutputWidth, OutputSize, OutputShape} = calculateTransConvOutputShape(inputHeight, inputWidth, kernelHeight, kernelWidth, filters, S, P);
+
+                    const kernelShape = [filters, kernelHeight, kernelWidth, inputDepth];
+                    const kernelSize = filters * kernelHeight * kernelWidth * inputDepth;
+
+                    const weights = new Float32Array(kernelSize);
+                    const biases = new Float32Array(filters);
+                    const weightGrads = new Float32Array(kernelSize);
+                    const biasGrads = new Float32Array(filters);
+                    const output_tensor_template = new Float32Array(OutputSize);
+
+                    const fanIn = kernelHeight * kernelWidth * inputDepth;
+                    const fanOut = kernelHeight * kernelWidth * filters;
+                    const limit = XavierInitialization(fanIn, fanOut);
+
+                    for (let i = 0; i < kernelSize; i++) {
+                        weights[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    for (let i = 0; i < filters; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit;
+                    }
+
+                    return {
+                        updatedSize: OutputSize,
+                        updatedShape: OutputShape,
+                        weights: weights,
+                        biases: biases,
+                        weightGrads: weightGrads,
+                        biasGrads: biasGrads,
+                        outputTensors: output_tensor_template,
+                        inputShape: inputShape,
+                        outputShape: OutputShape,
+                        paramShape: kernelShape,
+                        isParametric: true,
+                    }
+                
+                },
+                determineInferenceType: (layerObject, lossFunc, trainY) => {
+                    
+                    let activation_function = layerObject.activation_function.name; // activation function
+                    // let layer_size = layerObject.layer_size; // layer size
+
+                    /* do a loop to check if the trainY length are the same as output size if the loss is a categorical cross entropy and the activation function is softmax
+                    * Example:
+                    * output size: 3
+                    * 
+                    * The trainY should be:
+                    * [
+                    *    [0, 0, 1],
+                    *    [1, 0, 0],
+                    *    [0, 1, 0],
+                    *    ....
+                    * ]
+                    */
+
+                    // if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
+                    //     trainY.forEach(label => {
+                    //         if (label.length != layer_size) throw new Error(`Output size must be the same number of classes. Number of classes: ${label.length} | Output layer size: ${layer_size}`);
+                    //     });
+
+                    //     // check also if the trainY are one hot encoded. Categorical Cross Entropy works wiht one-hot encoded labels
+                    //     const isOneHotEncoded = ifOneHotEndcoded(trainY);
+                    //     if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
+                    // }
+
+                    if (lossFunc === "mae" || lossFunc === "mse") {
+                        return "regression";
+                    }
+
+                    // if (lossFunc === "binary_cross_entropy") {
+                    //     return "binary_classification";
+                    // }
+
+                    // if (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy") {
+                    //     return "multi_class_classification";
+                    // }
+
+                    //  if none satisfies the conditions above, throw an error
+                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
+                },
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
+                    
+                    const strides = current_layer.strides;
+                    const [inputHeight, inputWidth, inputDepth] = current_layer.inputShape;
+                    const [OutputHeight, OutputWidth, OutputDepth] = current_layer.outputShape;
+                    const [filters, kernelHeight, kernelWidth, kernelDepth] = current_layer.weightShape;
+
+                    const {data, dilatedH, dilatedW} = Dilate_Input(input, [inputHeight, inputWidth, inputDepth], strides);
+
+                    if (data.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] - dilation of input for transpose conv has NaNs");
+
+                    const transConvRes = TransConvolve(data, strides, OutputHeight, OutputWidth, filters, kernelHeight, kernelWidth, inputDepth, dilatedH, dilatedW, pointer, outputTemplatePointer);
+
+                    if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] - Result of transpose conv has NaNs");
+
+                    const activation_function = activation[function_name];
+
+                    const outputs = activation_function(transConvRes);
+
+                    if (outputs.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] - activation output array has Nans");
+
+                    return {
+                        outputs: outputs,
+                        z_values: transConvRes,
+                        incrementor_value:1
+                    }
+
+                },
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+                    let dActivation = activation.derivatives[function_name];
+                    let dOutputLayer = new Float32Array(preds.length); 
+
+                    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
+                        dOutputLayer = element_wise_sub(preds, actuals);
+                    }
+                    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
+                        dOutputLayer.set(preds);
+                        dOutputLayer[actuals[0]] -= 1;
+                        
+                    }
+                    else if (tasktype === "regression") {
+                        if (preds.length != actuals.length) {
+                            throw new Error("Predictions array is not equal to actuals array");
+                        }
+
+                        const lastLayerZs = zs[zs.length - 1]; 
+                        const dAct = dActivation(lastLayerZs); 
+
+                        dOutputLayer = scaleDiff(preds, actuals, dAct);
+
+                        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
+
+                    }
+
+                    return dOutputLayer;
+                },
+                backpropagate: () => {
+
+                },
+                computeWeightGradients: () => {
+
+                },
+                computeBiasGradients: () => {
+
+                },
+                scaleGrads: () => {
+
+                }
+
             }
         }
         catch (error) {

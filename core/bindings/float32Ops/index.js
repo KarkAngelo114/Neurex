@@ -319,6 +319,51 @@ exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_heigh
     return output;
 };
 
+exports.TransConv = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => {
+    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
+
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    const rotatedKernels = RotateKernels(num_filters, kernel_height, kernel_width, depth, pointer);
+
+    for (let f = 0; f < num_filters; f++) {
+
+        const bias = globalBiases[pointer][f];
+
+        for (let y = 0; y < outputH; y++) {
+            for (let x = 0; x < outputW; x++) {
+
+                let sum = 0;
+
+                for (let ky = 0; ky < kernel_height; ky++) {
+                    for (let kx = 0; kx < kernel_width; kx++) {
+                        for (let c = 0; c < depth; c++) {
+
+                            const inY = y * strides + ky;
+                            const inX = x * strides + kx;
+
+                            if (inY < inputH && inX < inputW) {
+
+                                const inputIndex = ((inY * inputW + inX) * depth + c);
+
+                                const kernelIndex = (((f * kernel_height + ky) * kernel_width + kx) * depth + c);
+
+                                sum += input[inputIndex] * rotatedKernels[kernelIndex];
+                            }
+                        }
+                    }
+                }
+
+                const outIndex = ((y * outputW + x) * num_filters + f);
+
+                output[outIndex] = sum + bias;
+            }
+        }
+    }
+
+    return output;
+}
+
 exports.DilateDelta = (input, shape, stride) => {
     const [H, W, C] = shape;
     const dilatedH = (H - 1) * stride + 1;
@@ -339,7 +384,11 @@ exports.DilateDelta = (input, shape, stride) => {
         }
     }
 
-    return dilated;
+    return {
+        data: dilated,
+        dilatedHeight: dilatedH,
+        dilatedWidth: dilatedW
+    };
 };
 
 const RotateKernels = (F, KH, KW, D, pointer) => {

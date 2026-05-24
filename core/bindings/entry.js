@@ -52,6 +52,8 @@ const init = () => {
                 console.log(res.error);
                 // if "failed", we need to set the global boolean state on C++ to false to use CPU-based functions.
                 addon.setOnGPU(false);
+                functions = addon;
+                return;
             }
             
             console.log("Kernels successfully compiled...");
@@ -76,7 +78,7 @@ const init = () => {
 
 
 /**
- *  "☑️"
+ *  "✅☑️"
  * @function getEmbeddings
  * @param {Array<Number>} tokenVector an array of token vector 
  * @param {Number} embeddingDim embedding dim value
@@ -87,7 +89,7 @@ const init = () => {
 const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, pointer, outputTemplatePointer);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Array<Number>} activated_outputs activation outputs. During feedfoward, the activation outputs before going to the embedding layer is actually the raw token array
  * @param {Float32Array} delta float32array delta 
  * @param {Float32Array} weightGrads initialized 0s
@@ -212,35 +214,53 @@ const dlinear = (input) => functions.DLinear(input);
  * @param {Number} padRight 
  * @returns padded tensor
  */
-const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight)
+const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight);
+
+ /**
+  * "✅☑️"
+  * @param {Float32Array} input Float32Array input 
+  * @param {Number} strides Stride value 
+  * @param {Numebr} outputH Expected output height
+  * @param {Number} outputW Expected output width
+  * @param {Numebr} num_filters number of filters
+  * @param {Number} kernel_height kernel height
+  * @param {Number} kernel_width kernel width
+  * @param {Number} depth depth value
+  * @param {Number} inputH current input height
+  * @param {Number} inputW currnet input width
+  * @param {Number} pointer pointer value to get the matching parameter from the global store
+  * @param {Number} outputTemplatePointer pointer value to get the matching output template tensor from the global store 
+  * @returns {Float32Array} Convolution result
+  */
+const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer);
 
 /**
- * "✅☑️"
- * @param {Float32Array} input - padded input
- * @param {Float32Array} kernels - kernels of the current layer
- * @param {Float32Array} biases - biases for each kernels of the current layer
- * @param {number} strides - determines how many pixels the kernel will skip
- * @param {number} outputH - expected output height
- * @param {number} outputW - expected ouptut width
- * @param {number} num_filters - number of filters
- * @param {number} kernel_height - kernel height
- * @param {number} kernel_width - kernel width
- * @param {number} depth - depth
- * @param {number} inputH - input height of the padded input
- * @param {number} inputW - input widht of the padded input
- * @returns output float32 of the convolution
- */
-const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer);
+ * "☑️"
+ * @param {Float32Array} input Float32Array input 
+ * @param {Number} strides Stride value 
+ * @param {Numebr} outputH Expected output height
+ * @param {Number} outputW Expected output width
+ * @param {Numebr} num_filters number of filters
+ * @param {Number} kernel_height kernel height
+ * @param {Number} kernel_width kernel width
+ * @param {Number} depth depth value
+ * @param {Number} inputH current input height
+ * @param {Number} inputW currnet input width
+ * @param {Number} pointer pointer value to get the matching parameter from the global store
+ * @param {Number} outputTemplatePointer pointer value to get the matching output template tensor from the global store 
+ * @returns {Float32Array} Convolution result
+*/
+const TransConvolve =  (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.TransConv(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer); 
 
 
 /**
  * "✅☑️" dilate the input inserting 0s
- * @param {Float32Array} delta 
+ * @param {Float32Array} input 
  * @param {Array<Number>} shape_array 
  * @param {Number} strides 
- * @returns Dilated delta
+ * @returns Dilated Input
  */
-const Dilate_Input = (delta, shape_array, strides) => functions.DilateDelta(delta, shape_array, strides);
+const Dilate_Input = (input, shape_array, strides) => functions.DilateDelta(input, shape_array, strides);
 
 /**
  * "✅☑️" Perform delta convolution
@@ -414,6 +434,7 @@ module.exports = {
     linear,
     applyPadding,
     Convolve,
+    TransConvolve,
     Dilate_Input,
     ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
