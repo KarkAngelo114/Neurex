@@ -399,7 +399,7 @@ class Neurex {
                     const embeddingDim = layerData.embeddingDim;
                     const sequence_length = layerData.maxSequenceLength;
                     const outputSize = sequence_length * embeddingDim;
-                    newLayer = layerBuilder.emebeddingLayer(vocabSize, embeddingDim, sequence_length);
+                    newLayer = layerBuilder.embeddingLayer(vocabSize, embeddingDim, sequence_length);
                     newLayer.inputShape = [];
                     newLayer.outputShape = [1, 1, outputSize];
                     newLayer.weightShape = [vocabSize, embeddingDim];

@@ -81,6 +81,7 @@ const IntegerLabeling = async (data) => {
  */
 
 const BinaryLabeling = async (data) => {
+    let currentRow = 0;
     if (!data || !Array.isArray(data)) {
         throw new Error("[ERROR] No data provided or data is not an array.");
     }
@@ -99,10 +100,12 @@ const BinaryLabeling = async (data) => {
         if (!uniqueLabels.includes(label)) {
             uniqueLabels.push(label);
         }
+        currentRow++;
     });
 
     if (uniqueLabels.length !== 2) {
-        throw new Error("[ERROR] There must be exactly two classes for binary labeling.");
+        console.log(uniqueLabels);
+        throw new Error(`[ERROR] There must be exactly two classes for binary labeling. Check row ${currentRow+1}`);
     }
 
     // Map labels to binary values
