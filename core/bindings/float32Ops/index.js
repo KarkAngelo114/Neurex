@@ -325,7 +325,7 @@ exports.TransConv = (input, strides, outputH, outputW, num_filters, kernel_heigh
 
     const output = globalOutputTensorTemplate[outputTemplatePointer];
 
-    const rotatedKernels = RotateKernels(num_filters, kernel_height, kernel_width, depth, pointer);
+    // const rotatedKernels = RotateKernels(num_filters, kernel_height, kernel_width, depth, pointer);
 
     for (let f = 0; f < num_filters; f++) {
 
@@ -349,7 +349,7 @@ exports.TransConv = (input, strides, outputH, outputW, num_filters, kernel_heigh
 
                                 const kernelIndex = (((f * kernel_height + ky) * kernel_width + kx) * depth + c);
 
-                                sum += input[inputIndex] * rotatedKernels[kernelIndex];
+                                sum += input[inputIndex] * globalWeights[pointer][kernelIndex];
                             }
                         }
                     }
@@ -475,7 +475,7 @@ exports.TransConvolveDelta = (input, shape, kernels_shape, oH, oW, pointer) => {
     const [Hp, Wp, C_in] = shape;
     const [F, KH, KW, C_k] = kernels_shape;
 
-    const rotated_kernel = RotateKernels(F, KH, KW, C_k, pointer);
+    const {globalWeights} = getGlobalParams();
     const output = new Float32Array(oH * oW * C_k);
 
     for (let c_out = 0; c_out < C_k; c_out++) {
@@ -489,7 +489,7 @@ exports.TransConvolveDelta = (input, shape, kernels_shape, oH, oW, pointer) => {
                             if (ph < Hp && pw < Wp) { 
                                 const padIdx = (ph * Wp + pw) * C_in + f;
                                 const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                                sum += input[padIdx] * rotated_kernel[kernelIdx];
+                                sum += input[padIdx] * globalWeights[pointer][kernelIdx];
                             }
                         }
                     }
