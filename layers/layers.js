@@ -28,6 +28,7 @@ const {
     TransConvolve,
     Dilate_Input,
     ConvolveDelta,
+    TransConvDelta,
     scaleGrads,
     element_wise_mul,
     element_wise_sub,
@@ -35,6 +36,7 @@ const {
     MaxPool,
     MaxPoolDelta,
     ComputeGradientForKernels,
+    ComputeGradientForTransKernels,
     scaleDiff
 } = require('../core/bindings');
 
@@ -98,7 +100,7 @@ class Layers {
     * @param {Number} maxSequenceLength - The length of the encoded token containing token IDs.
     * @returns {Object} - The embedding layer object configuration
     */
-    emebeddingLayer(vocabSize, embeddingDim, maxSequenceLength) {
+    embeddingLayer(vocabSize, embeddingDim, maxSequenceLength) {
         if (vocabSize <= 0 || embeddingDim <= 0 || maxSequenceLength <= 0) throw new Error(`VocabSize or embeddingDim should not be a negative number or 0. vocabSize: ${vocabSize} | embeddingDim: ${embeddingDim} | maxSequenceLength: ${maxSequenceLength}`);
 
         return {
@@ -356,20 +358,41 @@ class Layers {
 
                     return dOutputLayer;
                 },
-                backpropagate: (next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
-                    const dActivation = activation.derivatives[function_name];
-                    const [inputSize, outputSize] = nextLayer.weightShape;
-                    const dAct = dActivation(zs[layer_index]);
+                backpropagate: (delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
+
+                let current_delta;
+                const dActivation = activation.derivatives[function_name];
+                const dAct = dActivation(zs[layer_index]);
+
+                // Scenario A: Coming backward from a Transpose Convolution Layer
+                if (nextLayer.layer_name === "transConv") {
+                    const [iHNext, iWNext, iDNext] = nextLayer.inputShape;
+                    const [oHNex, oWNex, oDNex] = nextLayer.outputShape;
+                    const [f, kh, kw, kd] = nextLayer.weightShape;
+
+                    // TransConvDelta maps the delta directly back to the spatial/flattened size of this Connected Layer
+                    const transConvRes = TransConvDelta(delta, [oHNex, oWNex, oDNex], [f, kh, kw, kd], iHNext, iWNext, pointer + 1);
+                    if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Trans conv result has NaNs");
+
+                    // Multiply directly with activation derivative; skip DeltaMatMul
+                    current_delta = element_wise_mul(dAct, transConvRes);
+                    
+                } else {
+                    // Scenario B: Standard Connected-to-Connected Layer backprop
+                    let next_delta = delta;
+                    const [inputSize, outputSize] = nextLayer.layer_name === "connected_layer" ? nextLayer.weightShape : current_layer.weightShape;
                     const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                    const current_delta = element_wise_mul(dAct, delta_res);
+                    
+                    current_delta = element_wise_mul(dAct, delta_res);
+                }
 
-                    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
+                if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");            
 
-                    return {
-                        current_delta,
-                        decrementor_value: 1
-                    };
-                },
+                return {
+                    current_delta,
+                    decrementor_value: 1
+                };
+            },
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
                 computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
@@ -927,7 +950,7 @@ class Layers {
                     }
                     else if (tasktype === "regression") {
                         if (preds.length != actuals.length) {
-                            throw new Error("Predictions array is not equal to actuals array");
+                            throw new Error(`Predictions array is not equal to actuals array: Preds vector length: ${preds.length} | Actuals vector length: ${actuals.length}`);
                         }
 
                         const lastLayerZs = zs[zs.length - 1]; 
@@ -941,17 +964,50 @@ class Layers {
 
                     return dOutputLayer;
                 },
-                backpropagate: () => {
+                backpropagate: (next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer) => {
+                    let derivativeActivation = activation.derivatives[function_name];
+                    const [oHCurr, oWCurr, oDCurr] = currentLayer.outputShape;
+                    const [oHNex, oWNex, oDNex] = next_layer.outputShape;
+                    const [f, kh, kw, kd] = next_layer.weightShape;
+                    const currentZ = zs[layer_index];
 
+                    const transConvRes = TransConvDelta(next_delta, [oHNex, oWNex, oDNex], [f, kh, kw, kd], oHCurr, oWCurr, pointer);
+                    if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Trans conv result has NaNs");
+
+                    const output = element_wise_mul(derivativeActivation(currentZ), transConvRes);
+                    if (output.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] NaNS occurred after element-wise operation");
+                    
+                    return {
+                        current_delta: output,
+                        decrementor_value: 1
+                    };
                 },
-                computeWeightGradients: () => {
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data, pointer) => {
+                    const strides = layer_data.strides;
+                    const [inputHeight, inputWidth, inputDepth] = layer_data.inputShape;
+                    const [OutputHeight, OutputWidth, OutputDepth] = layer_data.outputShape;
+                    const [filters, kernelHeight, kernelWidth, kernelDepth] = layer_data.weightShape;
 
+                    const { data: dilatedInput, dilatedH, dilatedW } = Dilate_Input(activation_outputs, [inputHeight, inputWidth, inputDepth], strides);
+
+                    const updatedGrads = ComputeGradientForTransKernels(dilatedInput, deltas, weightGrads, dilatedH, dilatedW, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth);
+
+                    if (updatedGrads.some(v => Number.isNaN(v))) {
+                        throw new Error("[TRANS CONV ERROR] - NaNs occurred during weight gradient computation");
+                    }
+
+                    return updatedGrads;
                 },
-                computeBiasGradients: () => {
 
+                computeBiasGradients: (biasgrads, deltas, layer_data) => {
+                    const [OutputHeight, OutputWidth, OutputDepth] = layer_data.outputShape;
+
+                    // Accumulate error deltas over the spatial output map for each filter channel
+                    return computeBiasGradsForConv(biasgrads, deltas, OutputHeight, OutputWidth, OutputDepth);
                 },
-                scaleGrads: () => {
 
+                scaleGrads: (grads, batchSize, layer_data) => {
+                    return scaleGrads(grads, batchSize);
                 }
 
             }
@@ -962,7 +1018,5 @@ class Layers {
         }
     }
 }
-
-
 
 module.exports = Layers;

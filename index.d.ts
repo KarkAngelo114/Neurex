@@ -448,10 +448,27 @@ declare module 'neurex' {
     */
     export function load_multiple_images(targetDir: String, resize: Number[], pixelFormat: String): Object;
 
+    /**
+     * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
+     * @param sentences an array of sentences or large corpus
+     * @returns {Array<String>} an array of tokenized words
+     */
     export function buildVocab(sentences: Array<String>): Array<String>;
 
-    export function buildWord2Id(vocab: Array<String>): Object;
+    /**
+     * @function buildWord2Id - this function assign unique token IDs to tokenized words. These token IDs will be use to `Encode` input tokenized words.
+     * @param {Array<String>} vocab tokenized words
+     * @returns {Object} an object containing key value pairs. Each key (words) has corresponding value (token ID)
+     */
+    export function buildWord2Id(vocab: String[]): Object;
 
+    /**
+     * @function Encode - this function tokenize a sentence and assign token IDs returning an array of token IDs.
+     * @param {String} sentence input sentence or prompt
+     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on based on the words in `buildWord2Id_output`
+     * @param {Number} max_length The length of the encoded token containing token IDs.
+     * @returns {Array<Number>} an array of token IDs to be use for token embeddings in the embedding layer 
+     */
     export function Encode(sentence: String, buildWord2Id_output: Object, max_length: Number): Array<Number>;
 
     /**
@@ -483,14 +500,13 @@ declare module 'neurex' {
         inputShape(shapeConfig: Object): Object;
 
         /**
-        * Creates an embedding layer for token encoding.
-        *
-        * @param {Number} vocabSize - The size of the vocabulary.
-        * @param {Number} embeddingDim - The size of the dense vector used to represent each token.
-        * @param {Number} maxSequenceLength - The length of the encoded token containing token IDs.
-        * @returns {Object} - The embedding layer object configuration
+        * @method embeddingLayer Creates an embedding layer for token encoding.
+        * @param {Number} vocabSize The size of the vocabulary.
+        * @param {Number} embeddingDim The size of the dense vector used to represent each token.
+        * @param {Number} maxSequenceLength The length of the encoded token containing token IDs.
+        * @returns {Object} The embedding layer object configuration
         */
-        emebeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number): Object;
+        embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number): Object;
 
         /**
         * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
@@ -503,20 +519,22 @@ declare module 'neurex' {
         /**
         * 
         * @method convolutionalLayer Allows you to add convolutional layers in your model architecture in sequential building.
-        * @param {Number} filters - the number of filters for this convolutional layer. Produces the same number of output features
-        * @param {Number} strides - It determines how much the filter overlaps with the input as it slides across.
-        * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
-        * @param {String} activation_function - the activation function to be use for this layer
-        * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
-        * @throws {Error} - if any of the parameters are invalid.
+        * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
+        * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
+        * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
+        * @param {String} activation_function the activation function to be use for this layer
+        * @param {String} padding adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+        * @returns {Object} The convolutional layer object configuration
+        * @throws {Error} if any of the parameters are invalid.
         */
         convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): Object;
 
         /**
-        * @method maxPooling `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
-        * @param {Array<Number>} poolSize - determines the pool size window
-        * @param {Number} strides - It determines how much the pool window slides across the input tensor. Default is `1`
-        * @param {String} padding - `same` or `valid`. Default is `same`
+        * @method maxPooling is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
+        * @param {Array<Number>} poolSize determines the pool size window
+        * @param {Number} strides It determines how much the pool window slides across the input tensor. Default is `1`
+        * @param {String} padding `same` or `valid`. Default is `same`
+        * @returns {Object} The max pooling layer configuration
         * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
         */
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
@@ -584,9 +602,9 @@ declare module 'neurex' {
 
     /**
     * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
-    * @param {Array<Number>} flat_arr_1 - a flat array input
-    * @param {Array<Number>} flat_arr_2 - a flat array input
-    * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
+    * @param {Array<Number>} flat_arr_1 a flat array input
+    * @param {Array<Number>} flat_arr_2  a flat array input
+    * @returns {Float32Array} A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
     * @throws an error will occured if both array are not equal in length
     */
     export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
@@ -594,19 +612,19 @@ declare module 'neurex' {
 
     /**
     * @function element_wise_sub use to subtract elements inside both arrays. Requires both arrays has same length;
-    * @param {Array<Number>} flat_arr_1 - a flat array input
-    * @param {Array<Number>} flat_arr_2 - a flat array input
-    * @returns A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
+    * @param {Array<Number>} flat_arr_1 a flat array input
+    * @param {Array<Number>} flat_arr_2 a flat array input
+    * @returns {Float32Array} A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
     * @throws an error will occured if both array are not equal in length
     */
     export function element_wise_sub(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
 
     /**
      * @function scaleDiff a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
-     * @param arr1 - a flat array input
-     * @param arr2 - a flat array input
-     * @param arr3 - a flat array input
-     * @returns A flat array output after performing `(arr1[i] - arr2[i]) * arr3[i]`
+     * @param arr1 a flat array input
+     * @param arr2 a flat array input
+     * @param arr3 a flat array input
+     * @returns {Float32Array} A flat array output after performing `(arr1[i] - arr2[i]) * arr3[i]`
      * @throws an error will occured if both array are not equal in length
      */
     export function scaleDiff(arr1: Number[], arr2: Number[], arr3: Number[]): Float32Array;

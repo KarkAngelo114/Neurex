@@ -1,11 +1,14 @@
-const tokenize = (sentence) => sentence
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, "")
-    .trim()
-    .split(/\s+/);
+const tokenize = (sentence) => {
+    return sentence
+        .toLowerCase()
+        .match(/[a-z]+|\d+|[^\w\s]/g) || [];
+};
 
 exports.buildVocab = (sentences) => {
-    let data = Array.isArray(sentences) ? sentences : [sentences];
+    const data = Array.isArray(sentences)
+        ? sentences
+        : [sentences];
+
     return [...new Set(data.flatMap(tokenize))];
 };
 
