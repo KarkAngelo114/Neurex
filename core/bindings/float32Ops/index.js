@@ -319,6 +319,7 @@ exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_heigh
     return output;
 };
 
+
 exports.TransConv = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => {
     const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
 

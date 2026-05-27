@@ -915,11 +915,11 @@ class Layers {
                     const [OutputHeight, OutputWidth, OutputDepth] = current_layer.outputShape;
                     const [filters, kernelHeight, kernelWidth, kernelDepth] = current_layer.weightShape;
 
-                    const {data, dilatedH, dilatedW} = Dilate_Input(input, [inputHeight, inputWidth, inputDepth], strides);
+                    const {data, dilatedHeight, dilatedWidth} = Dilate_Input(input, [inputHeight, inputWidth, inputDepth], strides);
 
                     if (data.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] - dilation of input for transpose conv has NaNs");
 
-                    const transConvRes = TransConvolve(data, strides, OutputHeight, OutputWidth, filters, kernelHeight, kernelWidth, inputDepth, dilatedH, dilatedW, pointer, outputTemplatePointer);
+                    const transConvRes = TransConvolve(data, strides, OutputHeight, OutputWidth, filters, kernelHeight, kernelWidth, inputDepth, dilatedHeight, dilatedWidth, pointer, outputTemplatePointer);
 
                     if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] - Result of transpose conv has NaNs");
 
@@ -988,9 +988,9 @@ class Layers {
                     const [OutputHeight, OutputWidth, OutputDepth] = layer_data.outputShape;
                     const [filters, kernelHeight, kernelWidth, kernelDepth] = layer_data.weightShape;
 
-                    const { data: dilatedInput, dilatedH, dilatedW } = Dilate_Input(activation_outputs, [inputHeight, inputWidth, inputDepth], strides);
+                    const { data: dilatedInput, dilatedHeight, dilatedWidth } = Dilate_Input(activation_outputs, [inputHeight, inputWidth, inputDepth], strides);
 
-                    const updatedGrads = ComputeGradientForTransKernels(dilatedInput, deltas, weightGrads, dilatedH, dilatedW, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth);
+                    const updatedGrads = ComputeGradientForTransKernels(dilatedInput, deltas, weightGrads, dilatedHeight, dilatedWidth, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth);
 
                     if (updatedGrads.some(v => Number.isNaN(v))) {
                         throw new Error("[TRANS CONV ERROR] - NaNs occurred during weight gradient computation");
