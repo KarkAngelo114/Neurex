@@ -18,6 +18,7 @@ exports.setGlobalParams = (weights, biases, outputTemplates) => {
 }
 
 /** 
+ * Use to get paramters from the global store. 
  * @returns {Object}
 */
 exports.getGlobalParams = () => {

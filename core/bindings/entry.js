@@ -233,26 +233,6 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
   * @returns {Float32Array} Convolution result
   */
 const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer);
-
-/**
- * "☑️"
- * @param {Float32Array} input Float32Array input 
- * @param {Number} strides Stride value 
- * @param {Numebr} outputH Expected output height
- * @param {Number} outputW Expected output width
- * @param {Numebr} num_filters number of filters
- * @param {Number} kernel_height kernel height
- * @param {Number} kernel_width kernel width
- * @param {Number} depth depth value
- * @param {Number} inputH current input height
- * @param {Number} inputW currnet input width
- * @param {Number} pointer pointer value to get the matching parameter from the global store
- * @param {Number} outputTemplatePointer pointer value to get the matching output template tensor from the global store 
- * @returns {Float32Array} Convolution result
-*/
-const TransConvolve =  (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.TransConv(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer); 
-
-
 /**
  * "✅☑️" dilate the input inserting 0s
  * @param {Float32Array} input 
@@ -272,18 +252,6 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
  * @returns output delta convolution
  */
 const ConvolveDelta = (input, padded_delta_shape, kernel_shape, oh, ow, pointer) => functions.ConvolveDelta(input, padded_delta_shape, kernel_shape, oh, ow, pointer);
-
-/**
- * "☑️"
- * @param {Float32Array} input float32array input 
- * @param {Array<Number>} outputShape input shape [oH, oW, oF] 
- * @param {Array<Number>} kernelShape kernel shape [f, kh, kw, c_in]
- * @param {Number} prev_dim_H previous input height 
- * @param {Number} prev_dim_W previous input width
- * @param {Number} pointer pointer value to get the corresponding kernels from the global store 
- * @returns {Float32Array} float32array output
- */
-const TransConvDelta = (input, outputShape, kernelShape, prev_dim_H, prev_dim_W, pointer) => functions.TransConvolveDelta(input, outputShape, kernelShape, prev_dim_H, prev_dim_W, pointer);
 
 /**
  * 
@@ -338,24 +306,6 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
  * @returns 
  */
 const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => functions.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
-
-/**
- * "☑️"
- * @param {Float32Array} dilatedInput the dilated input 
- * @param {Float32Array} delta delta input
- * @param {Float32Array} weightGrads initialized gradient accumulator
- * @param {Number} dilatedH dilated height value 
- * @param {Number} dilatedW dilated width value
- * @param {Number} inputDepth depth value
- * @param {Number} OutputHeight output height value
- * @param {Number} OutputWidth output width value
- * @param {Number} OutputDepth output depth value
- * @param {Number} filters number of filters
- * @param {Number} kernelHeight kernel height value
- * @param {Number} kernelWidth kernel width value
- * @returns {Float32Array} accumulated gradients
- */
-const ComputeGradientForTransKernels = (dilatedInput, delta, weightGrads, dilatedH, dilatedW, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth) => functions.computeTransKernelGradients(dilatedInput, delta, weightGrads, dilatedH, dilatedW, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth);
 
 /**
  * "✅☑️"
@@ -451,6 +401,8 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTempla
  */
 const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
 
+
+
 module.exports = {
     getEmbeddings,
     returnEmbeddings,
@@ -463,13 +415,10 @@ module.exports = {
     linear,
     applyPadding,
     Convolve,
-    TransConvolve,
     Dilate_Input,
     ConvolveDelta,
-    TransConvDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,
-    ComputeGradientForTransKernels,
     computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
     scaleGrads,

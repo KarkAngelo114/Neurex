@@ -29,30 +29,6 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
  * @param {Number} kernelH - height of the kernel
  * @param {Number} kernelW - width of the kernel
  * @param {Number} stride - stride value
- * @param {Number} paddingValue - padding value 
- * @returns {Object}
- */
-const calculateTransConvOutputShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, paddingValue) => {
-    const output_height = (inputHeight - 1) * stride + kernelHeight - 2 * paddingValue;
-    const output_width = (inputWidth - 1) * stride + kernelWidth - 2 * paddingValue;
-    
-    const calculatedSize = output_height * output_width * depth;
-
-    return {
-        OutputHeight: output_height,
-        OutputWidth: output_width,
-        OutputSize: calculatedSize,
-        OutputShape: [output_height, output_width, depth]
-    }
-};
-
-/**
- * 
- * @param {Number} inputH - height of the input
- * @param {Number} inputW - width of the input 
- * @param {Number} kernelH - height of the kernel
- * @param {Number} kernelW - width of the kernel
- * @param {Number} stride - stride value
  * @param {String} padding - "same" or "valid"
  * @returns 
  */
@@ -128,7 +104,6 @@ const formatDuration = (totalSeconds) => {
 
 module.exports = {
     calculateTensorShape,
-    calculateTransConvOutputShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,

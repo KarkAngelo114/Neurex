@@ -16,7 +16,7 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
-const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration } = require('../utils');
+const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration, calculateTransConvOutputShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init } = require('./bindings');
@@ -1071,7 +1071,7 @@ class Neurex {
                 H = OutputHeight;
                 W = OutputWidth;
                 D = filters;
-            } 
+            }
             else if (layer.layer_name === "maxPooling") {
                 const [poolHeight, poolWidth] = layer.poolSize;
                 const stride = layer.strides;
@@ -1113,6 +1113,10 @@ class Neurex {
                 }
                 pointer++; // Increment only when a parametric layer is found
             }
+        }
+
+        for (const template of this.output_layers_templates) {
+            template.fill(0);
         }
     }
 }

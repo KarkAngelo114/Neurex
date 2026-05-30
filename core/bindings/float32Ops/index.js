@@ -320,51 +320,6 @@ exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_heigh
 };
 
 
-exports.TransConv = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => {
-    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
-
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
-
-    // const rotatedKernels = RotateKernels(num_filters, kernel_height, kernel_width, depth, pointer);
-
-    for (let f = 0; f < num_filters; f++) {
-
-        const bias = globalBiases[pointer][f];
-
-        for (let y = 0; y < outputH; y++) {
-            for (let x = 0; x < outputW; x++) {
-
-                let sum = 0;
-
-                for (let ky = 0; ky < kernel_height; ky++) {
-                    for (let kx = 0; kx < kernel_width; kx++) {
-                        for (let c = 0; c < depth; c++) {
-
-                            const inY = y + ky;
-                            const inX = x + kx;
-
-                            if (inY < inputH && inX < inputW) {
-
-                                const inputIndex = ((inY * inputW + inX) * depth + c);
-
-                                const kernelIndex = (((f * kernel_height + ky) * kernel_width + kx) * depth + c);
-
-                                sum += input[inputIndex] * globalWeights[pointer][kernelIndex];
-                            }
-                        }
-                    }
-                }
-
-                const outIndex = ((y * outputW + x) * num_filters + f);
-
-                output[outIndex] = sum + bias;
-            }
-        }
-    }
-
-    return output;
-}
-
 exports.DilateInput = (input, shape, stride) => {
     const [H, W, C] = shape;
     const dilatedH = (H - 1) * stride + 1;
@@ -463,44 +418,6 @@ exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, poin
     return output;
 };
 
-/**
- * 
- * @param {Float32Array} padded 
- * @param {Array<Number>} padded_delta_shape - [Hp, Wp, C]
- * @param {Float32Array} rotatedKernels 
- * @param {Array<Number>} kernels_shape - [F, KH, KW, C]
- * @returns {Float32Array} output tensor [H, W, F]
- */
-exports.TransConvolveDelta = (input, shape, kernels_shape, oH, oW, pointer) => {
-    const [Hp, Wp, C_in] = shape;
-    const [F, KH, KW, C_k] = kernels_shape;
-
-    const {globalWeights} = getGlobalParams();
-    const output = new Float32Array(oH * oW * C_k);
-
-    for (let c_out = 0; c_out < C_k; c_out++) {
-        for (let h = 0; h < oH; h++) {
-            for (let w = 0; w < oW; w++) {
-                let sum = 0;
-                for (let kh = 0; kh < KH; kh++) {
-                    for (let kw = 0; kw < KW; kw++) {
-                        for (let f = 0; f < F; f++) {
-                            const ph = h + kh, pw = w + kw;
-                            if (ph < Hp && pw < Wp) { 
-                                const padIdx = (ph * Wp + pw) * C_in + f;
-                                const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                                sum += input[padIdx] * globalWeights[pointer][kernelIdx];
-                            }
-                        }
-                    }
-                }
-                output[(h * oW + w) * C_k + c_out] = sum;
-            }
-        }
-    }
-    return output;
-};
-
 exports.computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     for (let f = 0; f < numFilters; f++) {
         let sum = 0;
@@ -558,41 +475,6 @@ exports.computeKernelGradients = (input, delta, weightGrads, inputH, inputW, Cin
     return weightGrads;
 }
 
-exports.computeTransKernelGradients = (dilatedInput, delta, weightGrads, dilatedH, dilatedW, inputDepth, OutputHeight, OutputWidth, OutputDepth, filters, kernelHeight, kernelWidth) => {
-    const padH = Math.floor(kernelHeight / 2);
-    const padW = Math.floor(kernelWidth / 2);
-
-    for (let f = 0; f < filters; f++) {
-        for (let kh = 0; kh < kernelHeight; kh++) {
-            for (let kw = 0; kw < kernelWidth; kw++) {
-                for (let c = 0; c < inputDepth; c++) {
-                    
-                    let sum = 0;
-
-                    for (let h = 0; h < OutputHeight; h++) {
-                        for (let w = 0; w < OutputWidth; w++) {
-
-                            const inH = h + kh - padH;
-                            const inW = w + kw - padW;
-
-                            if (inH >= 0 && inH < dilatedH && inW >= 0 && inW < dilatedW) {
-                                const inputIndex = (inH * dilatedW + inW) * inputDepth + c;
-                                const deltaIndex = (h * OutputWidth + w) * OutputDepth + f;
-
-                                sum += dilatedInput[inputIndex] * delta[deltaIndex];
-                            }
-                        }
-                    }
-
-                    const gradIndex = ((f * kernelHeight + kh) * kernelWidth + kw) * inputDepth + c;
-                    weightGrads[gradIndex] += sum;
-                }
-            }
-        }
-    }
-
-    return weightGrads;
-};
 
 exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
     const {globalOutputTensorTemplate} = getGlobalParams();

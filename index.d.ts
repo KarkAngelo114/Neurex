@@ -538,21 +538,6 @@ declare module 'neurex' {
         * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
         */
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
-
-        /**
-        * 
-        * @method transConvLayer `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
-        * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
-        * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
-        * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
-        * @param {String} activation_function the activation function to be use for this layer
-        * @param {Number} padding adds N amount of padding on all sides. Default is 0
-        * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize]) 
-        * @return {Object} transConv layer configs
-        * @throws {Error} if any of the parameters are invalid.
-        */
-        transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: Number, inputShape: Number[]): Object;
-        
     }
 
     /**
