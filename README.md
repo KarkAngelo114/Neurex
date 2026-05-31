@@ -111,8 +111,6 @@ const { Neurex, Layers, templates } = require('neurex');
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/api#templates).
 
 # Test the Experimental Upcoming Updates 🔥
-> ⚠️ This version is currently under active development and may contain breaking changes, bugs, or incomplete features.
-
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.
 
 ## Install from GitHub
