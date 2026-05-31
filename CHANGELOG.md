@@ -1,4 +1,4 @@
-# v0.0.9
+# v0.0.9 (Latest)
 ### What's New
 - major overhaul of the entire core functionalities of the library to use float32array
 - 2x performance boost due to type arrays
@@ -13,7 +13,7 @@
 - `Interpreter` class has been removed. You can now directly use the loading function with the main class.
 
 
-# v0.0.7 (latest)
+# v0.0.7 
 ### What's New
 - introduced sequential stacking (via `sequentialBuild`)
 - more internal functions are modular
