@@ -98,7 +98,7 @@ const layer = new Layers();
 })();
 ```
 
-_Note: `nrx` (or neurex) models are proprietary model file format in `Neurex` only.
+_Note: `nrx` (or neurex) models are proprietary model file format in `Neurex` only._
 
 ## Loading, popping and adding new layers for transfer learning
 
