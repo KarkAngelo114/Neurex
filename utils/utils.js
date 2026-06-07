@@ -4,7 +4,7 @@ const XavierInitialization = (inputSize, outputSize) => {
     return Math.sqrt(2 / (inputSize + outputSize));
 }
 
-const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, padding) => {
+const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, outputdepth, stride, padding) => {
     // console.log(inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, padding);
     let oH, oW;
     if (padding === "same") {
@@ -19,6 +19,24 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
         OutputHeight: oH,
         OutputWidth: oW,
         CalculatedTensorShape: oH * oW * depth
+    };
+};
+
+const calculateTransposedConvShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, outputdepth, stride, padding) => {
+    let oH, oW;
+
+    if (padding === "same") {
+        oH = inputHeight * stride;
+        oW = inputWidth * stride;
+    } else {
+        oH = (inputHeight - 1) * stride + kernelHeight;
+        oW = (inputWidth - 1) * stride + kernelWidth;
+    }
+
+    return {
+        OutputHeight: oH,
+        OutputWidth: oW,
+        CalculatedTensorShape: oH * oW * outputdepth
     };
 };
 
@@ -104,6 +122,7 @@ const formatDuration = (totalSeconds) => {
 
 module.exports = {
     calculateTensorShape,
+    calculateTransposedConvShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,
