@@ -37,6 +37,7 @@ const {
     scaleDiff
 } = require('../core/bindings');
 
+const float32Ops = require('../core/bindings/float32Ops/index');
 const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization, calculateTransposedConvShape} = require('../utils/utils');
 const activation = require('../core/bindings');
 const { red, reset } = require('../color-code');
@@ -179,7 +180,6 @@ class Layers {
                 process.exit(1);
             },
             backpropagate: (next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
-                
                 let delta = next_delta;
 
                 if (nextLayer.layer_name === "connected_layer") {
@@ -355,14 +355,56 @@ class Layers {
 
                     return dOutputLayer;
                 },
-                backpropagate: (next_delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
-                    const dActivation = activation.derivatives[function_name];
-                    const [inputSize, outputSize] = nextLayer.weightShape;
-                    const dAct = dActivation(zs[layer_index]);
-                    const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                    const current_delta = element_wise_mul(dAct, delta_res);
+                backpropagate: (delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
 
-                    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");            
+                    let current_delta;
+                    const dActivation = activation.derivatives[function_name];
+                    const dAct = dActivation(zs[layer_index]);
+
+                    // Scenario A: Coming backward from a Transpose Convolution Layer
+                    if (nextLayer.layer_name === "transConv") {
+                        const [iHNext, iWNext, iDNext] = nextLayer.inputShape;
+                        const [oHNex, oWNex, oDNex] = nextLayer.outputShape;
+                        const [f, kh, kw, kd] = nextLayer.weightShape;
+                        const stridesNext = nextLayer.strides;
+                        const paddingNext = nextLayer.padding;
+
+                        //pad so ConvolveDelta yields [iHNext, iWNext]
+                        let pT, pB, pL, pR;
+                        if (paddingNext === "valid") {
+                            pT = pB = kh - 1;
+                            pL = pR = kw - 1;
+                        } else {
+                            pT = Math.floor((kh - 1) / 2); pB = (kh - 1) - pT;
+                            pL = Math.floor((kw - 1) / 2); pR = (kw - 1) - pL;
+
+                            const needH = iHNext + kh - 1;
+                            const needW = iWNext + kw - 1;
+                            const haveH = oHNex + pT + pB;
+                            const haveW = oWNex + pL + pR;
+                            if (haveH < needH) pB += (needH - haveH);
+                            if (haveW < needW) pR += (needW - haveW);
+                        }
+
+                        //apply padding, then ConvolveDelta
+                        const { data: paddedDelta, shape: paddedShape } = applyPadding(delta, oHNex, oWNex, oDNex, pT, pB, pL, pR);
+
+                        const transConvRes = ConvolveDelta(paddedDelta, paddedShape, [f, kh, kw, kd], iHNext, iWNext, pointer + 1, stridesNext);
+                        if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Trans conv result has NaNs");
+
+                        // Multiply directly with activation derivative; skip DeltaMatMul
+                        current_delta = element_wise_mul(dAct, transConvRes);
+                        
+                    } else {
+                        // Scenario B: Standard Connected-to-Connected Layer backprop
+                        let next_delta = delta;
+                        const [inputSize, outputSize] = nextLayer.layer_name === "connected_layer" ? nextLayer.weightShape : current_layer.weightShape;
+                        const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
+                        
+                        current_delta = element_wise_mul(dAct, delta_res);
+                    }
+
+                    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");            
 
                     return {
                         current_delta,
@@ -439,7 +481,6 @@ class Layers {
                     let kernelGrads = new Float32Array(TotalSize);
                     let biases = new Float32Array(filters);
                     let biasGrads = new Float32Array(filters);
-
                     const fanIn = kH * kW * inputDepth;
                     const fanOut = kH * kW * filters;
                     const limit = XavierInitialization(fanIn, fanOut);
@@ -476,27 +517,12 @@ class Layers {
                 },
                 determineInferenceType: (layerObject, lossFunc, trainY) => {
 
-                    if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
-                        // check if the trainY are one hot encoded. Categorical Cross Entropy works wiht one-hot encoded labels
-                        const isOneHotEncoded = ifOneHotEndcoded(trainY);
-                        if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
-                    }
-
-                    if (activation_function === "linear" && (lossFunc === "mae" || lossFunc === "mse")) {
-                        return "regression";
-                    }
-
-                    if ((activation_function === "sigmoid" || activation_function === "tanh") && (lossFunc === "binary_cross_entropy")) {
-                        return "binary_classification";
-                    }
-
-                    if (activation_function === "softmax" && (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy")) {
-                        return "multi_class_classification";
-                    }
+                    throw new Error('Convolutional layer cannot be an output layer for now');
 
                     /**
                     * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
                     */
+                    
                 },
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
                     
@@ -799,9 +825,6 @@ class Layers {
                 "strides":strides,
                 initParams: (size, shape, layer_data) => {
 
-                    // in order not to repeatedly pass `inputShape` when adding trans conv layer, we use Math.max() 
-                    // to compare the shape[h, w, d] to default value (or if a new value passed to inputShape parameter) 
-                    // which values are bigger
                     let inputHeight = inputShape[0];
                     let inputWidth = inputShape[1];
                     let inputDepth = inputShape[2];
@@ -865,7 +888,7 @@ class Layers {
                     }
 
                     //  if none satisfies the conditions above, throw an error
-                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
+                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
                 },
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
                     
@@ -876,6 +899,7 @@ class Layers {
                     const [OutputHeight, OutputWidth] = current_layer.outputShape;
 
                     // 1. dilate input
+                    // const {data, dilatedHeight, dilatedWidth} = float32Ops.DilateInput(input, current_layer.inputShape, strides);
                     const {data, dilatedHeight, dilatedWidth} = Dilate_Input(input, current_layer.inputShape, strides);
                     if (data.some(Number.isNaN)) throw new Error('[Trans Conv Error]------ NaNs detected after input dilation');
 
@@ -887,13 +911,84 @@ class Layers {
                     const activation_function = activation[function_name];
                     const outputs = activation_function(convolve_result);
                     if (outputs.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error]------ output array has Nans after applying activation");
-
+                    current_layer.preDilated = input;
                     return {
                         outputs: outputs,
                         z_values: convolve_result,
                         incrementor_value: 1
                     };
                 },
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+                    let dOutputLayer = new Float32Array(preds.length); 
+                    const lastLayerZs = zs[zs.length - 1]; 
+
+                    dOutputLayer = element_wise_sub(preds, actuals); // performs p[i] - a[i] = d[i]
+
+                    return dOutputLayer;
+                },
+                backpropagate: (next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer) => {
+                    let Current_Z = zs[layer_index];
+                    let dActivation = activation.derivatives[function_name];
+                    let dL_dActivation;
+
+                    const [Fn, KHn, KWn, KCn] = next_layer.weightShape;
+                    const [oHn, oWn, oDn] = next_layer.outputShape;
+                    const [oHcurr, oWcurr] = currentLayer.outputShape;
+                    const stridesN = next_layer.strides;
+                    const paddingN = next_layer.padding;
+
+                    //pad the dilated delta so ConvolveDelta produces output of shape [oHcurr, oWcurr]
+                    let pT, pB, pL, pR;
+                    if (paddingN === "valid") {
+                        pT = pB = KHn - 1;
+                        pL = pR = KWn - 1;
+                    } else {
+                        // "same": start with symmetric K-1 split, then extend bottom/right if needed
+                        pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
+                        pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
+
+                        const needH = oHcurr + KHn - 1;
+                        const needW = oWcurr + KWn - 1;
+                        const haveH = oHn + pT + pB;
+                        const haveW = oWn + pL + pR;
+                        if (haveH < needH) pB += (needH - haveH);
+                        if (haveW < needW) pR += (needW - haveW);
+                    }
+
+                    // apply padding, then run ConvolveDelta with real padded dims
+                    const { data: paddedDelta, shape: paddedShape } = applyPadding(next_delta, oHn, oWn, oDn, pT, pB, pL, pR);
+
+                    dL_dActivation = ConvolveDelta(paddedDelta, paddedShape, [Fn, KHn, KWn, KCn], oHcurr, oWcurr, pointer, strides);
+                    if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Conv delta result has NaNs");
+
+                    const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
+                    if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
+
+                    return {
+                        current_delta: output,
+                        decrementor_value: 1
+                    }
+                },
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
+                    const [filters, kH, kW, inDepth] = layer_data.weightShape;
+                    const [inH, inW, inD] = layer_data.inputShape;
+                    const [outH, outW] = layer_data.outputShape;
+                    const stride = layer_data.strides;
+
+                    const {data, dilatedHeight, dilatedWidth} = Dilate_Input(layer_data.preDilated, [inH, inW, inD] , stride);
+
+                    const output = ComputeGradientForKernels(data, deltas, weightGrads, dilatedHeight, dilatedWidth, inDepth, outH, outW, filters, kH, kW);
+
+                    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
+
+                    return output;
+                },
+                computeBiasGradients: (biasgrads, deltas, layer_data) => {
+                    const [filters] = layer_data.weightShape;
+                    const [outH, outW] = layer_data.outputShape;
+                    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
+                },
+                scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
             }
         }
         catch (error) {

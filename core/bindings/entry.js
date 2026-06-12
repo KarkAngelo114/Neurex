@@ -243,15 +243,17 @@ const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, 
 const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(input, shape_array, strides);
 
 /**
- * "✅☑️" Perform delta convolution
- * @param {Float32Array} input - padded delta
- * @param {Array<Number>} padded_delta_shape - padded delta shape
- * @param {Float32Array} kernels - rotated kernels 
- * @param {Array<Number>} kernel_shape - kernel shapes arrange as [f][kh][kw][c] 
- * @param {Number} strides
- * @returns output delta convolution
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} padded_delta_shape 
+ * @param {Array<Number>} kernel_shape 
+ * @param {Number} oh 
+ * @param {Nunber} ow 
+ * @param {Numer} pointer 
+ * @param {Nunber} stride 
+ * @returns {Float32Array} convolve result
  */
-const ConvolveDelta = (input, padded_delta_shape, kernel_shape, oh, ow, pointer) => functions.ConvolveDelta(input, padded_delta_shape, kernel_shape, oh, ow, pointer);
+const ConvolveDelta = (input, padded_delta_shape, kernel_shape, oh, ow, pointer, stride = 1) => functions.ConvolveDelta(input, padded_delta_shape, kernel_shape, oh, ow, pointer, stride);
 
 /**
  * 
@@ -290,19 +292,20 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2)
  */
 const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
 
+
 /**
- * "✅☑️"
- * @param {Float32Array} activated_outputs - activated outputs during feedforward
- * @param {Float32Array} delta - delta outputs during backpropagation 
- * @param {Float32Array} weightGrads - initiated weight gradients for accumulation 
- * @param {number} inputH - input height
- * @param {number} inputW - input width 
- * @param {number} C_in - input channels
- * @param {number} Out_H - output height
- * @param {number} Out_W - output width 
- * @param {number} C_out - output channel 
- * @param {number} kh - kernel height 
- * @param {number} kw -kernel width
+ *  "✅☑️"
+ * @param {*} activated_outputs 
+ * @param {*} delta 
+ * @param {*} weightGrads 
+ * @param {*} inputH 
+ * @param {*} inputW 
+ * @param {*} C_in 
+ * @param {*} Out_H 
+ * @param {*} Out_W 
+ * @param {*} C_out 
+ * @param {*} kh 
+ * @param {*} kw
  * @returns 
  */
 const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => functions.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);

@@ -9,7 +9,8 @@ __kernel void delta_convolve(
     const int KW,
     const int C_k,
     const int oH,
-    const int oW
+    const int oW,
+    const int stride
 ) {
     int h = get_global_id(0);
     int w = get_global_id(1);
@@ -24,8 +25,8 @@ __kernel void delta_convolve(
         for (int kw = 0; kw < KW; kw++) {
             for (int f = 0; f < F; f++) {
 
-                int ph = h + kh;
-                int pw = w + kw;
+                int ph = h * stride + kh;
+                int pw = w * stride + kw;
 
                 int inputIdx  = (ph * Wp + pw) * C_in + f;
                 int kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;

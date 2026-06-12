@@ -18,7 +18,7 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
     return {
         OutputHeight: oH,
         OutputWidth: oW,
-        CalculatedTensorShape: oH * oW * depth
+        CalculatedTensorShape: oH * oW * outputdepth
     };
 };
 

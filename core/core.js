@@ -272,6 +272,10 @@ class Neurex {
             "batch_size":this.batch_size,
             "optimizer":this.optimizer,
             "learning_rate":this.learning_rate,
+            "input_size":this.input_size,
+            "input_shape":this.input_shape,
+            "output_size":this.output_size,
+            "num_layers":this.num_layers,
             "layers": this.layers.map(layer => ({
                 layer_name: layer.layer_name,
                 activation_function_name: layer.activation_function ? layer.activation_function.name : null,
@@ -293,10 +297,6 @@ class Neurex {
                 isParametric: layer.isParametric
 
             })),
-            "input_size":this.input_size,
-            "input_shape":this.input_shape,
-            "output_size":this.output_size,
-            "num_layers":this.num_layers,
             "weights":this.weights.map(w => Array.from(w)),
             "biases":this.biases.map(b => Array.from(b)),
         };
@@ -376,7 +376,8 @@ class Neurex {
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
-                } else if (layerData.layer_name === "convolutionalLayer") {
+                } 
+                else if (layerData.layer_name === "convolutionalLayer") {
                     // recreate Convolutional layer
                     newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
                     newLayer.weightShape = layerData.weightShape;
@@ -405,6 +406,17 @@ class Neurex {
                     newLayer.weightShape = [vocabSize, embeddingDim];
                     newLayer.outputSize = outputSize;
                     this.output_layers_templates.push(new Float32Array(outputSize));
+                    this.parametric_layers.push(layerData.layer_name);
+                }
+                else if (layerData.layer_name === "transConv") {
+                    // recreate transpose convolutional layer
+                    newLayer = layerBuilder.transConvLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding, layerData.inputShape);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    const [H, W, D] = layerData.outputShape;
+                    const totalSize = H * W * D;
+                    this.output_layers_templates.push(new Float32Array(totalSize));
                     this.parametric_layers.push(layerData.layer_name);
                 }
                 else {
@@ -1099,20 +1111,10 @@ class Neurex {
     }
 
    #reinitiateWeightSBiasGrads() {
-        let pointer = 0; // Use a separate pointer for parametric layers
-        for (let l = 0; l < this.layers.length; l++) {
-            const layer_data_obj = this.layers[l];
 
-            // Only reset gradients for layers that actually HAVE weights/biases
-            if (this.parametric_layers.includes(layer_data_obj.layer_name)) {
-                if (this.weightGrads[pointer]) {
-                    this.weightGrads[pointer].fill(0);
-                }
-                if (this.biasGrads[pointer]) {
-                    this.biasGrads[pointer].fill(0);
-                }
-                pointer++; // Increment only when a parametric layer is found
-            }
+        for (let i = 0; i < this.weights.length; i ++) {
+            this.weightGrads[0].fill(0);
+            this.biasGrads[0].fill(0);
         }
 
         for (const template of this.output_layers_templates) {

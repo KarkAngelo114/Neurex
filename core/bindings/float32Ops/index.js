@@ -279,7 +279,7 @@ exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_heigh
 
     const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = new Float32Array(outputH * outputW * num_filters);
 
     for (let f = 0; f < num_filters; f++) {
 
@@ -335,7 +335,7 @@ exports.DilateInput = (input, shape, stride) => {
                 const dilatedHIdx = h * stride;
                 const dilatedWIdx = w * stride;
                 const dstIdx = (dilatedHIdx * dilatedW + dilatedWIdx) * C + c;
-                dilated[dstIdx] = input[srcIdx] || 0;
+                dilated[dstIdx] = input[srcIdx];
             }
         }
     }
@@ -376,7 +376,7 @@ const RotateKernels = (F, KH, KW, D, pointer) => {
  * @param {Array<Number>} kernels_shape - [F, KH, KW, C]
  * @returns {Float32Array} output tensor [H, W, F]
  */
-exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, pointer) => {
+exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, pointer, stride) => {
 
     const [Hp, Wp, C_in] = padded_delta_shape;
     // const [F, KH, KW, C_k] = kernels_shape;
@@ -384,9 +384,6 @@ exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, poin
 
     // rotate kernels
     const rotated_kernel = RotateKernels(F, KH, KW, C_k, pointer);
-
-    // Match C++ logic
-    const C = Math.min(C_in, C_k);
 
     // Infer output size (same as inputH, inputW in C++)
     const H = Hp - KH + 1;
@@ -404,7 +401,8 @@ exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, poin
                 for (let kh = 0; kh < KH; kh++) {
                     for (let kw = 0; kw < KW; kw++) {
                         for (let f = 0; f < F; f++) {         // sum over delta's filter dim
-                            const ph = h + kh, pw = w + kw;
+                            const ph = h * stride + kh;
+                            const pw = w * stride + kw;
                             const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
                             const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
                             sum += padded[padIdx] * rotated_kernel[kernelIdx];
