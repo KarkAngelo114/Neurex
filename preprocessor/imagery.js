@@ -93,11 +93,13 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
  * @param {String} pixelFormat - grayscale, rgb, or rgba.
  * @returns a normalized tensor map
  */
-const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale") => {
+const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale", showLog = true) => {
 
     try {
         
-        console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+        if (showLog) { 
+            console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+        }
 
         const filename = path.basename(file_path, path.extname(file_path));
         const stat = await fs.stat(file_path);
@@ -122,8 +124,11 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
 
         const normalized = Array.from(data).map(v => v / 255);
 
-        console.log(`${green}[/]------- Successfully loaded image "${file_path}"${reset}\n`);
 
+        if (showLog) {
+            console.log(`${green}[/]------- Successfully loaded image "${file_path}"${reset}\n`);
+        }
+    
         return {
             datasets: [new Float32Array(normalized)],
             shape: [height, width, channels],

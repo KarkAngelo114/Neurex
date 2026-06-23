@@ -274,44 +274,80 @@ exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padL
     };
 };
 
+/**
+ * 
+ * @param {Float32Array} input 
+ * @param {Number} strides 
+ * @param {Array<Number>} outputShape 
+ * @param {Array<Number>} kernelShape 
+ * @param {Array<Number>} inputShape 
+ * @param {Number} pointer 
+ * @param {Number} outputTemplatePointer 
+ * @returns 
+ */
+exports.Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer) => {
 
-exports.Convolve = ( input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer ) => {
+    const [numFilters, kernelH, kernelW, depth] = kernelShape;
+    const [inputH, inputW] = inputShape;
+    const [outputH, outputW] = outputShape;
 
-    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
+    const { globalWeights, globalBiases } = getGlobalParams();
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const weights = globalWeights[pointer];
+    const biases = globalBiases[pointer];
 
-    for (let f = 0; f < num_filters; f++) {
+    const output = new Float32Array(outputH * outputW * numFilters);
 
-        const bias = globalBiases[pointer][f];
+    const kernelSize = kernelH * kernelW * depth;
 
-        for (let y = 0; y < outputH; y++) {
-            for (let x = 0; x < outputW; x++) {
+    for (let y = 0; y < outputH; y++) {
 
-                let sum = 0;
+        const baseY = y * strides;
 
-                for (let ky = 0; ky < kernel_height; ky++) {
-                    for (let kx = 0; kx < kernel_width; kx++) {
-                        for (let c = 0; c < depth; c++) {
+        for (let x = 0; x < outputW; x++) {
 
-                            const inY = y * strides + ky;
-                            const inX = x * strides + kx;
+            const baseX = x * strides;
 
-                            if (inY < inputH && inX < inputW) {
+            const outBase = (y * outputW + x) * numFilters;
 
-                                const inputIndex = ((inY * inputW + inX) * depth + c);
+            for (let f = 0; f < numFilters; f++) {
 
-                                const kernelIndex = (((f * kernel_height + ky) * kernel_width + kx) * depth + c);
+                let sum = biases[f];
 
-                                sum += input[inputIndex] * globalWeights[pointer][kernelIndex];
-                            }
+                const filterOffset = f * kernelSize;
+
+                for (let ky = 0; ky < kernelH; ky++) {
+
+                    const inY = baseY + ky;
+
+                    if (inY >= inputH) continue;
+
+                    for (let kx = 0; kx < kernelW; kx++) {
+
+                        const inX = baseX + kx;
+
+                        if (inX >= inputW) continue;
+
+                        const inputBase = (inY * inputW + inX) * depth;
+
+                        const kernelBase = filterOffset + (ky * kernelW + kx) * depth;
+
+                        let c = 0;
+
+                        for (; c <= depth - 4; c += 4) {
+                            sum += input[inputBase + c] * weights[kernelBase + c];
+                            sum += input[inputBase + c + 1] * weights[kernelBase + c + 1];
+                            sum += input[inputBase + c + 2] * weights[kernelBase + c + 2];
+                            sum += input[inputBase + c + 3] * weights[kernelBase + c + 3];
+                        }
+
+                        for (; c < depth; c++) {
+                            sum += input[inputBase + c] * weights[kernelBase + c];
                         }
                     }
                 }
 
-                const outIndex = ((y * outputW + x) * num_filters + f);
-
-                output[outIndex] = sum + bias;
+                output[outBase + f] = sum;
             }
         }
     }
@@ -335,7 +371,7 @@ exports.DilateInput = (input, shape, stride) => {
                 const dilatedHIdx = h * stride;
                 const dilatedWIdx = w * stride;
                 const dstIdx = (dilatedHIdx * dilatedW + dilatedWIdx) * C + c;
-                dilated[dstIdx] = input[srcIdx] || 0;
+                dilated[dstIdx] = input[srcIdx];
             }
         }
     }
@@ -368,46 +404,56 @@ const RotateKernels = (F, KH, KW, D, pointer) => {
     // Return the rotated array for temporary use[cite: 1]
     return rotated; 
 };
+
 /**
  * 
- * @param {Float32Array} padded 
- * @param {Array<Number>} padded_delta_shape - [Hp, Wp, C]
- * @param {Float32Array} rotatedKernels 
- * @param {Array<Number>} kernels_shape - [F, KH, KW, C]
- * @returns {Float32Array} output tensor [H, W, F]
+ * @param {Float32Array} input 
+ * @param {Array<Number>} delta_shape 
+ * @param {Array<Number>} kernels_shape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} pointer 
+ * @param {Number} stride 
+ * @returns 
  */
-exports.ConvolveDelta = (padded, padded_delta_shape, kernels_shape, oH, oW, pointer) => {
+exports.ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, pointer, stride) => {
 
-    const [Hp, Wp, C_in] = padded_delta_shape;
-    // const [F, KH, KW, C_k] = kernels_shape;
-    const [F, KH, KW, C_k] = kernels_shape; // C_k == previous layer's depth
+    const [Hp, Wp, C_in] = delta_shape;
+    const [F, KH, KW, C_k] = kernels_shape;
+    const [oH, oW] = outputShape;
 
     // rotate kernels
     const rotated_kernel = RotateKernels(F, KH, KW, C_k, pointer);
-
-    // Match C++ logic
-    const C = Math.min(C_in, C_k);
 
     // Infer output size (same as inputH, inputW in C++)
     const H = Hp - KH + 1;
     const W = Wp - KW + 1;
 
-    // const output = new Float32Array(oH * oW * F);
     const output = new Float32Array(oH * oW * C_k);
 
     // ---- Convolution ----
-
     for (let c_out = 0; c_out < C_k; c_out++) {     // output channel = previous depth
         for (let h = 0; h < oH; h++) {
             for (let w = 0; w < oW; w++) {
                 let sum = 0;
                 for (let kh = 0; kh < KH; kh++) {
                     for (let kw = 0; kw < KW; kw++) {
-                        for (let f = 0; f < F; f++) {         // sum over delta's filter dim
-                            const ph = h + kh, pw = w + kw;
-                            const padIdx = (ph * Wp + pw) * C_in + f;             // C_in here is F
+                        const ph = h * stride + kh;
+                        const pw = w * stride + kw;
+                        const baseIdx = (ph * Wp + pw) * C_in;
+                        const kernelBase = ((kh * KW + kw) * F) * C_k + c_out;
+
+                        let f = 0;
+                        for (; f <= F - 4; f += 4) {
+                            sum += input[baseIdx + f] * rotated_kernel[f * C_k + kernelBase];
+                            sum += input[baseIdx + f + 1] * rotated_kernel[(f + 1) * C_k + kernelBase];
+                            sum += input[baseIdx + f + 2] * rotated_kernel[(f + 2) * C_k + kernelBase];
+                            sum += input[baseIdx + f + 3] * rotated_kernel[(f + 3) * C_k + kernelBase];
+                        }
+
+                        for (; f < F; f++) {
+                            const padIdx = baseIdx + f;
                             const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                            sum += padded[padIdx] * rotated_kernel[kernelIdx];
+                            sum += input[padIdx] * rotated_kernel[kernelIdx];
                         }
                     }
                 }
@@ -435,7 +481,22 @@ exports.computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     return grads;
 };
 
-exports.computeKernelGradients = (input, delta, weightGrads, inputH, inputW, Cin, H, W, Cout, Kh, Kw) => {
+/**
+ * 
+ * @param {Float32Array} input 
+ * @param {Float32Array} delta 
+ * @param {Float32Array} weightGrads 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Array<Number>} kernelSize 
+ * @param {Array<Number>} stride 
+ * @returns 
+ */
+exports.computeKernelGradients = (input, delta, weightGrads, inputShape, outputShape, kernelSize, stride) => {
+
+    const [inputH, inputW, Cin] = inputShape;
+    const [H, W, Cout] = outputShape; 
+    const [Kh, Kw] = kernelSize;
 
     const padH = Math.floor(Kh / 2);
     const padW = Math.floor(Kw / 2);
@@ -443,29 +504,54 @@ exports.computeKernelGradients = (input, delta, weightGrads, inputH, inputW, Cin
     for (let f = 0; f < Cout; f++) {
         for (let kh = 0; kh < Kh; kh++) {
             for (let kw = 0; kw < Kw; kw++) {
-                for (let c = 0; c < Cin; c++) {
+                const kernelRowOffset = (f * Kh + kh) * Kw + kw;
 
+                let c = 0;
+                for (; c <= Cin - 4; c += 4) {
+                    let sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;
+
+                    for (let h = 0; h < H; h++) {
+                        for (let w = 0; w < W; w++) {
+                            const inH = (h * stride) + kh - padH;
+                            const inW = (w * stride) + kw - padW;
+
+                            if (inH >= 0 && inH < inputH && inW >= 0 && inW < inputW) {
+                                const baseInputIndex = (inH * inputW + inW) * Cin;
+                                const deltaIndex = (h * W + w) * Cout + f;
+                                const deltaVal = delta[deltaIndex];
+
+                                sum0 += input[baseInputIndex + c] * deltaVal;
+                                sum1 += input[baseInputIndex + c + 1] * deltaVal;
+                                sum2 += input[baseInputIndex + c + 2] * deltaVal;
+                                sum3 += input[baseInputIndex + c + 3] * deltaVal;
+                            }
+                        }
+                    }
+
+                    weightGrads[kernelRowOffset * Cin + c] += sum0;
+                    weightGrads[kernelRowOffset * Cin + c + 1] += sum1;
+                    weightGrads[kernelRowOffset * Cin + c + 2] += sum2;
+                    weightGrads[kernelRowOffset * Cin + c + 3] += sum3;
+                }
+
+                // Process remaining channels
+                for (; c < Cin; c++) {
                     let sum = 0;
 
                     for (let h = 0; h < H; h++) {
                         for (let w = 0; w < W; w++) {
-
-                            const inH = h + kh - padH;
-                            const inW = w + kw - padW;
+                            const inH = (h * stride) + kh - padH;
+                            const inW = (w * stride) + kw - padW;
 
                             if (inH >= 0 && inH < inputH && inW >= 0 && inW < inputW) {
-
                                 const inputIndex = (inH * inputW + inW) * Cin + c;
-
                                 const deltaIndex = (h * W + w) * Cout + f;
-
                                 sum += input[inputIndex] * delta[deltaIndex];
                             }
                         }
                     }
 
-                    const gradIndex = ((f * Kh + kh) * Kw + kw) * Cin + c;
-
+                    const gradIndex = kernelRowOffset * Cin + c;
                     weightGrads[gradIndex] += sum;
                 }
             }
@@ -564,4 +650,49 @@ exports.element_wise_sub = (arr1, arr2) => {
     }
 
     return output;
+}
+
+exports.mse = (predictions, actuals) => {
+    let occurrence = predictions.length;
+    let sum = 0;
+    for (let i = 0; i < occurrence; i++) {
+        let difference = predictions[i] - actuals[i];
+        sum += difference * difference;
+    }
+
+    return sum / occurrence;
+}   
+
+exports.mae = (predictions, actuals) => {
+    let occurrence = predictions.length;
+    let sum = 0;
+    for (let i = 0; i < occurrence; i++) {
+        sum += Math.abs(predictions[i] - actuals[i]);
+    }
+
+    return sum / occurrence;
+}
+
+exports.categorical_cross_entropy = (predictions, actuals, epsilon) => {
+    let loss = 0;
+    for (let i = 0; i < predictions.length; i++) {
+        loss -= actuals[i] * Math.log(Math.max(predictions[i], epsilon));
+    }
+
+    return loss;
+}
+
+
+exports.sparse_categorical_cross_entropy = (predictions, actuals, epsilon) => {
+    const p = Math.max(predictions[actuals[0]], epsilon); // actuals being passed here can be use to index the predicted output because the actuals are like this: [0], [4], [1], and so on
+    return -Math.log(p);
+}
+
+exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
+    let sum = 0;
+    for (let i = 0; i < predictions.length; i++) {
+        const p = Math.max(Math.min(predictions[i], 1 - epsilon), epsilon);
+        sum -= actuals[i] * Math.log(p) + (1 - actuals[i]) * Math.log(1 - p);
+    }
+    return sum / predictions.length;
 }

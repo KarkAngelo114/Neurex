@@ -77,6 +77,8 @@ exports.AutoEncoder = () => {
         layer.connectedLayer('relu', 28),
         layer.connectedLayer('relu', 14),
         layer.connectedLayer('relu', 7),
+        layer.connectedLayer('relu', 7),
+        layer.connectedLayer('relu', 7),
         layer.connectedLayer('relu', 14),
         layer.connectedLayer('relu', 28),
         layer.connectedLayer('relu', 56),

@@ -11,40 +11,72 @@ __kernel void computeKernelGradients(
     const int Kh,
     const int Kw,
     const int padH,
-    const int padW
+    const int padW,
+    const int stride
 ) {
 
     int f  = get_global_id(0);
     int kh = get_global_id(1);
     int z = get_global_id(2);
 
-    int kw = z / Cin;
-    int c  = z % Cin;
+    int kw = z / (Cin / 4 + (Cin % 4 > 0 ? 1 : 0));
+    int c_block = z % (Cin / 4 + (Cin % 4 > 0 ? 1 : 0));
 
-    if (f >= Cout || kh >= Kh || kw >= Kw || c >= Cin) {
+    if (f >= Cout || kh >= Kh || kw >= Kw) {
         return;
     }
 
-    float sum = 0.0f;
-
+    int kernelRowOffset = (f * Kh + kh) * Kw + kw;
+    
+    // Process 4 channels at a time
+    int c_start = c_block * 4;
+    if (c_start >= Cin) {
+        return;
+    }
+    
+    int c_end = min(c_start + 4, Cin);
+    
+    float sum0 = 0.0f, sum1 = 0.0f, sum2 = 0.0f, sum3 = 0.0f;
+    
     for (int h = 0; h < H; h++) {
         for (int w = 0; w < W; w++) {
 
-            int inH = h + kh - padH;
-            int inW = w + kw - padW;
+            int inH = (h * stride) + kh - padH;
+            int inW = (w * stride) + kw - padW;
 
             if (inH >= 0 && inH < inputH && inW >= 0 && inW < inputW) {
 
-                size_t inputIndex = (inH * inputW + inW) * Cin + c;
+                int baseInputIndex = (inH * inputW + inW) * Cin;
+                int deltaIndex = (h * W + w) * Cout + f;
+                float deltaVal = d[deltaIndex];
 
-                size_t deltaIndex = (h * W + w) * Cout + f;
-
-                sum += input_Data[inputIndex] * d[deltaIndex];
+                if (c_start < Cin) {
+                    sum0 += input_Data[baseInputIndex + c_start] * deltaVal;
+                }
+                if (c_start + 1 < Cin) {
+                    sum1 += input_Data[baseInputIndex + c_start + 1] * deltaVal;
+                }
+                if (c_start + 2 < Cin) {
+                    sum2 += input_Data[baseInputIndex + c_start + 2] * deltaVal;
+                }
+                if (c_start + 3 < Cin) {
+                    sum3 += input_Data[baseInputIndex + c_start + 3] * deltaVal;
+                }
             }
         }
     }
 
-    size_t gradIndex = ((f * Kh + kh) * Kw + kw) * Cin + c;
-
-    wg[gradIndex] += sum;
+    // Write results back
+    if (c_start < Cin) {
+        wg[kernelRowOffset * Cin + c_start] += sum0;
+    }
+    if (c_start + 1 < Cin) {
+        wg[kernelRowOffset * Cin + c_start + 1] += sum1;
+    }
+    if (c_start + 2 < Cin) {
+        wg[kernelRowOffset * Cin + c_start + 2] += sum2;
+    }
+    if (c_start + 3 < Cin) {
+        wg[kernelRowOffset * Cin + c_start + 3] += sum3;
+    }
 }

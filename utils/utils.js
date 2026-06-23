@@ -4,7 +4,7 @@ const XavierInitialization = (inputSize, outputSize) => {
     return Math.sqrt(2 / (inputSize + outputSize));
 }
 
-const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, padding) => {
+const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, outputdepth, stride, padding) => {
     // console.log(inputHeight, inputWidth, kernelHeight, kernelWidth, depth, stride, padding);
     let oH, oW;
     if (padding === "same") {
@@ -18,7 +18,7 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
     return {
         OutputHeight: oH,
         OutputWidth: oW,
-        CalculatedTensorShape: oH * oW * depth
+        CalculatedTensorShape: oH * oW * outputdepth
     };
 };
 

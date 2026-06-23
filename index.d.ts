@@ -368,12 +368,13 @@ declare module 'neurex' {
     /**
     * Computes evaluation metrics for regression tasks given test features and labels.
     *
-    * @function
-    * @param {Array<Array<number>>} predictions - The input features for the test set.
-    * @param {Array<number>} actuals - The true target values for the test set.
+    * @function RegressionMetrics
+    * @param {Array<Array<number>>} predictions The input features for the test set.
+    * @param {Array<number>} actuals The true target values for the test set.
+    * @param {Boolean} showOutputs shows the outputs. You can disable it by passing a boolean value. Default is `true`
     * @throws {Error} when textX and testY are not provided
     */
-    export function RegressionMetrics(predictions: number[][], actuals: number[]): void;
+    export function RegressionMetrics(predictions: number[][], actuals: number[], showOutputs: Boolean): void;
 
     /**
     *
@@ -431,12 +432,13 @@ declare module 'neurex' {
     /**
     * @async
     * @function load_single_image allows you to load a single image
-    * @param {String} targetDir - points to the directory of the image
-    * @param {Array<Number>} resize - resize the image to [h][w][d]
-    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @returns a normalized tensor map
+    * @param {String} targetDir points to the directory of the image
+    * @param {Array<Number>} resize resize the image to [h][w][d]
+    * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @param {Boolean} showLog Shows a debugging log when loading an image file and if loaded successfully. Can be disable if  set to false. Default is `true`.
+    * @returns {Object} {datasets: [][], shape: [], filename: String}
     */
-    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String): Object;
+    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String, showLog: Boolean): Object;
 
     /**
     * 
