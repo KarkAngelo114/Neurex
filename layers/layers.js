@@ -361,36 +361,11 @@ class Layers {
                     const dActivation = activation.derivatives[function_name];
                     const dAct = dActivation(zs[layer_index]);
 
-                    // Scenario A: Coming backward from a Transpose Convolution Layer
-                    if (nextLayer.layer_name === "transConv") {
-                        const [iHNext, iWNext, iDNext] = nextLayer.inputShape;
-                        const [oHNex, oWNex, oDNex] = nextLayer.outputShape;
-                        const [f, kh, kw, kd] = nextLayer.weightShape;
-                        const stridesNext = nextLayer.strides;
-                        const paddingNext = nextLayer.padding;
-
-                        const {data: dilated, dilatedHeight, dilatedWidth} = Dilate_Input(delta, [oHNex, oWNex, oDNex], stridesNext);
-
-                        const padH = Math.floor(kh / 2);
-                        const padW = Math.floor(kw / 2);
-                        const { data: paddedDelta, shape: paddedShape } = applyPadding(
-                            dilated, dilatedHeight, dilatedWidth, oDNex, padH, padH, padW, padW
-                        );
-
-                        const transConvRes = ConvolveDelta(paddedDelta, paddedShape, [f, kh, kw, kd], [iHNext, iWNext], pointer, stridesNext);
-                        if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Trans conv result has NaNs");
-
-                        // Multiply directly with activation derivative; skip DeltaMatMul
-                        current_delta = element_wise_mul(dAct, transConvRes);
+                    let next_delta = delta;
+                    const [inputSize, outputSize] = nextLayer.weightShape;
+                    const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
                         
-                    } else {
-                        // Scenario B: Standard Connected-to-Connected Layer backprop
-                        let next_delta = delta;
-                        const [inputSize, outputSize] = nextLayer.layer_name === "connected_layer" ? nextLayer.weightShape : current_layer.weightShape;
-                        const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                        
-                        current_delta = element_wise_mul(dAct, delta_res);
-                    }
+                    current_delta = element_wise_mul(dAct, delta_res);
 
                     if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");            
 
