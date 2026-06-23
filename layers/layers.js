@@ -37,7 +37,7 @@ const {
     scaleDiff
 } = require('../core/bindings');
 
-const float32Ops = require('../core/bindings/float32Ops/index');
+const float32Ops = require('../core/bindings/float32Ops');
 const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization, calculateTransposedConvShape} = require('../utils/utils');
 const activation = require('../core/bindings');
 const { red, reset } = require('../color-code');
@@ -369,27 +369,15 @@ class Layers {
                         const stridesNext = nextLayer.strides;
                         const paddingNext = nextLayer.padding;
 
-                        //pad so ConvolveDelta yields [iHNext, iWNext]
-                        let pT, pB, pL, pR;
-                        if (paddingNext === "valid") {
-                            pT = pB = kh - 1;
-                            pL = pR = kw - 1;
-                        } else {
-                            pT = Math.floor((kh - 1) / 2); pB = (kh - 1) - pT;
-                            pL = Math.floor((kw - 1) / 2); pR = (kw - 1) - pL;
+                        const {data: dilated, dilatedHeight, dilatedWidth} = Dilate_Input(delta, [oHNex, oWNex, oDNex], stridesNext);
 
-                            const needH = iHNext + kh - 1;
-                            const needW = iWNext + kw - 1;
-                            const haveH = oHNex + pT + pB;
-                            const haveW = oWNex + pL + pR;
-                            if (haveH < needH) pB += (needH - haveH);
-                            if (haveW < needW) pR += (needW - haveW);
-                        }
+                        const padH = Math.floor(kh / 2);
+                        const padW = Math.floor(kw / 2);
+                        const { data: paddedDelta, shape: paddedShape } = applyPadding(
+                            dilated, dilatedHeight, dilatedWidth, oDNex, padH, padH, padW, padW
+                        );
 
-                        //apply padding, then ConvolveDelta
-                        const { data: paddedDelta, shape: paddedShape } = applyPadding(delta, oHNex, oWNex, oDNex, pT, pB, pL, pR);
-
-                        const transConvRes = ConvolveDelta(paddedDelta, paddedShape, [f, kh, kw, kd], iHNext, iWNext, pointer + 1, stridesNext);
+                        const transConvRes = ConvolveDelta(paddedDelta, paddedShape, [f, kh, kw, kd], [iHNext, iWNext], pointer, stridesNext);
                         if (transConvRes.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Trans conv result has NaNs");
 
                         // Multiply directly with activation derivative; skip DeltaMatMul
@@ -541,7 +529,7 @@ class Layers {
                     const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
                     // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const convolve_result = Convolve(data,current_layer.strides, OutputHeight, OutputWidth, f, kh, kw, kd, shape[0], shape[1], pointer, outputTemplatePointer);
+                    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, outputTemplatePointer);
 
                     if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
@@ -590,9 +578,6 @@ class Layers {
 
                         // dilate input
                         const {data: dilated, dilatedHeight: dilatedH, dilatedWidth:dilatedW} = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
-                        
-                        // const dilatedH = (oHn - 1) * stridesN + 1;
-                        // const dilatedW = (oWn - 1) * stridesN + 1;
 
                         let pT, pB, pL, pR;
                         if (paddingN === "valid") {
@@ -615,7 +600,7 @@ class Layers {
                         // pass the REAL dilated dims, not oHn/oWn
                         const { data, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
-                        dL_dActivation = ConvolveDelta(data, shape, [Fn, KHn, KWn, KCn], oHcurr, oWcurr, pointer);
+                        dL_dActivation = ConvolveDelta(data, shape, [Fn, KHn, KWn, KCn], [oHcurr, oWcurr], pointer);
                     }
                     
                     const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
@@ -635,7 +620,13 @@ class Layers {
                     const [outH, outW] = layer_data.outputShape
 
 
-                    const output = ComputeGradientForKernels(activation_outputs,deltas,weightGrads,inH, inW, inDepth,outH, outW, filters,kH, kW);
+                    const output = ComputeGradientForKernels(
+                        activation_outputs,
+                        deltas,
+                        weightGrads,
+                        [inH, inW, inDepth],
+                        [outH, outW, filters],
+                        [kH, kW]);
 
                     if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
 
@@ -774,221 +765,6 @@ class Layers {
                 scaleGrads: () => {
                     // max pooling layer has no params like weights and biases, so no functions here :)
                 },
-            }
-        }
-        catch (error) {
-            console.error(error);
-            process.exit(1);
-        }
-    }
-
-    /**
-     * @method transConvLayer
-     * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
-     * @param {Number} strides It determines how much to dilate the input for upsampling
-     * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and across input feature map
-     * @param {String} activation_function the activation function to be use for this layer
-     * @param {String} padding `same` or `valid`
-     * @param {Array<Number>} inputShape the input shape that will pass to this layer
-     * @throws {Error} if any of the parameters are invalid.
-     * @returns {Object} layer configuration object
-     */
-    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same', inputShape=[28, 28, 3]) {
-        try {
-            if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
-            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
-            if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
-            if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
-            if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
-            if (inputShape.some(v => v <=0)) throw new Error(`[ERROR]------- input shape values must not have any 0s or negative values. Input shape: ${inputShape}`);
-
-            // check if the padding is same/valid, otherwise throw error
-            let paddings = ["same", "valid"];
-            if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
-            }
-
-            // check if the activation function is valid
-            const function_name = activation_function.toLowerCase();
-
-            if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
-            }
-
-            return {
-                "layer_name":"transConv",
-                "activation_function":activation[function_name],
-                "derivative_activation_function":activation.derivatives[function_name],
-                "kernel_size":kernel_size,
-                "filters":filters,
-                "padding":padding.toLowerCase(),
-                "strides":strides,
-                initParams: (size, shape, layer_data) => {
-
-                    let inputHeight = inputShape[0];
-                    let inputWidth = inputShape[1];
-                    let inputDepth = inputShape[2];
-
-                    if (size != (inputHeight * inputWidth * inputDepth)) throw new Error(`[ERROR]------- input shape of this current layer didn't match to the previous output layer. Current input shape: [${inputHeight}, ${inputWidth}, ${inputDepth}] | Expected size: ${size}`);
-
-                    const filters = layer_data.filters;
-                    const [kh, kw] = layer_data.kernel_size;
-                    const stride = layer_data.strides || 1;
-                    const padding = layer_data.padding || "same";
-
-                    const kernelTotalSize = filters * kh * kw * inputDepth;
-                    const {OutputHeight, OutputWidth} = calculateTransposedConvShape(inputHeight, inputWidth, kh, kw, filters, stride, padding);
-                    const outputSize = OutputHeight * OutputWidth * filters;
-                    const weightShape = [filters, kh, kw, inputDepth];
-
-                    let weights = new Float32Array(kernelTotalSize);
-                    let biases = new Float32Array(filters);
-                    let weightGrads = new Float32Array(kernelTotalSize)
-                    let biasGrads = new Float32Array(filters);
-                    let outputTemplateTensor = new Float32Array(outputSize);
-
-                    const fanIn = kh * kw * inputDepth;
-                    const fanOut = kh * kw * filters;
-                    const limit = XavierInitialization(fanIn, fanOut);
-
-                    for (let i = 0; i < kernelTotalSize; i++) {
-                        weights[i] = (Math.random() * 2 - 1) * limit;
-                    }
-
-                    for (let i = 0; i < filters; i++) {
-                        biases[i] = (Math.random() * 2 - 1) * limit;
-                    }
-                    
-                    return {
-                        updatedSize: outputSize,
-                        updatedShape: [OutputHeight, OutputWidth, filters],
-                        weights: weights,
-                        biases: biases,
-                        weightGrads: weightGrads,
-                        biasGrads: biasGrads,
-                        outputTensors: outputTemplateTensor,
-                        inputShape: [inputHeight, inputWidth, inputDepth],
-                        outputShape: [OutputHeight, OutputWidth, filters],
-                        paramShape: weightShape,
-                        isParametric: true,
-                    }
-                },
-                determineInferenceType: (layerObject, lossFunc, trainY) => {
-                    
-                    if (lossFunc === "mae" || lossFunc === "mse") {
-                        return "regression";
-                    }
-
-                    if (lossFunc === "binary_cross_entropy") {
-                        return "binary_classification";
-                    }
-
-                    if (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy") {
-                        return "multi_class_classification";
-                    }
-
-                    //  if none satisfies the conditions above, throw an error
-                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
-                },
-                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
-                    
-                    let [f, kh, kw, kd] = current_layer.weightShape;
-                    let [input_H, input_W, input_D] = current_layer.inputShape; 
-                    let padding = current_layer.padding;
-                    let strides = current_layer.strides;
-                    const [OutputHeight, OutputWidth] = current_layer.outputShape;
-
-                    // 1. dilate input
-                    // const {data, dilatedHeight, dilatedWidth} = float32Ops.DilateInput(input, current_layer.inputShape, strides);
-                    const {data, dilatedHeight, dilatedWidth} = Dilate_Input(input, current_layer.inputShape, strides);
-                    if (data.some(Number.isNaN)) throw new Error('[Trans Conv Error]------ NaNs detected after input dilation');
-
-                    // 2. Perform the convolve operation using the shapes calculated in step 1
-                    const convolve_result = Convolve(data, 1, OutputHeight, OutputWidth, f, kh, kw, kd, dilatedHeight, dilatedWidth, pointer, outputTemplatePointer);
-                    if (convolve_result.some(Number.isNaN)) throw new Error('[Trans Conv Error]------ NaN detected on convolve result');
-
-                    // 3. activate each depth input using the given activation function
-                    const activation_function = activation[function_name];
-                    const outputs = activation_function(convolve_result);
-                    if (outputs.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error]------ output array has Nans after applying activation");
-                    current_layer.preDilated = input;
-                    return {
-                        outputs: outputs,
-                        z_values: convolve_result,
-                        incrementor_value: 1
-                    };
-                },
-                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
-                    let dOutputLayer = new Float32Array(preds.length); 
-                    const lastLayerZs = zs[zs.length - 1]; 
-
-                    dOutputLayer = element_wise_sub(preds, actuals); // performs p[i] - a[i] = d[i]
-
-                    return dOutputLayer;
-                },
-                backpropagate: (next_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer) => {
-                    let Current_Z = zs[layer_index];
-                    let dActivation = activation.derivatives[function_name];
-                    let dL_dActivation;
-
-                    const [Fn, KHn, KWn, KCn] = next_layer.weightShape;
-                    const [oHn, oWn, oDn] = next_layer.outputShape;
-                    const [oHcurr, oWcurr] = currentLayer.outputShape;
-                    const stridesN = next_layer.strides;
-                    const paddingN = next_layer.padding;
-
-                    //pad the dilated delta so ConvolveDelta produces output of shape [oHcurr, oWcurr]
-                    let pT, pB, pL, pR;
-                    if (paddingN === "valid") {
-                        pT = pB = KHn - 1;
-                        pL = pR = KWn - 1;
-                    } else {
-                        // "same": start with symmetric K-1 split, then extend bottom/right if needed
-                        pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
-                        pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
-
-                        const needH = oHcurr + KHn - 1;
-                        const needW = oWcurr + KWn - 1;
-                        const haveH = oHn + pT + pB;
-                        const haveW = oWn + pL + pR;
-                        if (haveH < needH) pB += (needH - haveH);
-                        if (haveW < needW) pR += (needW - haveW);
-                    }
-
-                    // apply padding, then run ConvolveDelta with real padded dims
-                    const { data: paddedDelta, shape: paddedShape } = applyPadding(next_delta, oHn, oWn, oDn, pT, pB, pL, pR);
-
-                    dL_dActivation = ConvolveDelta(paddedDelta, paddedShape, [Fn, KHn, KWn, KCn], oHcurr, oWcurr, pointer, strides);
-                    if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV ERROR] Conv delta result has NaNs");
-
-                    const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
-                    if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
-
-                    return {
-                        current_delta: output,
-                        decrementor_value: 1
-                    }
-                },
-                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
-                    const [filters, kH, kW, inDepth] = layer_data.weightShape;
-                    const [inH, inW, inD] = layer_data.inputShape;
-                    const [outH, outW] = layer_data.outputShape;
-                    const stride = layer_data.strides;
-
-                    const {data, dilatedHeight, dilatedWidth} = Dilate_Input(layer_data.preDilated, [inH, inW, inD] , stride);
-
-                    const output = ComputeGradientForKernels(data, deltas, weightGrads, dilatedHeight, dilatedWidth, inDepth, outH, outW, filters, kH, kW);
-
-                    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
-
-                    return output;
-                },
-                computeBiasGradients: (biasgrads, deltas, layer_data) => {
-                    const [filters] = layer_data.weightShape;
-                    const [outH, outW] = layer_data.outputShape;
-                    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
-                },
-                scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
             }
         }
         catch (error) {

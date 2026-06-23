@@ -2,43 +2,64 @@ __kernel void convolve(
     __global const float* input,
     __global const float* weights,
     __global const float* biases,
-    __global float* output_tensor_template,
+    __global float* output,
     const int strides,
-    const int output_height,
-    const int output_width,
-    const int num_filters,
-    const int kernel_height,
-    const int kernel_width,
+    const int outputH,
+    const int outputW,
+    const int numFilters,
+    const int kernelH,
+    const int kernelW,
     const int depth,
-    const int input_height,
-    const int input_width
+    const int inputH,
+    const int inputW
 ) {
-    int oh = get_global_id(0);
-    int ow = get_global_id(1);
-    int f  = get_global_id(2);
+    int y = get_global_id(0);
+    int x = get_global_id(1);
+    int f = get_global_id(2);
 
-    if (ow >= output_width || oh >= output_height || f >= num_filters)
-        return;
+    // Bounds check
+    if (y >= outputH || x >= outputW || f >= numFilters) return;
 
-    float sum = 0.0f;
+    int kernelSize = kernelH * kernelW * depth;
 
-    for (int kh = 0; kh < kernel_height; kh++) {
-        for (int kw = 0; kw < kernel_width; kw++) {
-            for (int c = 0; c < depth; c++) {
+    // Equivalent to CPU:
+    int baseY = y * strides;
+    int baseX = x * strides;
+    int outIndex = (y * outputW + x) * numFilters + f;
 
-                int inY = (oh * strides) + kh;
-                int inX = (ow * strides) + kw;
+    float sum = biases[f];
 
-                if (inY < input_height && inX < input_width) {
-                    int input_idx  = ((inY * input_width + inX) * depth + c);
-                    int kernel_idx = (((f * kernel_height + kh) * kernel_width + kw) * depth + c);
+    // Filter offset
+    int filterOffset = f * kernelSize;
 
-                    sum += input[input_idx] * weights[kernel_idx];
-                }
+    for (int ky = 0; ky < kernelH; ky++) {
+        int inY = baseY + ky;
+
+        if (inY >= inputH) continue;
+
+        for (int kx = 0; kx < kernelW; kx++) {
+            int inX = baseX + kx;
+
+            if (inX >= inputW) continue;
+
+            int inputBase = (inY * inputW + inX) * depth;
+            int kernelBase = filterOffset + (ky * kernelW + kx) * depth;
+
+            int c = 0;
+            
+            for (; c <= depth - 4; c += 4) {
+                sum += input[inputBase + c]     * weights[kernelBase + c];
+                sum += input[inputBase + c + 1] * weights[kernelBase + c + 1];
+                sum += input[inputBase + c + 2] * weights[kernelBase + c + 2];
+                sum += input[inputBase + c + 3] * weights[kernelBase + c + 3];
+            }
+
+            // Remaining channels
+            for (; c < depth; c++) {
+                sum += input[inputBase + c] * weights[kernelBase + c];
             }
         }
     }
 
-    int outIndex = ((oh * output_width + ow) * num_filters + f);
-    output_tensor_template[outIndex] = sum + biases[f];
+    output[outIndex] = sum;
 }

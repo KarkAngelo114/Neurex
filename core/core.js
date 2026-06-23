@@ -199,15 +199,6 @@ class Neurex {
                     params = paramCount.toLocaleString();
                     padding = "None"
                     break;
-                
-                case "transConv":
-                    displayName = "Trans Conv Layer";
-                    outputShape = `(${layer.outputShape.join('x')})`;
-                    activation = activationName;
-                    params = paramCount.toLocaleString();
-                    padding = layer.padding || 'None';
-                    break;
-
                 default:
                     displayName = layerType;
                     outputShape = '-';
@@ -459,7 +450,7 @@ class Neurex {
                 return;
             }
 
-            if (!layer_data || layer_data.length < 2) {
+            if (!layer_data || layer_data.length < 1) {
                 throw new Error(`${color.red}[ERROR]------- No layers${color.reset} added.`);
             }
 
@@ -1113,8 +1104,8 @@ class Neurex {
    #reinitiateWeightSBiasGrads() {
 
         for (let i = 0; i < this.weights.length; i ++) {
-            this.weightGrads[0].fill(0);
-            this.biasGrads[0].fill(0);
+            this.weightGrads[i].fill(0);
+            this.biasGrads[i].fill(0);
         }
 
         for (const template of this.output_layers_templates) {

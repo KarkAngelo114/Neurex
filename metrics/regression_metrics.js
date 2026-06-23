@@ -10,7 +10,7 @@ const {MSE, MAE, r2, rMSE} = require('../loss_functions/metrics');
  * @param {Array<number>} actuals - The true target values for the test set.
  * @throws {Error} when textX and testY are not provided
  */
-const RegressionMetrics = (predictions, actuals) => {
+const RegressionMetrics = (predictions, actuals, showOutputs = true) => {
     try  {
         if (!predictions || !actuals) {
             throw new Error("[ERROR]------- No predictions or testY is present");
@@ -40,10 +40,12 @@ const RegressionMetrics = (predictions, actuals) => {
             }
         }
 
-        console.log("\nOutput:");
-        // Print predictions and actuals side by side
-        for (let i = 0; i < predictions.length; i++) {
-            console.log("Predicted:",predictions[i],"| Actual:",actuals[i]);
+        if (showOutputs) {
+            console.log("\nOutput:");
+            // Print predictions and actuals side by side
+            for (let i = 0; i < predictions.length; i++) {
+                console.log("Predicted:",predictions[i],"| Actual:",actuals[i]);
+            }
         }
         
         console.log("\n======= Evaluation Metrics =======");

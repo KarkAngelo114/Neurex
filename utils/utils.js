@@ -22,24 +22,6 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
     };
 };
 
-const calculateTransposedConvShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, outputdepth, stride, padding) => {
-    let oH, oW;
-
-    if (padding === "same") {
-        oH = inputHeight * stride;
-        oW = inputWidth * stride;
-    } else {
-        oH = (inputHeight - 1) * stride + kernelHeight;
-        oW = (inputWidth - 1) * stride + kernelWidth;
-    }
-
-    return {
-        OutputHeight: oH,
-        OutputWidth: oW,
-        CalculatedTensorShape: oH * oW * outputdepth
-    };
-};
-
 /**
  * 
  * @param {Number} inputH - height of the input
@@ -122,7 +104,6 @@ const formatDuration = (totalSeconds) => {
 
 module.exports = {
     calculateTensorShape,
-    calculateTransposedConvShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,

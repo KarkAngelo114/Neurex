@@ -1,5 +1,5 @@
 __kernel void delta_convolve(
-    __global const float* padded,
+    __global const float* input,
     __global const float* weights,
     __global float* output_tensor,
     const int Wp,
@@ -20,18 +20,38 @@ __kernel void delta_convolve(
 
     float sum = 0.0f;
 
-    // ===== convolution accumulation =====
+    // ===== convolution accumulation with loop unrolling =====
     for (int kh = 0; kh < KH; kh++) {
         for (int kw = 0; kw < KW; kw++) {
-            for (int f = 0; f < F; f++) {
+            int ph = h * stride + kh;
+            int pw = w * stride + kw;
+            int baseInputIdx = (ph * Wp + pw) * C_in;
+            int baseKernelIdx = ((kh) * KW + kw) * C_k;
 
-                int ph = h * stride + kh;
-                int pw = w * stride + kw;
+            // Unrolled loop: process 4 filters at a time
+            int f = 0;
+            for (; f <= F - 4; f += 4) {
+                int inputIdx0 = baseInputIdx + f;
+                int inputIdx1 = baseInputIdx + f + 1;
+                int inputIdx2 = baseInputIdx + f + 2;
+                int inputIdx3 = baseInputIdx + f + 3;
 
-                int inputIdx  = (ph * Wp + pw) * C_in + f;
-                int kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
+                int kernelIdx0 = (f * KH + kh) * KW * C_k + baseKernelIdx + c_out;
+                int kernelIdx1 = ((f + 1) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
+                int kernelIdx2 = ((f + 2) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
+                int kernelIdx3 = ((f + 3) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
 
-                sum += padded[inputIdx] * weights[kernelIdx];
+                sum += input[inputIdx0] * weights[kernelIdx0];
+                sum += input[inputIdx1] * weights[kernelIdx1];
+                sum += input[inputIdx2] * weights[kernelIdx2];
+                sum += input[inputIdx3] * weights[kernelIdx3];
+            }
+
+            // Handle remaining filters
+            for (; f < F; f++) {
+                int inputIdx = baseInputIdx + f;
+                int kernelIdx = (f * KH + kh) * KW * C_k + baseKernelIdx + c_out;
+                sum += input[inputIdx] * weights[kernelIdx];
             }
         }
     }

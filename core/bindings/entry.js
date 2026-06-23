@@ -204,6 +204,49 @@ const dlinear = (input) => functions.DLinear(input);
 
 /**
  * "✅☑️"
+ * @param {Float32Array} p predictions array 
+ * @param {Float32Array} a actuals array 
+ * @returns loss output
+ */
+const mse = (p, a) => functions.mse(new Float32Array(p), new Float32Array(a));
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} p predictions array 
+ * @param {Float32Array} a actuals array 
+ * @returns loss output
+ */
+const mae = (p, a) => functions.mae(new Float32Array(p), new Float32Array(a));
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} p predictions array 
+ * @param {Float32Array} a actuals array 
+ * @param {Number} epsilon epsilon value. Default is `1e-15`
+ * @returns loss output
+ */
+const categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.categorical_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} p predictions array 
+ * @param {Float32Array} a actuals array 
+ * @param {Number} epsilon epsilon value. Default is `1e-15`
+ * @returns loss output
+ */
+const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.sparse_categorical_cross_entropy(new Float32Array(p), a, epsilon);
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} p predictions array 
+ * @param {Float32Array} a actuals array 
+ * @param {Number} epsilon epsilon value. Default is `1e-15`
+ * @returns loss output
+ */
+const binary_cross_entropy = (p, a, epsilon = 1e-15) => functions.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
+
+/**
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Number} inputH 
  * @param {Number} inputW 
@@ -216,23 +259,19 @@ const dlinear = (input) => functions.DLinear(input);
  */
 const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight);
 
- /**
-  * "✅☑️"
-  * @param {Float32Array} input Float32Array input 
-  * @param {Number} strides Stride value 
-  * @param {Numebr} outputH Expected output height
-  * @param {Number} outputW Expected output width
-  * @param {Numebr} num_filters number of filters
-  * @param {Number} kernel_height kernel height
-  * @param {Number} kernel_width kernel width
-  * @param {Number} depth depth value
-  * @param {Number} inputH current input height
-  * @param {Number} inputW currnet input width
-  * @param {Number} pointer pointer value to get the matching parameter from the global store
-  * @param {Number} outputTemplatePointer pointer value to get the matching output template tensor from the global store 
-  * @returns {Float32Array} Convolution result
-  */
-const Convolve = (input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputH, outputW, num_filters, kernel_height, kernel_width, depth, inputH, inputW, pointer, outputTemplatePointer);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input input to perform convolution
+ * @param {Number} strides stride value
+ * @param {Array<Number>} outputShape [oH, oW]
+ * @param {Array<Number>} kernelShape [num_filters, Kh, Kw, channels]
+ * @param {Array<Number>} inputShape [iH, iW] 
+ * @param {Number} pointer pointer value to fetch corresponding parameters of the layer from the global store
+ * @param {Number} outputTemplatePointer pointer value to fetch allocated tensor of the layer from the global store
+ * @returns {Float32Array} convolution result
+ */
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer);
+
 /**
  * "✅☑️" dilate the input inserting 0s
  * @param {Float32Array} input 
@@ -244,16 +283,15 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
 
 /**
  * "✅☑️"
- * @param {Float32Array} input 
- * @param {Array<Number>} padded_delta_shape 
- * @param {Array<Number>} kernel_shape 
- * @param {Number} oh 
- * @param {Nunber} ow 
- * @param {Numer} pointer 
- * @param {Nunber} stride 
+ * @param {Float32Array} input input tensors
+ * @param {Array<Number>} deltaShape delta shape: [Hp, Wp, C_in]
+ * @param {Array<Number>} kernel_shape kernel shape: [F, KH, KW, C_k]
+ * @param {Array<Number>} outputShape output shape: [oH, oW]
+ * @param {Numer} pointer pointer value to fetch parameters from the global store
+ * @param {Nunber} stride stride value
  * @returns {Float32Array} convolve result
  */
-const ConvolveDelta = (input, padded_delta_shape, kernel_shape, oh, ow, pointer, stride = 1) => functions.ConvolveDelta(input, padded_delta_shape, kernel_shape, oh, ow, pointer, stride);
+const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1) => functions.ConvolveDelta(input, deltaShape, kernel_shape, outputShape, pointer, stride);
 
 /**
  * 
@@ -292,23 +330,18 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2)
  */
 const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
 
-
 /**
- *  "✅☑️"
- * @param {*} activated_outputs 
- * @param {*} delta 
- * @param {*} weightGrads 
- * @param {*} inputH 
- * @param {*} inputW 
- * @param {*} C_in 
- * @param {*} Out_H 
- * @param {*} Out_W 
- * @param {*} C_out 
- * @param {*} kh 
- * @param {*} kw
- * @returns 
+ * "✅☑️"
+ * @param {Float32Array} input inputs that is already activated by and activation function
+ * @param {Float32Array} delta delta input
+ * @param {Float32Array} ZeroedGrads zero gradients for accumulation
+ * @param {Array<Number>} inputShape input shape: [inputH, inputW, Cin]
+ * @param {Array<Number>} outputShape output shape: [H, W, Cout]
+ * @param {Array<Number>} kernelSize kernel size: [Kh, Kw]
+ * @param {Number} stride stride value. Default value is `1`
+ * @returns accumulated gradients
  */
-const ComputeGradientForKernels = (activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw) => functions.computeKernelGradients(activated_outputs, delta, weightGrads, inputH, inputW, C_in, Out_H, Out_W, C_out, kh, kw);
+const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1) => functions.computeKernelGradients(input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride);
 
 /**
  * "✅☑️"
@@ -433,6 +466,11 @@ module.exports = {
     MaxPoolDelta,
     init,
     scaleDiff,
+    mse,
+    mae,
+    categorical_cross_entropy,
+    sparse_categorical_cross_entropy,
+    binary_cross_entropy,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

@@ -368,12 +368,13 @@ declare module 'neurex' {
     /**
     * Computes evaluation metrics for regression tasks given test features and labels.
     *
-    * @function
-    * @param {Array<Array<number>>} predictions - The input features for the test set.
-    * @param {Array<number>} actuals - The true target values for the test set.
+    * @function RegressionMetrics
+    * @param {Array<Array<number>>} predictions The input features for the test set.
+    * @param {Array<number>} actuals The true target values for the test set.
+    * @param {Boolean} showOutputs shows the outputs. You can disable it by passing a boolean value. Default is `true`
     * @throws {Error} when textX and testY are not provided
     */
-    export function RegressionMetrics(predictions: number[][], actuals: number[]): void;
+    export function RegressionMetrics(predictions: number[][], actuals: number[], showOutputs: Boolean): void;
 
     /**
     *
@@ -539,19 +540,6 @@ declare module 'neurex' {
         * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
         */
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
-
-        /**
-        * @method transConvLayer Performs the opposite of normal convolution. Instead of downsampling, it performs upsampling input feature map. 
-        * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
-        * @param {Number} strides It determines how much to dilate the input for upsampling
-        * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and across input feature map
-        * @param {String} activation_function the activation function to be use for this layer
-        * @param {String} padding `same` or `valid`
-        * @param {Array<Number>} inputShape the input shape that will pass to this layer. Default is [28, 28, 3]
-        * @throws {Error} if any of the parameters are invalid.
-        * @returns {Object} layer configuration object
-        */
-        transConvLayer(filters:Number, strides:Number, kernel_size: Number[][], activation_function: String, padding: String, inputShape: Number[]): Object;
     }
 
     /**
