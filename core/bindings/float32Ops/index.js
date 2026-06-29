@@ -83,10 +83,9 @@ exports.DLinear = (arr) => {
 };
 
 
-exports.getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => {
-    const {globalWeights, globalOutputTensorTemplate} = getGlobalParams();
+exports.getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointer) => {
+    const {globalOutputTensorTemplate} = getGlobalParams();
 
-    const lookup = globalWeights[pointer];
     const output = globalOutputTensorTemplate[outputTemplatePointer];
 
     // helper function
@@ -126,19 +125,13 @@ exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     return weightGrads;
 }
 
-exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) => {
-
-    /**
-     * since there's no weights and biases being passed to this function, we use the pointer to reference the parameters
-     */
-
-    const {globalWeights, globalBiases, globalOutputTensorTemplate} = getGlobalParams();
+exports.MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
+    const {globalOutputTensorTemplate} = getGlobalParams();
     
     const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
-    
     // 1. Initialize with Biases (Faster than adding them in a separate loop later)
-    z_values.set(globalBiases[pointer]);
+    z_values.set(biases);
 
     // 2. Perform Weighted Sum
     // We iterate through each input neuron
@@ -150,15 +143,14 @@ exports.MatMul = (input, inputSize, outputSize, pointer, outputTemplatePointer) 
 
         // Multiply the input by every weight connecting to output neurons
         for (let j = 0; j < outputSize; j++) {
-            z_values[j] += inputVal * globalWeights[pointer][offset + j];
+            z_values[j] += inputVal * weights[offset + j];
         }
     }
 
     return z_values;
 }
 
-exports.DeltaMatMul = (delta, inputSize, outputSize, pointer) => {
-    const { globalWeights } = getGlobalParams();
+exports.DeltaMatMul = (delta, inputSize, outputSize, weights) => {
 
     const prevDelta = new Float32Array(inputSize);
 
@@ -171,7 +163,7 @@ exports.DeltaMatMul = (delta, inputSize, outputSize, pointer) => {
 
         for (let j = 0; j < outputSize; j++) {
             // We multiply the j-th delta by the weight connecting input i to output j
-            sum += globalWeights[pointer][offset + j]  * delta[j];
+            sum += weights[offset + j]  * delta[j];
         }
         prevDelta[i] = sum;
     }
@@ -281,20 +273,15 @@ exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padL
  * @param {Array<Number>} outputShape 
  * @param {Array<Number>} kernelShape 
  * @param {Array<Number>} inputShape 
- * @param {Number} pointer 
- * @param {Number} outputTemplatePointer 
+ * @param {Float32Array} weights
+ * @param {Float32Array} biases
  * @returns 
  */
-exports.Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer) => {
+exports.Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
 
     const [numFilters, kernelH, kernelW, depth] = kernelShape;
     const [inputH, inputW] = inputShape;
     const [outputH, outputW] = outputShape;
-
-    const { globalWeights, globalBiases } = getGlobalParams();
-
-    const weights = globalWeights[pointer];
-    const biases = globalBiases[pointer];
 
     const output = new Float32Array(outputH * outputW * numFilters);
 
@@ -383,9 +370,8 @@ exports.DilateInput = (input, shape, stride) => {
     };
 };
 
-const RotateKernels = (F, KH, KW, D, pointer) => {
-    const {globalWeights} = getGlobalParams();
-    const rotated = new Float32Array(globalWeights[pointer].length);
+const RotateKernels = (F, KH, KW, D, weights) => {
+    const rotated = new Float32Array(weights.length);
 
     for (let f = 0; f < F; f++) {
         for (let kh = 0; kh < KH; kh++) {
@@ -396,12 +382,12 @@ const RotateKernels = (F, KH, KW, D, pointer) => {
                     const newKw = KW - 1 - kw;
                     const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
                     
-                    rotated[newIdx] = globalWeights[pointer][oldIdx];
+                    rotated[newIdx] = weights[oldIdx];
                 }
             }
         }
     }
-    // Return the rotated array for temporary use[cite: 1]
+    // Return the rotated array for temporary use
     return rotated; 
 };
 
@@ -411,22 +397,18 @@ const RotateKernels = (F, KH, KW, D, pointer) => {
  * @param {Array<Number>} delta_shape 
  * @param {Array<Number>} kernels_shape 
  * @param {Array<Number>} outputShape 
- * @param {Number} pointer 
+ * @param {Float32Array} weights 
  * @param {Number} stride 
  * @returns 
  */
-exports.ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, pointer, stride) => {
+exports.ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights, stride) => {
 
     const [Hp, Wp, C_in] = delta_shape;
     const [F, KH, KW, C_k] = kernels_shape;
     const [oH, oW] = outputShape;
 
     // rotate kernels
-    const rotated_kernel = RotateKernels(F, KH, KW, C_k, pointer);
-
-    // Infer output size (same as inputH, inputW in C++)
-    const H = Hp - KH + 1;
-    const W = Wp - KW + 1;
+    const rotated_kernel = RotateKernels(F, KH, KW, C_k, weights);
 
     const output = new Float32Array(oH * oW * C_k);
 

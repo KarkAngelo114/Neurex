@@ -86,7 +86,7 @@ const init = () => {
  * @param {Number} outputTemplatePointer pointer value correspondind to the output template tensor 
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, pointer, outputTemplatePointer);
+const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, getGlobalParams().globalWeights[pointer], outputTemplatePointer);
 
 /**
  * "✅☑️"
@@ -109,7 +109,15 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functio
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output
  */
-const MatMul = (inputs, inputSize, outputSize, pointer, outputTemplatePointer) => functions.MatMul(inputs, inputSize, outputSize, pointer, outputTemplatePointer);
+const MatMul = (inputs, inputSize, outputSize, pointer, outputTemplatePointer) => functions.MatMul(
+    inputs, 
+    inputSize, 
+    outputSize, 
+    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalBiases[pointer], 
+    outputTemplatePointer
+);
+
 /**
  * "✅☑️"
  * @function DeltaMatMul
@@ -120,7 +128,12 @@ const MatMul = (inputs, inputSize, outputSize, pointer, outputTemplatePointer) =
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
  */
-const DeltaMatMul = (deltas, inputSize, outputSize, pointer) => functions.DeltaMatMul(deltas, inputSize, outputSize, pointer);
+const DeltaMatMul = (deltas, inputSize, outputSize, pointer) => functions.DeltaMatMul(
+    deltas, 
+    inputSize, 
+    outputSize, 
+    getGlobalParams().globalWeights[pointer]
+);
 
 /**
  * "✅☑️"
@@ -225,7 +238,7 @@ const mae = (p, a) => functions.mae(new Float32Array(p), new Float32Array(a));
  * @param {Number} epsilon epsilon value. Default is `1e-15`
  * @returns loss output
  */
-const categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.categorical_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
+const categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.categorical_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 
 /**
  * "✅☑️"
@@ -234,7 +247,7 @@ const categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.categoric
  * @param {Number} epsilon epsilon value. Default is `1e-15`
  * @returns loss output
  */
-const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.sparse_categorical_cross_entropy(new Float32Array(p), a, epsilon);
+const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.sparse_categorical_cross_entropy(new Float32Array(p), a, epsilon);
 
 /**
  * "✅☑️"
@@ -243,7 +256,7 @@ const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => functions.sp
  * @param {Number} epsilon epsilon value. Default is `1e-15`
  * @returns loss output
  */
-const binary_cross_entropy = (p, a, epsilon = 1e-15) => functions.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
+const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 
 /**
  * "✅☑️"
@@ -270,7 +283,16 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {Number} outputTemplatePointer pointer value to fetch allocated tensor of the layer from the global store
  * @returns {Float32Array} convolution result
  */
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer) => functions.Convolve(input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer);
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer) => functions.Convolve(
+    input, 
+    strides, 
+    outputShape, 
+    kernelShape, 
+    inputShape, 
+    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalBiases[pointer], 
+    outputTemplatePointer
+);
 
 /**
  * "✅☑️" dilate the input inserting 0s
@@ -291,7 +313,14 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
  * @param {Nunber} stride stride value
  * @returns {Float32Array} convolve result
  */
-const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1) => functions.ConvolveDelta(input, deltaShape, kernel_shape, outputShape, pointer, stride);
+const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1) => functions.ConvolveDelta(
+    input, 
+    deltaShape, 
+    kernel_shape, 
+    outputShape, 
+    getGlobalParams().globalWeights[pointer],
+    stride
+);
 
 /**
  * 
