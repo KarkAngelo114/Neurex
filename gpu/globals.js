@@ -13,13 +13,13 @@ exports.setGlobalParams = (weights, biases, outputTemplates) => {
 
     // upload the parameters to C++ side to be use by
     if (addon) {
-        addon.setGlobalParams(weights, biases, outputTemplates);
+        addon.uploadOutputTensorTemplates(outputTemplates);
     }
 }
 
 /** 
  * Use to get paramters from the global store. 
- * @returns {Object}
+ * @returns {{globalWeights:Float32Array[], globalBiases: Float32Array[], globalOutputTensorTemplate: Float32Array[]}}
 */
 exports.getGlobalParams = () => {
     return {
