@@ -102,11 +102,31 @@ const formatDuration = (totalSeconds) => {
     return parts.join(' ');
 }
 
+/**
+ * 
+ * @param {Array<Float32Array>} chunks an array collection of float32 array 
+ * @returns { Float32Array }
+ */
+const concatenateFloat32Array = (chunks) => {
+    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    const result = new Float32Array(totalLength);
+    
+    // 2. Copy each chunk into the target position
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    
+    return result;
+}
+
 module.exports = {
     calculateTensorShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,
     getTotalMB,
-    formatDuration
+    formatDuration,
+    concatenateFloat32Array
 }

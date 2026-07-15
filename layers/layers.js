@@ -38,9 +38,13 @@ const {
 } = require('../core/bindings');
 
 const float32Ops = require('../core/bindings/float32Ops');
-const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization, calculateTransposedConvShape} = require('../utils/utils');
+const {calculateTensorShape, getPaddingSizes, ifOneHotEndcoded, XavierInitialization, concatenateFloat32Array} = require('../utils/utils');
 const activation = require('../core/bindings');
 const { red, reset } = require('../color-code');
+
+// import modular functions of different layers. We modularized it so that this file won't get bloated and contain 1k+ lines of code
+const ann = require('../layers/layer_functions/connectedLayer');
+const cnn = require('../layers/layer_functions/convolutionalLayer');
 
 
 class Layers {
@@ -226,154 +230,15 @@ class Layers {
             }
 
             return {
-                "layer_name":"connected_layer", 
-                "activation_function":activation[function_name], 
-                "derivative_activation_function":activation.derivatives[function_name],
-                "layer_size":layer_size,
-                initParams: (size, shape, layer_data) => {
-                    const inputSize = size;
-                    const outputSize = layer_data.layer_size;
-                    const TotalWeightSize = outputSize * inputSize;
-                    
-                    const weights = new Float32Array(TotalWeightSize);
-                    const weightGrads = new Float32Array(TotalWeightSize);
-                    const biases = new Float32Array(outputSize);
-                    const biasGrads = new Float32Array(outputSize);
-                    const output_template = new Float32Array(outputSize);
-                    
-                    const limit = XavierInitialization(inputSize, outputSize);
-
-                    for (let i = 0; i < TotalWeightSize; i++) {
-                        weights[i] = (Math.random() * 2 - 1) * limit;
-                    }
-                    
-                    for (let i = 0; i < outputSize; i++) {
-                        biases[i] = (Math.random() * 2 - 1) * limit;
-                    }
-
-                    const weightShape = [inputSize, outputSize];
-                    const updatedShape = [1, 1, outputSize]
-
-                    return {
-                        updatedSize: outputSize,
-                        updatedShape: updatedShape,
-                        weights: weights,
-                        biases: biases,
-                        weightGrads: weightGrads,
-                        biasGrads: biasGrads,
-                        outputTensors: output_template,
-                        inputShape: [],
-                        outputShape: updatedShape,
-                        paramShape: weightShape,
-                        isParametric: true,
-                    }
-                },
-                determineInferenceType: (layerObject, lossFunc, trainY) => {
-                    
-                    let activation_function = layerObject.activation_function.name; // activation function
-                    let layer_size = layerObject.layer_size; // layer size
-
-                    /* do a loop to check if the trainY length are the same as output size if the loss is a categorical cross entropy and the activation function is softmax
-                    * Example:
-                    * output size: 3
-                    * 
-                    * The trainY should be:
-                    * [
-                    *    [0, 0, 1],
-                    *    [1, 0, 0],
-                    *    [0, 1, 0],
-                    *    ....
-                    * ]
-                    */
-
-                    if (lossFunc === "categorical_cross_entropy" && activation_function === "softmax") {
-                        trainY.forEach(label => {
-                            if (label.length != layer_size) throw new Error(`Output size must be the same number of classes. Number of classes: ${label.length} | Output layer size: ${layer_size}`);
-                        });
-
-                        // check also if the trainY are one hot encoded. Categorical Cross Entropy works wiht one-hot encoded labels
-                        const isOneHotEncoded = ifOneHotEndcoded(trainY);
-                        if (!isOneHotEncoded) throw new Error("Labels must be one hot encoded if the loss function is 'categorical_cross_entropy' and the activation function is `softmax`.");
-                    }
-
-                    if (lossFunc === "mae" || lossFunc === "mse") {
-                        return "regression";
-                    }
-
-                    if (lossFunc === "binary_cross_entropy") {
-                        return "binary_classification";
-                    }
-
-                    if (lossFunc === "categorical_cross_entropy" || lossFunc === "sparse_categorical_cross_entropy") {
-                        return "multi_class_classification";
-                    }
-
-                    //  if none satisfies the conditions above, throw an error
-                    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
-                },
-                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
-
-                    const [inputSize, outputSize] = current_layer.weightShape;
-                    const z_values = MatMul(input, inputSize, outputSize, pointer, outputTemplatePointer);
-                    const activation_function = activation[function_name];
-
-                    let outputs = activation_function(z_values);
-                    
-                    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
-                    
-                    return {
-                        outputs, 
-                        z_values,
-                        incrementor_value: 1
-                    };
-                },
-                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
-                    let dActivation = activation.derivatives[function_name];
-                    let dOutputLayer = new Float32Array(preds.length); 
-
-                    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
-                        dOutputLayer = element_wise_sub(preds, actuals);
-                    }
-                    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
-                        dOutputLayer.set(preds);
-                        dOutputLayer[actuals[0]] -= 1;
-                        
-                    }
-                    else if (tasktype === "regression") {
-                        if (preds.length != actuals.length) {
-                            throw new Error("Predictions array is not equal to actuals array");
-                        }
-
-                        const lastLayerZs = zs[zs.length - 1]; 
-                        const dAct = dActivation(lastLayerZs); 
-
-                        dOutputLayer = scaleDiff(preds, actuals, dAct);
-
-                        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
-
-                    }
-
-                    return dOutputLayer;
-                },
-                backpropagate: (delta, zs, layer_index, current_layer, allWeights, activations, nextLayer, pointer) => {
-
-                    let current_delta;
-                    const dActivation = activation.derivatives[function_name];
-                    const dAct = dActivation(zs[layer_index]);
-
-                    let next_delta = delta;
-                    const [inputSize, outputSize] = nextLayer.weightShape;
-                    const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                        
-                    current_delta = element_wise_mul(dAct, delta_res);
-
-                    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");            
-
-                    return {
-                        current_delta,
-                        decrementor_value: 1
-                    };
-                },
+                layer_name: "connected_layer", 
+                activation_function: activation[function_name], 
+                derivative_activation_function: activation.derivatives[function_name],
+                layer_size: layer_size,
+                initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
+                determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => ann.feedforward(input, current_layer, pointer, outputTemplatePointer),
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => ann.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
+                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer) => ann.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
                 computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
@@ -419,176 +284,18 @@ class Layers {
             }
 
             return {
-                "layer_name":"convolutionalLayer",
-                "activation_function":activation[function_name],
-                "derivative_activation_function":activation.derivatives[function_name],
-                "kernel_size":kernel_size,
-                "filters":filters,
-                "padding":padding.toLowerCase(),
-                "strides":strides,
-                initParams: (size, shape, layer_data) => {
-                    const filters = layer_data.filters;
-                    const [kH, kW] = layer_data.kernel_size;
-                    const stride = layer_data.strides || 1;
-                    const padding = layer_data.padding || "same";
-
-                    const inputH = shape[0];
-                    const inputW = shape[1];
-                    const inputDepth = shape[2];
-
-                    const inputShape = [inputH, inputW, inputDepth];
-
-                    const TotalSize = filters * kH * kW * inputDepth;
-
-                    let kernels = new Float32Array(TotalSize);
-                    let kernelGrads = new Float32Array(TotalSize);
-                    let biases = new Float32Array(filters);
-                    let biasGrads = new Float32Array(filters);
-                    const fanIn = kH * kW * inputDepth;
-                    const fanOut = kH * kW * filters;
-                    const limit = XavierInitialization(fanIn, fanOut);
-
-                    for (let i = 0; i < TotalSize; i++) {
-                        kernels[i] = (Math.random() * 2 - 1) * limit;
-                    }
-
-                    for (let i = 0; i < filters; i++) {
-                        biases[i] = (Math.random() * 2 - 1) * limit;
-                    }
-
-                    // Calculate output shape
-                    const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(inputH, inputW, kH, kW, filters, stride, padding);
-                    const output_template = new Float32Array(CalculatedTensorShape)
-                    // store output shape too
-                    const outputShape = [OutputHeight, OutputWidth, filters];
-
-                    const weightShape = [filters, kH, kW, inputDepth];
-                    
-                    return {
-                        updatedSize: CalculatedTensorShape,
-                        updatedShape: outputShape,
-                        weights: kernels,
-                        biases: biases,
-                        weightGrads: kernelGrads,
-                        biasGrads: biasGrads,
-                        outputTensors: output_template,
-                        inputShape: inputShape,
-                        outputShape: outputShape,
-                        paramShape: weightShape,
-                        isParametric: true,
-                    }
-                },
-                determineInferenceType: (layerObject, lossFunc, trainY) => {
-
-                    throw new Error('Convolutional layer cannot be an output layer for now');
-
-                    /**
-                    * Convolution layers might have it's on way of determining task, I'll leave this as one of my TO DOs
-                    */
-                    
-                },
-                feedforward: (input, current_layer, pointer, outputTemplatePointer) => {
-                    
-                    let [f, kh, kw, kd] = current_layer.weightShape;
-                    let [input_H, input_W, input_D] = current_layer.inputShape; 
-                    let padding = current_layer.padding;
-                    let strides = current_layer.strides;
-
-                    // 1. compute expected output tensor shape
-                    const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, current_layer.strides, current_layer.padding);
-
-                    // 2. get padding sizes for each sides
-                    const {top, bottom, left, right} = getPaddingSizes(input_H, input_W, kh, kw, strides, padding);
-
-                    // 3. apply padding
-                    const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
-
-                    // 4. Perform the convolve operation using the shapes calculated in step 1
-                    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, outputTemplatePointer);
-
-                    if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
-
-                    // 5. activate each depth input using the given activation function
-                    const activation_function = activation[function_name];
-
-                    const outputs = activation_function(convolve_result);
-
-                    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");
-
-                    return {
-                        outputs: outputs,
-                        z_values: convolve_result,
-                        incrementor_value: 1
-                    };
-                },
-                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
-                    /**
-                    * Convolution layers has different process of getting delta of the output layer, so this is another TO DOs, but for now, throw an error 
-                    */
-
-                    throw new Error('Convolutional layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
-                    process.exit(1);
-                    // let dOutputLayer = new Float32Array(preds.length); 
-
-                    // return dOutputLayer;
-                },
-                backpropagate: (next_delta, zs, layer_index, currentLayer, weights, activations, next_layer,pointer) => {
-                    let Current_Z = zs[layer_index];
-                    let dActivation = activation.derivatives[function_name];
-                    let dL_dActivation;
-
-                    if (next_layer.layer_name === "connected_layer") {
-                        const [inputSize, outputSize] = next_layer.weightShape;
-                        dL_dActivation = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                    } 
-                    else if (next_layer.layer_name === "maxPooling") {
-                        dL_dActivation = next_delta;
-                    } 
-                    else if (next_layer.layer_name === "convolutionalLayer") {
-                        const [Fn, KHn, KWn, KCn] = next_layer.weightShape;
-                        const [oHn, oWn, oDn] = next_layer.outputShape;
-                        const [oHcurr, oWcurr] = currentLayer.outputShape;  // backward target shape
-                        const stridesN = next_layer.strides;
-                        const paddingN = next_layer.padding;
-
-                        // dilate input
-                        const {data: dilated, dilatedHeight: dilatedH, dilatedWidth:dilatedW} = Dilate_Input(next_delta, [oHn, oWn, oDn], stridesN);
-
-                        let pT, pB, pL, pR;
-                        if (paddingN === "valid") {
-                            // full conv: K-1 on every side
-                            pT = pB = KHn - 1;
-                            pL = pR = KWn - 1;
-                        } else {
-                            // "same": split K-1, then top up so the result is at least oHcurr/oWcurr
-                            pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
-                            pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
-
-                            const needH = oHcurr + KHn - 1;          // ConvolveDelta needs Hp >= needH
-                            const needW = oWcurr + KWn - 1;
-                            const haveH = dilatedH + pT + pB;
-                            const haveW = dilatedW + pL + pR;
-                            if (haveH < needH) pB += (needH - haveH);
-                            if (haveW < needW) pR += (needW - haveW);
-                        }
-
-                        // pass the REAL dilated dims, not oHn/oWn
-                        const { data, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
-
-                        dL_dActivation = ConvolveDelta(data, shape, [Fn, KHn, KWn, KCn], [oHcurr, oWcurr], pointer);
-                    }
-                    
-                    const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
-                    if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
-
-                    return {
-                        current_delta: output,
-                        decrementor_value: 1
-                    };
-                    
-                    
-                    
-                },
+                layer_name: "convolutionalLayer",
+                activation_function: activation[function_name],
+                derivative_activation_function: activation.derivatives[function_name],
+                kernel_size: kernel_size,
+                filters: filters,
+                padding: padding.toLowerCase(),
+                strides: strides,
+                initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
+                determineInferenceType: () => cnn.determineInferenceType(),
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => cnn.feedforward(input, current_layer, pointer, outputTemplatePointer),
+                getOutputLayerDelta: () => cnn.getOutputLayerDelta(),
+                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer) => cnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => {
                     const [filters, kH, kW, inDepth] = layer_data.weightShape
                     const [inH, inW] = layer_data.inputShape
@@ -709,7 +416,7 @@ class Layers {
                     throw new Error('Max pooling layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
                     process.exit(1);
                 },
-                backpropagate: (prev_delta, zs, layer_index, currentLayer, weights, activations, next_layer, pointer, outputTemplatePointer) => {
+                backpropagate: (prev_delta, zs, layer_index, currentLayer, next_layer, pointer, outputTemplatePointer) => {
                     let next_delta = prev_delta;
                     const [inputH, inputW, inputD] = currentLayer.inputShape;
                     const [outputH, outputW, outputD] = currentLayer.outputShape;
@@ -739,6 +446,85 @@ class Layers {
                 },
                 scaleGrads: () => {
                     // max pooling layer has no params like weights and biases, so no functions here :)
+                },
+            }
+        }
+        catch (error) {
+            console.error(error);
+            process.exit(1);
+        }
+    }
+
+    /**
+     * 
+     * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
+     * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
+     * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
+     * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
+     */
+    recurrentCell(units, activation_function = "tanh", return_sequence = false, return_state = false) {
+        try {
+            let function_name = activation_function.toLowerCase();
+
+            if (!activation[function_name] || !activation.derivatives[function_name])  throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid.`);
+            if (!units || units <= 0) throw new Error(`[ERROR]------- Units cannot be null, negative integer or a 0. | Units: ${units}`);
+
+            return {
+                layer_name: "recurrent_cell", 
+                activation_function: activation[function_name], 
+                derivative_activation_function: activation.derivatives[function_name],
+                layer_size: units,
+                initParams: (size, shape, layer_data) => {
+                    const total_input_weights = size * units; // this is for the layer weights of this layer
+                    const total_recurrent_weights = units * units; // this is for the recurrent weights of this layer
+                    const totalBiases = units; // number of biases of this layer
+
+                    const input_weights = new Float32Array(total_input_weights);
+                    const recurrent_weights = new Float32Array(total_recurrent_weights);
+                    const biases = new Float32Array(totalBiases);
+                    const weightGrads = new Float32Array(total_input_weights + total_recurrent_weights); // combined the zeroed grads accumulator for input_weights and recurrent_weights
+                    const biasGrads = new Float32Array(totalBiases);
+                    const output_template = new Float32Array(units);
+
+                    const limit1 = XavierInitialization(size, units);
+                    const limit2 = XavierInitialization(units, units);
+                    
+                    for (let i = 0; i < total_input_weights; i++) {
+                        input_weights[i] = (Math.random() * 2 - 1) * limit1;
+                    }
+
+                    for (let i = 0; i < total_recurrent_weights; i++) {
+                        recurrent_weights[i] = (Math.random() * 2 - 1) * limit2;
+                    }
+
+                    for (let i = 0; i < totalBiases; i++) {
+                        biases[i] = (Math.random() * 2 - 1) * limit1;
+                    }
+
+                    // concatenate input_weights and recurrent_weights. So the first size * units are the input_weights and the remaining units * units are the recurrent weights
+                    // we concatenate both so that the optimizers can blindly consume 1D array (since it works on 1D arrays)
+                    const concatenated_weights = concatenateFloat32Array([input_weights, recurrent_weights]);
+
+                    // cache the number of input_weights so that we can just slice it later on.
+                    layer_data.num_input_weights = total_input_weights;
+
+                    const weightShape = [size, units];
+                    const updatedShape = [1, 1, units];
+
+                    return {
+                        updatedSize: units,
+                        updatedShape: updatedShape,
+                        weights: concatenated_weights,
+                        biases: biases,
+                        weightGrads: weightGrads,
+                        biasGrads: biasGrads,
+                        outputTensors: output_template,
+                        inputShape: [],
+                        outputShape: updatedShape,
+                        paramShape: weightShape,
+                        isParametric: true,
+                    }
+
                 },
             }
         }

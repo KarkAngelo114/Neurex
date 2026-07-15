@@ -288,11 +288,9 @@ class Neurex {
                 isParametric: layer.isParametric
 
             })),
-            "weights":this.weights.map(w => Array.from(w)),
-            "biases":this.biases.map(b => Array.from(b)),
         };
 
-        this.#save(data, fileName);
+        this.#save(data, this.weights, this.biases, fileName);
         
     }
 
@@ -326,20 +324,47 @@ class Neurex {
 
             // Validate magic header
             const header = rawBuffer.slice(0, 4).toString('utf-8');
-            if (header !== 'NRX3') {
+            if (header !== 'NRX4') {
                 throw new Error(`${color.red}Invalid version format.${color.reset}`);
             }
 
             // Check version
             const version = rawBuffer[4];
-            if (version !== 0x03) {
+            if (version !== 0x04) {
                 throw new Error(`${color.red}Unsupported NRX version: ${version}${color.reset}`);
             }
 
-            // Decompress and parse
-            const compressedData = rawBuffer.slice(5);
-            const jsonString = zlib.inflateSync(compressedData).toString('utf-8');
-            const modelData = JSON.parse(jsonString);
+            // Read metadata block (small, JSON-friendly: arch, hyperparams, shapes)
+            const metaLength = rawBuffer.readUInt32LE(5);
+            const metaStart = 9;
+            const metaCompressed = rawBuffer.slice(metaStart, metaStart + metaLength);
+            const metaJson = zlib.inflateSync(metaCompressed).toString('utf-8');
+            const modelData = JSON.parse(metaJson);
+
+            // Read tensor block (weights/biases as raw concatenated Float32 bytes).
+            // This is never run through JSON.parse/stringify; we slice typed array
+            // views directly out of the decompressed buffer instead.
+            const tensorCompressed = rawBuffer.slice(metaStart + metaLength);
+            const tensorBlock = zlib.inflateSync(tensorCompressed);
+
+            let byteOffset = 0;
+            const readTensors = (lengths) => lengths.map(len => {
+                const byteLen = len * Float32Array.BYTES_PER_ELEMENT;
+                // tensorBlock's offset within its own underlying ArrayBuffer must be
+                // included, since inflateSync may return a Buffer that is itself a
+                // view into a larger pooled allocation.
+                const arr = new Float32Array(
+                    tensorBlock.buffer.slice(
+                        tensorBlock.byteOffset + byteOffset,
+                        tensorBlock.byteOffset + byteOffset + byteLen
+                    )
+                );
+                byteOffset += byteLen;
+                return arr;
+            });
+
+            const loadedWeights = readTensors(modelData.weightLengths);
+            const loadedBiases = readTensors(modelData.biasLengths);
 
             // Assign properties
             this.task = modelData.task;
@@ -351,8 +376,8 @@ class Neurex {
             this.input_size = modelData.input_size;
             this.output_size = modelData.output_size;
             this.num_layers = modelData.num_layers;
-            this.weights = modelData.weights.map(w => new Float32Array(w));
-            this.biases = modelData.biases.map(b => new Float32Array(b));
+            this.weights = loadedWeights;
+            this.biases = loadedBiases;
             this.optimizer = modelData.optimizer;
             this.input_shape = modelData.input_shape
             const layerBuilder = new Layers();
@@ -954,8 +979,12 @@ class Neurex {
             const pointer = layerPointers[layer_index + 1];
 
             const { current_delta: new_delta } = current_layer.backpropagate(
-                next_delta, zs, layer_index, current_layer,
-                this.weights, activations, next_layer, pointer
+                next_delta, 
+                zs, 
+                layer_index, 
+                current_layer,
+                next_layer, 
+                pointer
             );
 
             current_delta = new_delta;
@@ -995,25 +1024,48 @@ class Neurex {
             zs: zs
         };
     }
+
     //saving model
-    #save(data, fileName) {
+    #save(data, weights, biases, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);
 
-            // Serialize and compress the model data
-            const jsonString = JSON.stringify(data);
-            const compressedData = zlib.deflateSync(jsonString);
+            // Record tensor lengths (in elements, not bytes) so we can slice the
+            // binary block back into individual Float32Arrays on load.
+            data.weightLengths = weights.map(w => w.length);
+            data.biasLengths = biases.map(b => b.length);
+
+            // Metadata (architecture, hyperparams, shapes) is small text data,
+            // so JSON + deflate is fine here.
+            const metaJson = Buffer.from(JSON.stringify(data), 'utf-8');
+            const metaCompressed = zlib.deflateSync(metaJson);
+
+            // Weights/biases are large numeric tensors. Never run these through
+            // JSON.stringify: converting millions of floats to decimal text
+            // inflates a compact 4-byte-per-value Float32Array into a string many
+            // times larger, and at scale this exceeds V8's max string length
+            // (~512MB), throwing "RangeError: Invalid string length".
+            // Instead, view each Float32Array's underlying memory directly as a
+            // Buffer (zero-copy) and concatenate into one raw binary block.
+            const weightBuffers = weights.map(w => Buffer.from(w.buffer, w.byteOffset, w.byteLength));
+            const biasBuffers = biases.map(b => Buffer.from(b.buffer, b.byteOffset, b.byteLength));
+            const tensorBlock = Buffer.concat([...weightBuffers, ...biasBuffers]);
+            const tensorCompressed = zlib.deflateSync(tensorBlock);
 
             // Define file format:
-            // [HEADER (4 bytes)] + [VERSION (1 byte)] + [DATA (compressed)]
-            const header = Buffer.from("NRX3"); // Magic bytes
-            const version = Buffer.from([0x03]); // Version 3
+            // [HEADER (4 bytes)] + [VERSION (1 byte)] + [META_LENGTH (4 bytes, uint32 LE)]
+            // + [META (compressed JSON)] + [TENSOR BLOCK (compressed raw floats)]
+            const header = Buffer.from("NRX4"); // Magic bytes (bumped: new binary tensor format)
+            const version = Buffer.from([0x04]); // Version 4
+
+            const metaLengthBuf = Buffer.alloc(4);
+            metaLengthBuf.writeUInt32LE(metaCompressed.length, 0);
 
             // Combine all parts
-            const finalBuffer = Buffer.concat([header, version, compressedData]);
+            const finalBuffer = Buffer.concat([header, version, metaLengthBuf, metaCompressed, tensorCompressed]);
 
             const nrxFilePath = path.join(dir, `${fileName}.nrx`);
 
