@@ -44,49 +44,100 @@ const {Neurex, Layers} = require('neurex');
 const nrx = new Neurex();
 const layer = new Layers();
 
-const trainX = [
-    [0, 0],
-    [0, 1],
-    [1, 0],
-    [1, 1]
-]
-
-const trainY = [
-    [0],
-    [1],
-    [1],
-    [0]
-];
-
-// configurations
-nrx.configure({
-    optimizer:'adam',
-    learning_rate:0.1,
-    checkpoint_per_epoch: 100, // if you want to save the model for every N epochs (let's say every 100 epochs like in this example)
-    mode:"cpu", /* "gpu" or "auto" */
-});
-
-// stack layers in sequential order
-nrx.sequentialBuild([
-    layer.inputShape({ features:2 }),
-    layer.connectedLayer('relu', 4),
-    layer.connectedLayer('sigmoid',1)
-]);
 
 
-// you can show the summary of your model by calling modelSummary()
-nrx.modelSummary();
+(async () => {
+    const trainX = [
+        [0, 0],
+        [0, 1],
+        [1, 0],
+        [1, 1]
+    ]
 
-// train the model
-nrx.train(trainX, trainY, 'binary_cross_entropy', 1000, 2);
+    const trainY = [
+        [0],
+        [1],
+        [1],
+        [0]
+    ];
 
-// predict
-const predictions = nrx.predict(trainX);
-trainX.forEach((input, i) => {
-    const pred_val = predictions[i][0] > 0.5 ? 1 : 0; // since it's binary classiification. Predicted outputs are between 0 and 1
-    console.log(`Input: ${input} Predicted value: ${pred_val} | Raw output: ${predictions[i][0]} | Actual: ${trainY[i][0]}`);
-});
+    // configurations
+    nrx.configure({
+        optimizer:'adam',
+        learning_rate:0.1,
+        checkpoint_per_epoch: 100, // if you want to save the model for every N epochs (let's say every 100 epochs like in this example)
+        mode:"cpu", /* "gpu" or "auto" */
+    });
 
+    // stack layers in sequential order
+    nrx.sequentialBuild([
+        layer.inputShape({ features:2 }),
+        layer.connectedLayer('relu', 4),
+        layer.connectedLayer('sigmoid',1)
+    ]);
+
+
+    // you can show the summary of your model by calling modelSummary()
+    nrx.modelSummary();
+
+    // train the model
+    await nrx.train(trainX, trainY, 'binary_cross_entropy', 1000, 2);
+
+    // save model
+    nrx.saveModel('model'); // this will be saved as model.nrx
+
+    // predict
+    const predictions = await nrx.predict(trainX);
+    console.log(pedictions); // predicted outputs are in float32array. You may convert it to normal JS array if you need
+    /*
+    * Example:
+    * [
+    *   Float32Array(1) [ 0.2107422947883606 ]
+    * ]
+    */
+})();
+```
+
+_Note: `nrx` (or neurex) models are proprietary model file format in `Neurex` only._
+
+## Loading, popping and adding new layers for transfer learning
+
+To load `.nrx` models, you can use `loadSavedModel()`. This will load and recontruct your trained model
+
+```Javascript
+const { Neurex, Layers } = require('neurex');
+
+(async () => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    await nrx.loadSavedModel("model.nrx");
+
+    nrx.modelSummary(); // prints the model summary
+})();
+
+```
+
+To remove and add a new layer, use `pop()` and `add_layer()`. These methods are essentials if you do `transfer learning`
+
+```Javascript
+const { Neurex, Layers } = require('neurex');
+
+(async () => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    await nrx.loadSavedModel("model.nrx");
+    nrx.pop(); 
+
+    // calling more pop() will remove every last layer
+    // nrx.pop(); 
+    // nrx.pop(); 
+    // nrx.pop(); 
+    nrx.add_layer(layer.connectedLayer('softmax', 3)) // append a new layer with untrained parameters
+
+    nrx.modelSummary(); // prints the model summary
+})();
 ```
 
 You can also used predefined neural network templates which you can drop in to the `sequentialBuild()`
@@ -111,8 +162,6 @@ const { Neurex, Layers, templates } = require('neurex');
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/api#templates).
 
 # Test the Experimental Upcoming Updates 🔥
-> ⚠️ This version is currently under active development and may contain breaking changes, bugs, or incomplete features.
-
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.
 
 ## Install from GitHub
