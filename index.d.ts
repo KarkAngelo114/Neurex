@@ -539,15 +539,16 @@ declare module 'neurex' {
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
 
         /**
-         * @method recurrentCell A recurrent cell is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
+         * @method `recurrentCell` is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
          * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
          * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
+         * @param {Number} maxSequenceLength the max sequence length value. Default is value is `1`.
          * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
          * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
          * @returns {Object} The Recurrent Cell configuration
          * @throws {Error} if internal initialization and computational process has an error.
          */
-        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean): Object;
+        recurrentCell(units: Number, activation_function: String, maxSequenceLength: Number, return_sequence: Boolean, return_state: Boolean): Object;
     }
 
     /**

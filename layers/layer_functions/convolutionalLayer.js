@@ -1,5 +1,5 @@
 const activation = require('../../core/bindings')
-const { applyPadding, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul } = require("../../core/bindings");
+const { applyPadding, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
 const { XavierInitialization, calculateTensorShape, getPaddingSizes } = require("../../utils/utils");
 
 
@@ -145,10 +145,12 @@ const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer
     let Current_Z = zs[layer_index];
     let dActivation = activation.derivatives[current_layer.activation_function.name];
     let dL_dActivation;
-
+    
     if (nextLayer.layer_name === "connected_layer") {
+        console.log('connected_layer executing in convolutionalLayer.js')
         const [inputSize, outputSize] = nextLayer.weightShape;
         dL_dActivation = DeltaMatMul(delta, inputSize, outputSize, pointer);
+        if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
     } 
     else if (nextLayer.layer_name === "maxPooling") {
         dL_dActivation = delta;
@@ -186,6 +188,7 @@ const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer
         const { data: PaddedInput, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
         dL_dActivation = ConvolveDelta(PaddedInput, shape, [Fn, KHn, KWn, KCn], [oHcurr, oWcurr], pointer);
+        if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
     }
                     
     const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
@@ -197,10 +200,52 @@ const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer
     };
 }
 
+/**
+ * 
+ * @param {Float32Array} activation_outputs all outputs during feedforward
+ * @param {Float32Array} deltas all outputs during backpropagation 
+ * @param {Float32Array} weightGrads initially zeroed accumulators
+ * @param {Object} layer_data layer configuration data
+ * @returns {Float32Array} Float32Array accumulated gradients
+ */
+const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
+    const [filters, kH, kW, inDepth] = layer_data.weightShape
+    const [inH, inW] = layer_data.inputShape
+    const [outH, outW] = layer_data.outputShape
+
+
+    const output = ComputeGradientForKernels(
+        activation_outputs,
+        deltas,
+        weightGrads,
+        [inH, inW, inDepth],
+        [outH, outW, filters],
+        [kH, kW]);
+
+        if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
+
+        return output;
+}
+
+/**
+ * 
+ * @param {Float32Array} biasgrads initially zeroed gradient accumulators 
+ * @param {Float32Array} deltas all outputs during backpropagation
+ * @param {Object} layer_data layer configuration data
+ * @returns {Float32Array} Float32Array accumulated gradients
+ */
+const computeBiasGradients = (biasgrads, deltas, layer_data) => {
+    const [filters] = layer_data.weightShape;
+    const [outH, outW] = layer_data.outputShape;
+    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
+}
+
 module.exports = {
     initParams,
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate
+    backpropagate,
+    computeWeightGradients,
+    computeBiasGradients
 }

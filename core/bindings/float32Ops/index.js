@@ -678,3 +678,33 @@ exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
     }
     return sum / predictions.length;
 }
+
+exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
+    const { globalOutputTensorTemplate } = getGlobalParams();
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    // The weights were concatenated during initialization as:
+    // [input_weights..., recurrent_weights...]
+    const inputSize = inputWeightShape[0];
+    const units = inputWeightShape[1];
+    const range_input_weights = inputSize * units;
+
+    const input_weights = weights.subarray(0, range_input_weights);
+    const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
+
+    for (let j = 0; j < units; j++) {
+        let z = biases[j];
+
+        for (let i = 0; i < inputSize; i++) {
+            z += input[i] * input_weights[i * units + j];
+        }
+
+        for (let h = 0; h < units; h++) {
+            z += prevHiddenState[h] * recurrent_weights[h * units + j];
+        }
+
+        output[j] = z;
+    }
+
+    return output;
+}

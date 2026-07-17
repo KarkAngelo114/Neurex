@@ -96,7 +96,7 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     }
 
     //  if none satisfies the conditions above, throw an error
-    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable for this core's task.${reset}`);
+    throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable.${reset}`);
 }
 
 /**
