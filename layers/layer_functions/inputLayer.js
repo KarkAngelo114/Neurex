@@ -6,14 +6,23 @@
  */
 const inputConfig = (shapeConfig) => {
     try {
-        if (shapeConfig.features) {
+        if (shapeConfig.featureSize && shapeConfig.sequenceLength) {
+            const { featureSize, sequenceLength } = shapeConfig;
+            return {
+                layer_name: "input_layer",
+                layer_size: featureSize * sequenceLength,
+                input_shape: [1, 1, featureSize, sequenceLength]
+            };
+        }
+        else if (shapeConfig.features) {
             const features = shapeConfig.features;
             return {
                 layer_name: "input_layer",
                 layer_size: features,
-                input_shape: null
+                input_shape: [1, 1, features, 1]
             };
-        } else if (shapeConfig.height && shapeConfig.width && shapeConfig.depth) {
+        }
+        else if (shapeConfig.height && shapeConfig.width && shapeConfig.depth) {
             const { height, width, depth } = shapeConfig;
 
             return {

@@ -1,6 +1,6 @@
 const { XavierInitialization, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const activation = require('../../core/bindings');
-const { recurrentMatMul } = require('../../core/bindings');
+const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta } = require('../../core/bindings');
 /**
  * Initialized parameters for this layer
  * @param {Number} size number of neurons for this layer 
@@ -10,10 +10,16 @@ const { recurrentMatMul } = require('../../core/bindings');
  */
 const initParams = (size, shape, layer_data) => {
     const units = layer_data.units;
-    const maxSequenceLength = layer_data.maxSequenceLength || 1;
+    
+    // 1. Correctly extract the sequence length and feature size from the embedding layer's output shape
+    // shape format from embedding is: [1, 1, embeddingDim, maxSequenceLength]
+    const feature_size = shape[2] || size; 
+    let maxSequenceLength = shape[3] || layer_data.maxSequenceLength || 1;
+    
     const return_sequence = layer_data.return_sequence || false;
 
-    const total_input_weights = size * units; 
+    // 2. Compute total input weights using feature_size instead of size
+    const total_input_weights = feature_size * units; 
     const total_recurrent_weights = units * units; 
     const totalBiases = units; 
 
@@ -23,13 +29,10 @@ const initParams = (size, shape, layer_data) => {
     const weightGrads = new Float32Array(total_input_weights + total_recurrent_weights); 
     const biasGrads = new Float32Array(totalBiases);
 
-    // If returning the full sequence, the output size is multiplied by the steps
     const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
-    
-    // Create the output template with the corrected size
-    const output_template = new Float32Array(outputUnits);
+    const output_template = new Float32Array(units);
 
-    const limit1 = XavierInitialization(size, units);
+    const limit1 = XavierInitialization(feature_size, units); // Use feature_size
     const limit2 = XavierInitialization(units, units);
                     
     for (let i = 0; i < total_input_weights; i++) {
@@ -45,9 +48,11 @@ const initParams = (size, shape, layer_data) => {
     }
 
     const concatenated_weights = concatenateFloat32Array([input_weights, recurrent_weights]);
-    const weightShape = [size, units, units, units]; 
+    
+    // 3. Keep track of the actual step feature size here
+    const weightShape = [feature_size, units, units, units]; 
 
-    // Update the shape representation to reflect the sequence dimensionality
+    layer_data.maxSequenceLength = return_sequence ? maxSequenceLength : 1;
     const updatedShape = [1, 1, outputUnits];
 
     return {
@@ -117,16 +122,16 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
 
 /**
  * The feedforward logic of this layer
- * @param {Float32Array} input input features 
+ * @param {Float32Array} inputSequence input sequence data 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
 const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointer) => {
+
     const units = current_layer.units;
-    // Assume inputSequence is flat: [sequence_length * feature_size]
-    // You'll need to know the sequence length (e.g., passed from layer configuration)
+    // Assume inputSequence is flat: [units * sequence_length]
     const sequence_length = current_layer.maxSequenceLength || 1; 
     const feature_size = current_layer.weightShape[0]; // [feature_size/size, units]
 
@@ -139,19 +144,23 @@ const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointe
 
     // 3. Loop through each time step sequentially
     for (let t = 0; t < sequence_length; t++) {
+        
         // Extract x_t for the current time step
-        const x_t = inputSequence.subarray(t * feature_size, (t + 1) * feature_size);
+        let offset = t * feature_size;
+        const sequence_data = inputSequence.subarray(offset, offset + feature_size);
 
         // Compute z_t = (x_t * W_x) + (current_hidden * W_h) + bias
         // Pass current_hidden explicitly so it doesn't leak between global samples
         const z_t = recurrentMatMul(
-            x_t, 
+            sequence_data, 
             current_hidden, 
             [current_layer.weightShape[0], current_layer.weightShape[1]], 
             [current_layer.weightShape[2], current_layer.weightShape[3]], 
             pointer, 
             outputTemplatePointer
-        ); 
+        );
+
+        if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
         
         // Update hidden state for the next step
         current_hidden = activation[current_layer.activation_function.name](z_t);
@@ -161,10 +170,15 @@ const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointe
         all_hidden_states.push(new Float32Array(current_hidden));
     }
 
-    // 4. Format the output based on your return_sequence flag
+    // cache recurrent layer cell feedforward data
+    current_layer.cache = {
+        hidden_states: all_hidden_states,
+        recurrentZs: all_z_values
+    }
+
     let final_output;
     if (current_layer.return_sequence) {
-        // Concatenate all hidden states into one big flat array
+        // Concatenate all hidden states into one big flat array if return_sequence is true
         final_output = concatenateFloat32Array(all_hidden_states);
     } else {
         // Just return the very last hidden state vector
@@ -178,8 +192,114 @@ const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointe
     };
 }
 
+/**
+ * 
+ * @param {Float32Array} preds array of predicton outputs 
+ * @param {Float32Array} actuals array of target labels 
+ * @param {Array<Float32Array>} zs array of pre-activated values (zs)
+ * @param {String} lossFunc loss function used in training
+ * @param {String} tasktype task type the model is trained for 
+ * @param {Object} layerObj layer config object of the last layer
+ * @returns {Float32Array} the delta of the output layer
+ */
+const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+    let dActivation = activation.derivatives[layerObj.activation_function.name];
+    let dOutputLayer = new Float32Array(preds.length); 
+
+    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
+        dOutputLayer = element_wise_sub(preds, actuals);
+    }
+    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
+        dOutputLayer.set(preds);
+        dOutputLayer[actuals[0]] -= 1;
+                        
+    }
+    else if (tasktype === "regression") {
+        if (preds.length != actuals.length) throw new Error("Predictions array is not equal to actuals array");
+
+        const lastLayerZs = zs[zs.length - 1]; 
+        const dAct = dActivation(lastLayerZs); 
+
+        dOutputLayer = scaleDiff(preds, actuals, dAct);
+
+        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
+
+    }
+    
+    return dOutputLayer;
+}
+
+/**
+ * 
+ * @param {Float32Array} delta incoming delta 
+ * @param {Array<Float32Array>} zs an array containing Z values 
+ * @param {Number} layer_index current layer index
+ * @param {Object} current_layer current layer configuration 
+ * @param {Object} nextLayer the configs of the next layer (in feedforward pass direction)
+ * @param {Number} pointer pointer value to be used in fetching corresponding parameters
+ * @returns {{ current_delta: Float32Array, decrementor_value: Number }}
+ */
+const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer) => {
+    const sequenceLength = nextLayer.maxSequenceLength;
+    const units = nextLayer.units;
+    const featureSize = nextLayer.weightShape[0]; // [feature_size, units]
+    
+    const recurrentZs = nextLayer.cache.recurrentZs;
+    const dActivation = activation.derivatives[current_layer.activation_function.name];
+
+    // Arrays to store input deltas for each timestep
+    const inputDeltas = new Float32Array(sequenceLength * featureSize);
+    let dNextTime = new Float32Array(units).fill(0); // Temporal carryover
+
+    for (let t = sequenceLength - 1; t >= 0; t--) {
+        // 1. Get delta from the layer above for current timestep 't'
+        let dUpper = new Float32Array(units);
+        if (current_layer.return_sequence) {
+            dUpper.set(delta.subarray(t * units, (t + 1) * units));
+        } else if (t === sequenceLength - 1) {
+            dUpper.set(delta); // Only the last timestep gets the loss if return_sequence is false
+        }
+
+        if (dUpper.some(v => Number.isNaN(v))) throw new Error("Error - dUpper array has NaNs on recurrentCell (backpropagate)");
+
+        // 2. Sum upper delta and temporal delta from (t + 1)
+        let dTotal = new Float32Array(units);
+        for (let i = 0; i < units; i++) {
+            dTotal[i] = dUpper[i] + dNextTime[i];
+        }
+
+        if (dTotal.some(v => Number.isNaN(v))) throw new Error("Error - dTotal array has NaNs on recurrentCell (backpropagate)");
+
+        // 3. Apply activation derivative
+        const dAct = dActivation(recurrentZs[t]);
+        const delta_t = element_wise_mul(dTotal, dAct);
+
+        if (delta_t.some(v => Number.isNaN(v))) throw new Error("Error - delta_t array has NaNs on recurrentCell (backpropagate)");
+
+        // 4. Compute delta to pass back to previous timestep (t - 1)
+        dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer);
+
+        if (dNextTime.some(v => Number.isNaN(v))) throw new Error("Error - dNextTime array has NaNs on recurrentCell (backpropagate)");
+
+        // 5. Compute delta for the layer below (e.g., Embedding Layer)
+        // DeltaMatMul computes: delta_t * W_x_transposed
+        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer);
+        if (dInput_t.some(v => Number.isNaN(v))) throw new Error("Error - dInput_t array has NaNs on recurrentCell (backpropagate)");
+
+        // Store into flat array
+        inputDeltas.set(dInput_t, t * featureSize);
+    }
+
+    return {
+        current_delta: inputDeltas, 
+        decrementor_value: 1
+    };
+}
+
 module.exports = {
     initParams,
     determineInferenceType,
-    feedforward
+    feedforward,
+    getOutputLayerDelta,
+    backpropagate
 }

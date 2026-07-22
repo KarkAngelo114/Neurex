@@ -151,7 +151,6 @@ exports.MatMul = (input, inputSize, outputSize, weights, biases, outputTemplateP
 }
 
 exports.DeltaMatMul = (delta, inputSize, outputSize, weights) => {
-
     const prevDelta = new Float32Array(inputSize);
 
     // In a normal MatMul, we do: Input (inputSize) * Weights (inputSize x outputSize) = Output (outputSize)
@@ -681,13 +680,12 @@ exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
 
 exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
     const { globalOutputTensorTemplate } = getGlobalParams();
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
-
     // The weights were concatenated during initialization as:
     // [input_weights..., recurrent_weights...]
     const inputSize = inputWeightShape[0];
     const units = inputWeightShape[1];
     const range_input_weights = inputSize * units;
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
 
     const input_weights = weights.subarray(0, range_input_weights);
     const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
@@ -707,4 +705,35 @@ exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentW
     }
 
     return output;
+}
+
+
+exports.recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
+    // input weight shape [feature_size, units]
+    // recurrent weight shape [units, units]
+    const a = inputWeightShape[0];
+    const b = inputWeightShape[1];
+    const c = recurrentWeightShape[0];
+    const d = recurrentWeightShape[1];
+
+    const offset = a * b;
+    const length = c * d;
+
+    const weights = weightParams.subarray(offset, offset + length); // get the array of recurrent weights
+    
+    const prevDelta = new Float32Array(delta);
+
+
+    for (let i = 0; i < c; i++) {
+        let sum = 0;
+        const offset = i * c;
+
+        for (let j = 0; j < d; j++) {
+
+            sum += weights[offset + j]  * delta[j];
+        }
+        prevDelta[i] = sum;
+    }
+
+    return prevDelta;
 }

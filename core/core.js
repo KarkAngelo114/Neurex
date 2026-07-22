@@ -126,7 +126,7 @@ class Neurex {
 
         const COLS = [
             { title: 'Layer (type)', width: 24 },
-            { title: 'Output Shape', width: 22 },
+            { title: 'Output Shape', width: 26 },
             { title: 'Activation',   width: 14 },
             { title: 'Parameters',   width: 20 },
             { title: 'Padding',      width: 12 },
@@ -171,7 +171,7 @@ class Neurex {
             switch (layerType) {
                 case 'convolutionalLayer':
                     displayName = 'Convolutional Layer';
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation = activationName;
                     params = paramCount.toLocaleString();
                     padding = layer.padding || 'None';
@@ -179,7 +179,7 @@ class Neurex {
 
                 case 'connected_layer':
                     displayName = 'Connected Layer';
-                    outputShape = `(1x1x${layer.layer_size})`;
+                    outputShape = `(1 x 1 x ${layer.layer_size})`;
                     activation  = activationName;
                     params  = paramCount.toLocaleString();
                     padding = layer.padding || 'None';
@@ -187,14 +187,14 @@ class Neurex {
 
                 case 'maxPooling':
                     displayName = 'Max Pooling';
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation  = 'None';
                     params = '0 (non-param)';
                     padding = layer.padding || 'None';
                     break;
                 case "EmbeddingLayer":
                     displayName = "Embedding Layer";
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation = 'None';
                     params = paramCount.toLocaleString();
                     padding = "None"

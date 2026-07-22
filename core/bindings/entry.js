@@ -468,7 +468,7 @@ const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, 
 
 /**
  * "☑️"
- * @param {Float32Array} input input features 
+ * @param {Float32Array} input input vector
  * @param {Float32Array} prevHiddenState hidden temporal state
  * @param {Array<Number>} inputWeightShape input weight shape
  * @param {Array<Number>} recurrentWeightShape recurrent weight shape
@@ -485,6 +485,23 @@ const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeig
     getGlobalParams().globalBiases[pointer],
     outputTemplatePointer
 );
+
+
+/**
+ * 
+ * @param {*} input 
+ * @param {*} inputWeightShape 
+ * @param {*} recurrentWeightShape 
+ * @param {*} pointer 
+ * @returns 
+ */
+const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer) => float32_Modules.recurrentTimeDelta(
+    input, 
+    inputWeightShape,
+    recurrentWeightShape,
+    getGlobalParams().globalWeights[pointer], 
+);
+
 
 module.exports = {
     getEmbeddings,
@@ -519,6 +536,7 @@ module.exports = {
     sparse_categorical_cross_entropy,
     binary_cross_entropy,
     recurrentMatMul,
+    recurrentTimeDelta,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

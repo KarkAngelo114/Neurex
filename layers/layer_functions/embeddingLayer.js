@@ -18,7 +18,7 @@ const initParams = (size, shape, layer_data) => {
     const maxSequenceLength = layer_data.maxSequenceLength;
 
     const weightShape = [vocabSize, embeddingDim];
-    const updatedShape = [1, 1,  maxSequenceLength * embeddingDim]; // this will be use for the next layer
+    const updatedShape = [1, 1, embeddingDim, maxSequenceLength]; // this will be use for the next layer
     const updatedSize = maxSequenceLength * embeddingDim; // this will be use for the next layer
 
     // use Xavier Initialization: arg1 is the 'vocabSize' and; arg2 is the 'embeddingDim'
@@ -130,13 +130,15 @@ const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer
     if (nextLayer.layer_name === "connected_layer") {
         const [inputSize, outputSize] = nextLayer.weightShape;
         output = DeltaMatMul(delta, inputSize, outputSize, pointer);
+        if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (backpropagate)");
     }
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (backpropagate)");
+    if (delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (backpropagate)");
 
+    throw new Error('Stopping');
     return {
         current_delta: output,
-        incrementor_value: 1
+        decrementor_value: 1
     }
 }
 

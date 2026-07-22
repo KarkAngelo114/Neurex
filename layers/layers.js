@@ -233,11 +233,10 @@ class Layers {
      * 
      * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
      * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
-     * @param {Number} maxSequenceLength the max sequence length value. Default is value is `1`.
      * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
      * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
      */
-    recurrentCell(units, activation_function = "tanh", maxSequenceLength = 1, return_sequence = false, return_state = false) {
+    recurrentCell(units, activation_function = "tanh", return_sequence = false, return_state = false) {
         try {
             let function_name = activation_function.toLowerCase();
 
@@ -251,10 +250,11 @@ class Layers {
                 units: units,
                 return_sequence: return_sequence,
                 return_state: return_state,
-                maxSequenceLength: maxSequenceLength,
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
-                feedforward: (input, current_layer, pointer, outputTemplatePointer) => rnn.feedforward(input, current_layer, pointer, outputTemplatePointer), 
+                feedforward: (input, current_layer, pointer, outputTemplatePointer) => rnn.feedforward(input, current_layer, pointer, outputTemplatePointer),
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => rnn.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
+                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer) => rnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer),
             }
         }
         catch (error) {
