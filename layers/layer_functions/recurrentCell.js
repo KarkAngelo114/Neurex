@@ -270,10 +270,12 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 const applyOwnDerivative = (delta, z, layer_data) => delta;
 
 const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
+    throw new Error("Not yet implemented. TODO: implement the gradient accumulation for recurrent cell's")
     return weightGrads;
 }
 
 const accumulateRecurrentBiasGrads = (biasgrads, deltas) => {
+    throw new Error("Not yet implemented. TODO: implement the gradient accumulation for recurrent cell's")
     return biasgrads;
 }
 
