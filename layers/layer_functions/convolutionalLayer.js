@@ -132,72 +132,76 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * 
- * @param {Float32Array} delta incoming delta 
- * @param {Array<Float32Array>} zs an array containing Z values 
- * @param {Number} layer_index current layer index
- * @param {Object} current_layer current layer configuration 
- * @param {Object} nextLayer the configs of the next layer (in feedforward pass direction)
- * @param {Number} pointer pointer value to be used in fetching corresponding parameters
- * @returns {{ current_delta: Float32Array, decrementor_value: Number }}
+ * Projects the incoming delta backward through THIS conv layer's own kernels.
+ * Called on the *next* layer (in feedforward direction) from the core backprop loop.
+ * No branching on layer type — each layer implements this for itself.
+ *
+ * Math: we dilate the incoming delta (to undo strides), pad it (to undo the
+ * original padding mode), then cross-correlate with the flipped kernels to
+ * recover the gradient w.r.t. the previous layer's output.
+ *
+ * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
+ * @param {Number} pointer - weight pointer for THIS conv layer
+ * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
+ * @param {Object} layer_data - THIS conv layer's own configuration (weightShape, outputShape, strides, padding)
+ * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer) => {
-    let Current_Z = zs[layer_index];
-    let dActivation = activation.derivatives[current_layer.activation_function.name];
-    let dL_dActivation;
-    
-    if (nextLayer.layer_name === "connected_layer") {
-        console.log('connected_layer executing in convolutionalLayer.js')
-        const [inputSize, outputSize] = nextLayer.weightShape;
-        dL_dActivation = DeltaMatMul(delta, inputSize, outputSize, pointer);
-        if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
-    } 
-    else if (nextLayer.layer_name === "maxPooling") {
-        dL_dActivation = delta;
-    } 
-    else if (nextLayer.layer_name === "convolutionalLayer") {
-        const [Fn, KHn, KWn, KCn] = nextLayer.weightShape;
-        const [oHn, oWn, oDn] = nextLayer.outputShape;
-        const [oHcurr, oWcurr] = current_layer.outputShape;  // backward target shape
-        const stridesN = nextLayer.strides;
-        const paddingN = nextLayer.padding;
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+    const [Fn, KHn, KWn, KCn] = layer_data.weightShape;
+    const [oHn, oWn, oDn]     = layer_data.outputShape;
+    const [oHprev, oWprev]    = targetShape;   // output shape of the layer before this one
+    const stridesN             = layer_data.strides;
+    const paddingN             = layer_data.padding;
 
-        // dilate input
-        const {data: dilated, dilatedHeight: dilatedH, dilatedWidth:dilatedW} = Dilate_Input(delta, [oHn, oWn, oDn], stridesN);
+    // 1. Dilate the delta to undo the strides used in the forward pass
+    const { data: dilated, dilatedHeight: dilatedH, dilatedWidth: dilatedW } =
+        Dilate_Input(delta, [oHn, oWn, oDn], stridesN);
 
-        let pT, pB, pL, pR;
-        if (paddingN === "valid") {
-            // full conv: K-1 on every side
-            pT = pB = KHn - 1;
-            pL = pR = KWn - 1;
-        } 
-        else {
-            // "same": split K-1, then top up so the result is at least oHcurr/oWcurr
-            pT = Math.floor((KHn - 1) / 2); pB = (KHn - 1) - pT;
-            pL = Math.floor((KWn - 1) / 2); pR = (KWn - 1) - pL;
+    // 2. Determine how much padding to add around the dilated delta so that
+    //    the full-convolution with the flipped kernel lands on the correct shape.
+    let pT, pB, pL, pR;
+    if (paddingN === "valid") {
+        // "valid" forward → "full" backward: pad K-1 on every side
+        pT = pB = KHn - 1;
+        pL = pR = KWn - 1;
+    } else {
+        // "same" forward: split K-1, then top up so the result is at least oHprev × oWprev
+        pT = Math.floor((KHn - 1) / 2);  pB = (KHn - 1) - pT;
+        pL = Math.floor((KWn - 1) / 2);  pR = (KWn - 1) - pL;
 
-            const needH = oHcurr + KHn - 1;          // ConvolveDelta needs Hp >= needH
-            const needW = oWcurr + KWn - 1;
-            const haveH = dilatedH + pT + pB;
-            const haveW = dilatedW + pL + pR;
-            if (haveH < needH) pB += (needH - haveH);
-            if (haveW < needW) pR += (needW - haveW);
-        }
-
-        // pass the REAL dilated dims, not oHn/oWn
-        const { data: PaddedInput, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
-
-        dL_dActivation = ConvolveDelta(PaddedInput, shape, [Fn, KHn, KWn, KCn], [oHcurr, oWcurr], pointer);
-        if (dL_dActivation.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
+        const needH = oHprev + KHn - 1;   // ConvolveDelta needs Hp >= needH
+        const needW = oWprev + KWn - 1;
+        const haveH = dilatedH + pT + pB;
+        const haveW = dilatedW + pL + pR;
+        if (haveH < needH) pB += (needH - haveH);
+        if (haveW < needW) pR += (needW - haveW);
     }
-                    
-    const output = element_wise_mul(dActivation(Current_Z), dL_dActivation);
-    if (output.some(v => Number.isNaN(v))) throw new Error("Element-wise multiplication result has NaNs");
 
-    return {
-        current_delta: output,
-        decrementor_value: 1
-    };
+    // 3. Apply padding
+    const { data: paddedInput, shape } =
+        applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
+
+    // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
+    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer);
+    if (result.some(v => Number.isNaN(v))) throw new Error("ConvolveDelta result has NaNs in projectDeltaBackward (convolutionalLayer)");
+
+    return result;
+}
+
+/**
+ * Applies this conv layer's own activation derivative to the projected delta.
+ * Called on the *current* layer from the core backprop loop.
+ *
+ * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
+ * @param {Float32Array} z - pre-activation values (z) for this layer
+ * @param {Object} layer_data - this layer's own configuration
+ * @returns {Float32Array} delta for the layer before this one
+ */
+const applyOwnDerivative = (delta, z, layer_data) => {
+    const dActivation = activation.derivatives[layer_data.activation_function.name];
+    const result = element_wise_mul(dActivation(z), delta);
+    if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
+    return result;
 }
 
 /**
@@ -245,7 +249,8 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate,
+    projectDeltaBackward,
+    applyOwnDerivative,
     computeWeightGradients,
     computeBiasGradients
 }

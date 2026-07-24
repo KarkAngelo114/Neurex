@@ -1,4 +1,4 @@
-const { DeltaMatMul, MaxPoolDelta, MaxPool } = require("../../core/bindings");
+const { MaxPoolDelta, MaxPool } = require("../../core/bindings");
 const { calculateTensorShape } = require("../../utils/utils");
 
 /**
@@ -92,38 +92,41 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * 
- * @param {Float32Array} delta incoming delta 
- * @param {Array<Float32Array>} zs an array containing Z values 
- * @param {Number} layer_index current layer index
- * @param {Object} current_layer current layer configuration 
- * @param {Object} nextLayer the configs of the next layer (in feedforward pass direction)
- * @param {Number} pointer pointer value to be used in fetching corresponding parameters
- * @returns {{ current_delta: Float32Array, decrementor_value: Number }}
+ * Projects the incoming delta backward through this layer.
+ * MaxPooling has NO learnable weights, so the delta passes through unchanged —
+ * the actual "undo" work (unpooling) is done in applyOwnDerivative below.
+ * Called on the *next* layer (in feedforward direction) from the core backprop loop.
+ *
+ * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
+ * @param {Number} pointer - weight pointer (unused here; maxPooling is non-parametric)
+ * @param {Array<Number>} targetShape - output shape of the receiving layer (unused here)
+ * @param {Object} layer_data - this layer's own configuration (unused here)
+ * @returns {Float32Array} the delta unchanged (passthrough)
  */
-const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer) => {
-    let next_delta = delta;
-    const [inputH, inputW, inputD] = current_layer.inputShape;
-    const [outputH, outputW, outputD] = current_layer.outputShape;
-    const [poolHeight, poolWidth] = current_layer.poolSize;
-    const strides = current_layer.strides;
-    const padding = current_layer.padding;
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+    // No weights to project through — pass the delta straight through.
+    // The unpooling itself is this layer's own operation and belongs in applyOwnDerivative.
+    return delta;
+}
 
-    if (nextLayer.layer_name === "connected_layer") {
-        const [inputSize, outputSize] = nextLayer.weightShape;
-        next_delta = DeltaMatMul(delta, inputSize, outputSize, pointer);
-        if (next_delta.some(v => Number.isNaN(v))) throw new Error("DeltaMatMul in MaxPool backpropagate result has NaNs");
-    }
-
-    const indices = current_layer.maxIndices;
-
-    const output = MaxPoolDelta(new Float32Array(next_delta), indices, inputH, inputW, inputD);
-    if (output.some(v => Number.isNaN(v))) throw new Error("MaxPoolDelta result has NaNs");
-
-    return {
-        current_delta: output,
-        decrementor_value:0
-    }
+/**
+ * Applies this max-pooling layer's own inverse operation (unpooling via saved max indices).
+ * Called on the *current* layer from the core backprop loop.
+ *
+ * For max pooling there is no activation derivative in the traditional sense;
+ * this step IS the full "undo my transform" operation.
+ *
+ * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
+ * @param {Float32Array} z - pre-activation values for this layer (same as outputs for maxPooling; unused here)
+ * @param {Object} layer_data - this layer's own configuration (inputShape, maxIndices)
+ * @returns {Float32Array} unpooled delta (same spatial size as this layer's input)
+ */
+const applyOwnDerivative = (delta, z, layer_data) => {
+    const [inputH, inputW, inputD] = layer_data.inputShape;
+    const indices = layer_data.maxIndices;
+    const output = MaxPoolDelta(new Float32Array(delta), indices, inputH, inputW, inputD);
+    if (output.some(v => Number.isNaN(v))) throw new Error("MaxPoolDelta result has NaNs in applyOwnDerivative (maxPooling)");
+    return output;
 }
 
 module.exports = {
@@ -131,5 +134,6 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate
+    projectDeltaBackward,
+    applyOwnDerivative,
 }

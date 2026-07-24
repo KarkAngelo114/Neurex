@@ -4,15 +4,20 @@
  * - determineInferenceType()
  * - feedforward()
  * - getOutputLayerDelta()
- * - backpropagate()
+ * - projectDeltaBackward()   ← replaces the old backpropagate(); called on the NEXT layer
+ * - applyOwnDerivative()     ← replaces the old backpropagate(); called on the CURRENT layer
  * - computeWeightGrads()
  * - computeBiasGrads()
  * - scaleGrads()
  *
- * They'll be called during build time, feedforward, backpropagation, gradient accumulation and scaling gradients.
- * This is because Neurex follows a Plugin-style architecture where in modifications on the core engine (the core file) are minimal and the logic are exposed by these methods of the Layers class.
- * This allows the library to be extensible, flexible, and clean separation of concern without touching the core engine
- * Read here about Plugin-style architecture: https://medium.com/omarelgabrys-blog/plug-in-architecture-dec207291800
+ * The two-method split eliminates all `if (nextLayer.layer_name === ...)` branching from
+ * backprop. The core engine simply calls:
+ *
+ *   const dLda        = next_layer.projectDeltaBackward(delta, pointer, current_layer.outputShape, next_layer);
+ *   current_delta     = current_layer.applyOwnDerivative(dLda, zs[layer_index], current_layer);
+ *
+ * JS dispatches to the right implementation automatically — same pattern as feedforward.
+ * See core.js #backpropagation for the full driver loop.
  */
 
 const {
@@ -77,7 +82,8 @@ class Layers {
             determineInferenceType: () => embedding.determineInferenceType(),
             feedforward: (input, current_layer, pointer, outputTemplatePointer) => embedding.feedforward(input, current_layer, pointer, outputTemplatePointer),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
-            backpropagate: (next_delta, zs, layer_index, current_layer, nextLayer, pointer) => embedding.backpropagate(next_delta, zs, layer_index, current_layer, nextLayer, pointer),
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => delta,
+            applyOwnDerivative: (delta, z, layer_data) => delta,
             computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
             computeBiasGradients: (biasGrads, delta, layer_data) => biasGrads,
             scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
@@ -116,7 +122,12 @@ class Layers {
                 determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => ann.feedforward(input, current_layer, pointer, outputTemplatePointer),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => ann.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer) => ann.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
+                // Step 1 of backprop: project delta backward through THIS layer's own weights.
+                // Called as next_layer.projectDeltaBackward(...) from the core loop.
+                projectDeltaBackward: (delta, pointer, targetShape, layer_data) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+                // Step 2 of backprop: apply THIS layer's own activation derivative.
+                // Called as current_layer.applyOwnDerivative(...) from the core loop.
+                applyOwnDerivative: (delta, z, layer_data) => ann.applyOwnDerivative(delta, z, layer_data),
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
                 computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
@@ -173,7 +184,12 @@ class Layers {
                 determineInferenceType: () => cnn.determineInferenceType(),
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => cnn.feedforward(input, current_layer, pointer, outputTemplatePointer),
                 getOutputLayerDelta: () => cnn.getOutputLayerDelta(),
-                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer) => cnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
+                // Step 1 of backprop: project delta backward through THIS conv layer's own kernels.
+                // Called as next_layer.projectDeltaBackward(...) from the core loop.
+                projectDeltaBackward: (delta, pointer, targetShape, layer_data) => cnn.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+                // Step 2 of backprop: apply THIS layer's own activation derivative.
+                // Called as current_layer.applyOwnDerivative(...) from the core loop.
+                applyOwnDerivative: (delta, z, layer_data) => cnn.applyOwnDerivative(delta, z, layer_data),
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => cnn.computeWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
                 computeBiasGradients: (biasgrads, deltas, layer_data) => cnn.computeBiasGradients(biasgrads, deltas, layer_data),
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
@@ -217,7 +233,12 @@ class Layers {
                 determineInferenceType: () => maxpool.determineInferenceType(),
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => maxpool.feedforward(input, current_layer, pointer, outputTemplatePointer),
                 getOutputLayerDelta: () => maxpool.getOutputLayerDelta(),
-                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer) => maxpool.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
+                // Step 1 of backprop: maxPooling has no weights so this is a pure passthrough.
+                // Called as next_layer.projectDeltaBackward(...) from the core loop.
+                projectDeltaBackward: (delta, pointer, targetShape, layer_data) => maxpool.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+                // Step 2 of backprop: unpool using saved maxIndices.
+                // Called as current_layer.applyOwnDerivative(...) from the core loop.
+                applyOwnDerivative: (delta, z, layer_data) => maxpool.applyOwnDerivative(delta, z, layer_data),
                 computeWeightGradients: () => {},
                 computeBiasGradients: () => {},
                 scaleGrads: () => {},
@@ -254,7 +275,8 @@ class Layers {
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => rnn.feedforward(input, current_layer, pointer, outputTemplatePointer),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => rnn.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer) => rnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
+                projectDeltaBackward: (delta, pointer, targetShape, layer_data) => rnn.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+                applyOwnDerivative: (delta, z, layer_data) => rnn.applyOwnDerivative(delta, z, layer_data),
                 computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => rnn.accumulateRecurrentWeightGrads(activation_outputs, deltas, weightGrads, layer_data),
                 computeBiasGradients: (biasgrads, deltas, layer_data) => rnn.accumulateRecurrentBiasGrads(biasgrads, deltas),
                 scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)

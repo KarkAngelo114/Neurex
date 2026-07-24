@@ -956,13 +956,51 @@ class Neurex {
         layer_data.outputShape = outputShape || [];
     }
 
+    // #backpropagation(activations, zs, deltas_array) {
+    //     let deltas = deltas_array;
+    //     let current_delta = deltas[this.num_layers - 1];
+    //     let all_deltas = [current_delta];
+
+    //     // Build a map: layer_index → weight pointer
+    //     // (same pointer logic as feedforward)
+    //     const layerPointers = [];
+    //     let p = 0;
+    //     const parametric = this.parametric_layers;
+    //     for (let i = 0; i < this.layers.length; i++) {
+    //         layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
+    //     }
+
+    //     for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
+    //         const current_layer = this.layers[layer_index];
+    //         const next_layer = this.layers[layer_index + 1];
+    //         const next_delta = current_delta;
+
+    //         // pointer for the NEXT layer (what backprop needs to un-do)
+    //         const pointer = layerPointers[layer_index + 1];
+
+    //         const { current_delta: new_delta } = current_layer.backpropagate(
+    //             next_delta, 
+    //             zs, 
+    //             layer_index, 
+    //             current_layer,
+    //             next_layer, 
+    //             pointer
+    //         );
+
+    //         current_delta = new_delta;
+    //         deltas[layer_index] = current_delta;
+    //         all_deltas.unshift(current_delta);
+    //     }
+
+    //     return { deltas, all_deltas };
+    // }
+
     #backpropagation(activations, zs, deltas_array) {
         let deltas = deltas_array;
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        // Build a map: layer_index → weight pointer
-        // (same pointer logic as feedforward)
+        // Build layer_index → weight-pointer map (same logic as #Feedforward)
         const layerPointers = [];
         let p = 0;
         const parametric = this.parametric_layers;
@@ -972,22 +1010,30 @@ class Neurex {
 
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
-            const next_layer = this.layers[layer_index + 1];
-            const next_delta = current_delta;
+            const next_layer    = this.layers[layer_index + 1];
 
-            // pointer for the NEXT layer (what backprop needs to un-do)
+            // pointer for the NEXT layer — the one whose weights we're projecting through
             const pointer = layerPointers[layer_index + 1];
 
-            const { current_delta: new_delta } = current_layer.backpropagate(
-                next_delta, 
-                zs, 
-                layer_index, 
-                current_layer,
-                next_layer, 
-                pointer
+            // Step 1 — project delta backward through NEXT layer's own transform.
+            //   JS dispatches to the correct layer type automatically; no branching here.
+            //   connectedLayer  → DeltaMatMul with its own weightShape
+            //   convolutionalLayer → dilate / pad / ConvolveDelta with its own kernels
+            //   maxPooling      → passthrough (no weights; unpooling is step 2's job)
+            const dLda = next_layer.projectDeltaBackward(
+                current_delta,
+                pointer,
+                current_layer.outputShape,  // target shape the projected delta must match
+                next_layer                  // the layer itself, so it can read its own params
             );
 
-            current_delta = new_delta;
+            // Step 2 — apply CURRENT layer's own activation derivative (or unpool for maxPooling).
+            current_delta = current_layer.applyOwnDerivative(
+                dLda,
+                zs[layer_index],
+                current_layer   // the layer itself, so it can read its own params
+            );
+
             deltas[layer_index] = current_delta;
             all_deltas.unshift(current_delta);
         }

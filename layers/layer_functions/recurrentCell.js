@@ -229,80 +229,52 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     return dOutputLayer;
 }
 
-/**
- * 
- * @param {Float32Array} delta incoming delta 
- * @param {Array<Float32Array>} zs an array containing Z values 
- * @param {Number} layer_index current layer index
- * @param {Object} current_layer current layer configuration 
- * @param {Object} nextLayer the configs of the next layer (in feedforward pass direction)
- * @param {Number} pointer pointer value to be used in fetching corresponding parameters
- * @returns {{ current_delta: Float32Array, decrementor_value: Number }}
- */
-const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer) => {
-    const sequenceLength = nextLayer.maxSequenceLength;
-    const units = nextLayer.units;
-    const featureSize = nextLayer.weightShape[0]; // [feature_size, units]
-    
-    const recurrentZs = nextLayer.cache.recurrentZs;
-    const dActivation = activation.derivatives[current_layer.activation_function.name];
 
-    // Arrays to store input deltas for each timestep
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+    const sequenceLength = layer_data.maxSequenceLength;
+    const units = layer_data.units;
+    const featureSize = layer_data.weightShape[0];
+    const recurrentZs = layer_data.cache.recurrentZs;
+    const dActivation = activation.derivatives[layer_data.activation_function.name];
+
     const inputDeltas = new Float32Array(sequenceLength * featureSize);
-    let dNextTime = new Float32Array(units).fill(0); // Temporal carryover
+    const deltaTs = new Array(sequenceLength);
+    let dNextTime = new Float32Array(units).fill(0);
 
     for (let t = sequenceLength - 1; t >= 0; t--) {
-        // 1. Get delta from the layer above for current timestep 't'
         let dUpper = new Float32Array(units);
-        if (current_layer.return_sequence) {
+        if (layer_data.return_sequence) {
             dUpper.set(delta.subarray(t * units, (t + 1) * units));
         } else if (t === sequenceLength - 1) {
-            dUpper.set(delta); // Only the last timestep gets the loss if return_sequence is false
+            dUpper.set(delta);
         }
 
-        if (dUpper.some(v => Number.isNaN(v))) throw new Error("Error - dUpper array has NaNs on recurrentCell (backpropagate)");
-
-        // 2. Sum upper delta and temporal delta from (t + 1)
         let dTotal = new Float32Array(units);
-        for (let i = 0; i < units; i++) {
-            dTotal[i] = dUpper[i] + dNextTime[i];
-        }
+        for (let i = 0; i < units; i++) dTotal[i] = dUpper[i] + dNextTime[i];
 
-        if (dTotal.some(v => Number.isNaN(v))) throw new Error("Error - dTotal array has NaNs on recurrentCell (backpropagate)");
+        const delta_t = element_wise_mul(dTotal, dActivation(recurrentZs[t]));
+        if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrentCell.projectDeltaBackward");
 
-        // 3. Apply activation derivative
-        const dAct = dActivation(recurrentZs[t]);
-        const delta_t = element_wise_mul(dTotal, dAct);
+        deltaTs[t] = delta_t; // <-- NEW
 
-        if (delta_t.some(v => Number.isNaN(v))) throw new Error("Error - delta_t array has NaNs on recurrentCell (backpropagate)");
-
-        // 4. Compute delta to pass back to previous timestep (t - 1)
         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer);
-
-        if (dNextTime.some(v => Number.isNaN(v))) throw new Error("Error - dNextTime array has NaNs on recurrentCell (backpropagate)");
-
-        // 5. Compute delta for the layer below (e.g., Embedding Layer)
-        // DeltaMatMul computes: delta_t * W_x_transposed
         const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer);
-        if (dInput_t.some(v => Number.isNaN(v))) throw new Error("Error - dInput_t array has NaNs on recurrentCell (backpropagate)");
-
-        // Store into flat array
         inputDeltas.set(dInput_t, t * featureSize);
     }
 
-    return {
-        current_delta: inputDeltas, 
-        decrementor_value: 1
-    };
-}
+    layer_data.cache.deltaTs = deltaTs;
+    return inputDeltas;
+};
 
+
+const applyOwnDerivative = (delta, z, layer_data) => delta;
 
 const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
-    throw new Error('Stopping')
+    return weightGrads;
 }
 
 const accumulateRecurrentBiasGrads = (biasgrads, deltas) => {
-
+    return biasgrads;
 }
 
 module.exports = {
@@ -310,7 +282,8 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate,
+    projectDeltaBackward,
+    applyOwnDerivative,
     accumulateRecurrentWeightGrads,
     accumulateRecurrentBiasGrads
 }

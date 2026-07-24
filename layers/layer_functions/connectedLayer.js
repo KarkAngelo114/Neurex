@@ -160,32 +160,38 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * 
- * @param {Float32Array} delta incoming delta 
- * @param {Array<Float32Array>} zs an array containing Z values 
- * @param {Number} layer_index current layer index
- * @param {Object} current_layer current layer configuration 
- * @param {Object} nextLayer the configs of the next layer (in feedforward pass direction)
- * @param {Number} pointer pointer value to be used in fetching corresponding parameters
- * @returns {{ current_delta: Float32Array, decrementor_value: Number }}
+ * Projects the incoming delta backward through THIS layer's own weight matrix.
+ * Called on the *next* layer (in feedforward direction) from the core backprop loop.
+ * No branching — each layer type implements this for itself.
+ *
+ * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
+ * @param {Number} pointer - weight pointer for this layer
+ * @param {Array<Number>} targetShape - output shape of the layer receiving the projected delta (unused here, kept for interface consistency)
+ * @param {Object} layer_data - this layer's own configuration
+ * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer) => {
-    let current_delta;
-    const dActivation = activation.derivatives[current_layer.activation_function.name];
-    const dAct = dActivation(zs[layer_index]);
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+    const [inputSize, outputSize] = layer_data.weightShape;
+    const result = DeltaMatMul(delta, inputSize, outputSize, pointer);
+    if (result.some(v => Number.isNaN(v))) throw new Error("Error - DeltaMatMul result has NaNs in projectDeltaBackward (connectedLayer)");
+    return result;
+}
 
-    let next_delta = delta;
-    const [inputSize, outputSize] = nextLayer.weightShape;
-    const delta_res = DeltaMatMul(next_delta, inputSize, outputSize, pointer);
-                        
-    current_delta = element_wise_mul(dAct, delta_res);
-
-    if (current_delta.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");            
-
-    return {
-        current_delta,
-        decrementor_value: 1
-    };
+/**
+ * Applies this layer's own activation derivative to the projected delta.
+ * Called on the *current* layer from the core backprop loop.
+ *
+ * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
+ * @param {Float32Array} z - pre-activation values (z) for this layer
+ * @param {Object} layer_data - this layer's own configuration
+ * @returns {Float32Array} delta for the layer before this one
+ */
+const applyOwnDerivative = (delta, z, layer_data) => {
+    const dActivation = activation.derivatives[layer_data.activation_function.name];
+    const dAct = dActivation(z);
+    const result = element_wise_mul(dAct, delta);
+    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in applyOwnDerivative (connectedLayer)");
+    return result;
 }
 
 module.exports = {
@@ -193,5 +199,6 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate
+    projectDeltaBackward,
+    applyOwnDerivative,
 }
