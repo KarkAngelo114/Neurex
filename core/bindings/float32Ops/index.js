@@ -107,6 +107,7 @@ exports.getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointe
 }
 
 exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
+    
     const embeddingDim = dim;
     
     for (let i = 0; i < activation_outputs.length; i++) {

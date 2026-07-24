@@ -78,7 +78,7 @@ class Layers {
             feedforward: (input, current_layer, pointer, outputTemplatePointer) => embedding.feedforward(input, current_layer, pointer, outputTemplatePointer),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
             backpropagate: (next_delta, zs, layer_index, current_layer, nextLayer, pointer) => embedding.backpropagate(next_delta, zs, layer_index, current_layer, nextLayer, pointer),
-            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => returnEmbeddings(activation_outputs, delta, weightGrads, layer_data.embeddingDim),
+            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
             computeBiasGradients: (biasGrads, delta, layer_data) => biasGrads,
             scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
         }
@@ -254,7 +254,10 @@ class Layers {
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer, outputTemplatePointer) => rnn.feedforward(input, current_layer, pointer, outputTemplatePointer),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => rnn.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer) => rnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer),
+                backpropagate: (delta, zs, layer_index, current_layer, nextLayer, pointer, own_pointer) => rnn.backpropagate(delta, zs, layer_index, current_layer, nextLayer, pointer),
+                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => rnn.accumulateRecurrentWeightGrads(activation_outputs, deltas, weightGrads, layer_data),
+                computeBiasGradients: (biasgrads, deltas, layer_data) => rnn.accumulateRecurrentBiasGrads(biasgrads, deltas),
+                scaleGrads: (grads, batchSize, layer_data) => scaleGrads(grads, batchSize)
             }
         }
         catch (error) {

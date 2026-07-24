@@ -296,10 +296,21 @@ const backpropagate = (delta, zs, layer_index, current_layer, nextLayer, pointer
     };
 }
 
+
+const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
+    throw new Error('Stopping')
+}
+
+const accumulateRecurrentBiasGrads = (biasgrads, deltas) => {
+
+}
+
 module.exports = {
     initParams,
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    backpropagate
+    backpropagate,
+    accumulateRecurrentWeightGrads,
+    accumulateRecurrentBiasGrads
 }
