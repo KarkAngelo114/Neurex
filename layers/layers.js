@@ -85,7 +85,7 @@ class Layers {
     /**
      * @method connectedLayer
      * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
-     * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear. Default is `relu`.
+     * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
      * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
      * @returns {Object}
      *
