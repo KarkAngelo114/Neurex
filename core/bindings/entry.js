@@ -513,11 +513,30 @@ const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, point
  * @param {Number} sequenceLength 
  * @returns 
  */
-const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => functions.recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => functions.recurrentWeightGradsAccumulation(
+    activation_outputs, 
+    deltas, 
+    hiddenStates, 
+    deltaTs, 
+    weightGrads, 
+    weightShape, 
+    sequenceLength
+);
 
-
-
-const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => functions.recurrentBiasGradsAccumulation(biasGrads, deltaTs, sequenceLength, units);
+/**
+ * 
+ * @param {Float32Array} biasGrads 
+ * @param {Array<Float32Array>} deltaTs 
+ * @param {Number} sequenceLength 
+ * @param {Number} units 
+ * @returns 
+ */
+const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => functions.recurrentBiasGradsAccumulation(
+    biasGrads, 
+    deltaTs, 
+    sequenceLength, 
+    units
+);
 
 
 module.exports = {
