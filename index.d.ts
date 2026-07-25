@@ -381,12 +381,13 @@ declare module 'neurex' {
     * Computes evaluation metrics for classification tasks given predicted values and true labels.
     *
     * @function ClassificationMetrics
-    * @param {Array<Array<number>>} predictions - The predicted class labels or probabilities for the test set.
-    * @param {Array<Array<number>>} actuals - The true target class labels for the test set.
-    * @param {string} classificationType - binary, categorical, or sparse_categorical
-    * @param {Array<any>} labels - (Optional) - add labels that represents a class
+    * @param {Array<Array<number>>} predictions The predicted class labels or probabilities for the test set.
+    * @param {Array<Array<number>>} actuals The true target class labels for the test set.
+    * @param {string} classificationType binary, categorical, or sparse_categorical
+    * @param {Array<any>} labels add labels that represents a class
+    * @param {Boolean} showOutputs shows the misclassified outputs. You can disable it by passing a boolean value. Default is `true`
     */
-    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[]): void;
+    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[], showOutputs: Boolean): void;
 
     /**
     * Converts a column of categorical labels into one-hot encoded vectors.
