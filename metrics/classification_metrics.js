@@ -11,9 +11,9 @@
  * @param {Array<Array<number>>} predictions - The predicted class labels or probabilities for the test set.
  * @param {Array<Array<number>>} actuals - The true target class labels for the test set.
  * @param {string} classificationType - binary, categorical, or sparse_categorical
- * @param {Array<any>} labels - (Optional) - add labels that represents a class
+ * @param {Array<any>} labels - add labels that represents a class
  */
-const ClassificationMetrics = (predictions, actuals, classificationType = undefined, labels = []) => {
+const ClassificationMetrics = (predictions, actuals, classificationType = undefined, labels = [], showOutputs = true) => {
     try {
         if (!predictions || predictions.length === 0 || !actuals || actuals.length === 0) {
             throw new Error("[ERROR]------- No predictions or actuals provided.");
@@ -75,10 +75,14 @@ const ClassificationMetrics = (predictions, actuals, classificationType = undefi
         console.log("Correct:", correctCount);
         console.log("Misclassified:", misclassifiedCount);
 
-        if (misclassifiedExamples.length > 0) {
-            console.log("\nMisclassified Examples:");
-            misclassifiedExamples.forEach(x => console.log(x));
+
+        if (showOutputs) {
+            if (misclassifiedExamples.length > 0) {
+                console.log("\nMisclassified Examples:");
+                misclassifiedExamples.forEach(x => console.log(x));
+            }
         }
+        
 
         console.log('\n======= Classification Report =======');
         console.log('\t           precision recall f1-score support\n');

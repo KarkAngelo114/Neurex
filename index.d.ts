@@ -112,9 +112,9 @@ declare module 'neurex' {
         * 
         * @method normalize
         * @param {String} method - the normalization method to use.
-        * @param {Array<Array<number>} data - the data to be normalized.
+        * @param {Array<Array<number>>} data - the data to be normalized.
         * @throws {Error} If no method or data is provided, or if the method is unsupported.
-        * @returns {Array>Array<number>} - normalized data.
+        * @returns {Array<Array<number>>} - normalized data.
         * @example
         * const loader = new CsvDataHandler();
         * const data = [[1, 2], [3, 4]];
@@ -381,12 +381,13 @@ declare module 'neurex' {
     * Computes evaluation metrics for classification tasks given predicted values and true labels.
     *
     * @function ClassificationMetrics
-    * @param {Array<Array<number>>} predictions - The predicted class labels or probabilities for the test set.
-    * @param {Array<Array<number>>} actuals - The true target class labels for the test set.
-    * @param {string} classificationType - binary, categorical, or sparse_categorical
-    * @param {Array<any>} labels - (Optional) - add labels that represents a class
+    * @param {Array<Array<number>>} predictions The predicted class labels or probabilities for the test set.
+    * @param {Array<Array<number>>} actuals The true target class labels for the test set.
+    * @param {string} classificationType binary, categorical, or sparse_categorical
+    * @param {Array<any>} labels add labels that represents a class
+    * @param {Boolean} showOutputs shows the misclassified outputs. You can disable it by passing a boolean value. Default is `true`
     */
-    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[]): void;
+    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[], showOutputs: Boolean): void;
 
     /**
     * Converts a column of categorical labels into one-hot encoded vectors.
@@ -509,11 +510,11 @@ declare module 'neurex' {
 
         /**
         * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
-        * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
-        * @param {Number} layer_size specify the number of neuron for this layer.
+        * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
+        * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
         */
-        connectedLayer(activation: string, layer_size: number): Object;
+        connectedLayer(layer_size: number, activation: string): Object;
 
         /**
         * 
