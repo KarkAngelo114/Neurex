@@ -742,11 +742,11 @@ declare module 'neurex' {
         /**
          * 
          * @param {Number} units_per_cell number of units per recurrent cells. Default is `3` 
-         * @param activation_function activation function to be used by recurrent cells. Default is `tanh`
+         * @param {String} activation_function activation function to be used by recurrent cells. Default is `tanh`
          * 
          * A vanilla recurrent neural network with 3 recurrent cells.
          */
-        export function VanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
+        export function vanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
 
         /**
          * A type of neural network which has an decoding and encoding parts

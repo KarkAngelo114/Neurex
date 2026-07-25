@@ -20,7 +20,7 @@ const { load_images_from_directory, load_single_image, load_multiple_images } = 
 const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, element_wise_sub, scaleDiff  } = require('./core/bindings/float32Ops');
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
-const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, VanillaRNN } = require('./applications/templates');
+const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN } = require('./applications/templates');
 const { Encode, buildVocab, buildWord2Id } = require('./preprocessor/tokenizer');
 
 
@@ -56,7 +56,7 @@ module.exports= {
         simpleCNN,
         VGG16,
         LiteNet,
-        VanillaRNN,
+        vanillaRNN,
         AutoEncoder
     }
 }
