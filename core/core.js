@@ -395,7 +395,7 @@ class Neurex {
                 let newLayer;
                 if (layerData.layer_name === "connected_layer") {
                     // Recreate the connected layer with the correct activation and size
-                    newLayer = layerBuilder.connectedLayer(layerData.activation_function_name, layerData.layer_size);
+                    newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
                     this.output_layers_templates.push(new Float32Array(layerData.layer_size));
                     this.parametric_layers.push(layerData.layer_name);

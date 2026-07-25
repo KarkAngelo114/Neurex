@@ -84,15 +84,15 @@ class Layers {
 
     /**
      * @method connectedLayer
-     * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear)
-     * @param {Number} layer_size specify the number of neuron for this layer.
+     * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
+     * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear. Default is `relu`.
      * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
      * @returns {Object}
      *
      * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
      * build connected layers or multilayer perceptron
      */
-    connectedLayer(activation_function = 'relu', layer_size = 5) {
+    connectedLayer(layer_size = 5, activation_function = 'relu') {
         try {
 
             if (!activation_function || !layer_size || layer_size <= 0) {
