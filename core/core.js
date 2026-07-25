@@ -126,7 +126,7 @@ class Neurex {
 
         const COLS = [
             { title: 'Layer (type)', width: 24 },
-            { title: 'Output Shape', width: 22 },
+            { title: 'Output Shape', width: 26 },
             { title: 'Activation',   width: 14 },
             { title: 'Parameters',   width: 20 },
             { title: 'Padding',      width: 12 },
@@ -171,7 +171,7 @@ class Neurex {
             switch (layerType) {
                 case 'convolutionalLayer':
                     displayName = 'Convolutional Layer';
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation = activationName;
                     params = paramCount.toLocaleString();
                     padding = layer.padding || 'None';
@@ -179,7 +179,7 @@ class Neurex {
 
                 case 'connected_layer':
                     displayName = 'Connected Layer';
-                    outputShape = `(1x1x${layer.layer_size})`;
+                    outputShape = `(1 x 1 x ${layer.layer_size})`;
                     activation  = activationName;
                     params  = paramCount.toLocaleString();
                     padding = layer.padding || 'None';
@@ -187,15 +187,22 @@ class Neurex {
 
                 case 'maxPooling':
                     displayName = 'Max Pooling';
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation  = 'None';
                     params = '0 (non-param)';
                     padding = layer.padding || 'None';
                     break;
                 case "EmbeddingLayer":
                     displayName = "Embedding Layer";
-                    outputShape = `(${layer.outputShape.join('x')})`;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation = 'None';
+                    params = paramCount.toLocaleString();
+                    padding = "None"
+                    break;
+                case "recurrent_cell":
+                    displayName = "Recurrent Cell";
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
+                    activation = activationName|| 'None';
                     params = paramCount.toLocaleString();
                     padding = "None"
                     break;
@@ -282,17 +289,18 @@ class Neurex {
                 inputShape: layer.inputShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
-                embeddingDim: layer.embeddingDim,
-                vocabSize: layer.vocabSize,
-                maxSequenceLength: layer.maxSequenceLength,
+                embeddingDim: layer.embeddingDim || 1,
+                vocabSize: layer.vocabSize || 1,
+                maxSequenceLength: layer.maxSequenceLength || 1,
+                units: layer.units || 1,
+                return_sequence: layer.return_sequence || false,
+                return_state: layer.return_state || false,
                 isParametric: layer.isParametric
 
             })),
-            "weights":this.weights.map(w => Array.from(w)),
-            "biases":this.biases.map(b => Array.from(b)),
         };
 
-        this.#save(data, fileName);
+        this.#save(data, this.weights, this.biases, fileName);
         
     }
 
@@ -326,20 +334,47 @@ class Neurex {
 
             // Validate magic header
             const header = rawBuffer.slice(0, 4).toString('utf-8');
-            if (header !== 'NRX3') {
+            if (header !== 'NRX4') {
                 throw new Error(`${color.red}Invalid version format.${color.reset}`);
             }
 
             // Check version
             const version = rawBuffer[4];
-            if (version !== 0x03) {
+            if (version !== 0x04) {
                 throw new Error(`${color.red}Unsupported NRX version: ${version}${color.reset}`);
             }
 
-            // Decompress and parse
-            const compressedData = rawBuffer.slice(5);
-            const jsonString = zlib.inflateSync(compressedData).toString('utf-8');
-            const modelData = JSON.parse(jsonString);
+            // Read metadata block (small, JSON-friendly: arch, hyperparams, shapes)
+            const metaLength = rawBuffer.readUInt32LE(5);
+            const metaStart = 9;
+            const metaCompressed = rawBuffer.slice(metaStart, metaStart + metaLength);
+            const metaJson = zlib.inflateSync(metaCompressed).toString('utf-8');
+            const modelData = JSON.parse(metaJson);
+
+            // Read tensor block (weights/biases as raw concatenated Float32 bytes).
+            // This is never run through JSON.parse/stringify; we slice typed array
+            // views directly out of the decompressed buffer instead.
+            const tensorCompressed = rawBuffer.slice(metaStart + metaLength);
+            const tensorBlock = zlib.inflateSync(tensorCompressed);
+
+            let byteOffset = 0;
+            const readTensors = (lengths) => lengths.map(len => {
+                const byteLen = len * Float32Array.BYTES_PER_ELEMENT;
+                // tensorBlock's offset within its own underlying ArrayBuffer must be
+                // included, since inflateSync may return a Buffer that is itself a
+                // view into a larger pooled allocation.
+                const arr = new Float32Array(
+                    tensorBlock.buffer.slice(
+                        tensorBlock.byteOffset + byteOffset,
+                        tensorBlock.byteOffset + byteOffset + byteLen
+                    )
+                );
+                byteOffset += byteLen;
+                return arr;
+            });
+
+            const loadedWeights = readTensors(modelData.weightLengths);
+            const loadedBiases = readTensors(modelData.biasLengths);
 
             // Assign properties
             this.task = modelData.task;
@@ -351,8 +386,8 @@ class Neurex {
             this.input_size = modelData.input_size;
             this.output_size = modelData.output_size;
             this.num_layers = modelData.num_layers;
-            this.weights = modelData.weights.map(w => new Float32Array(w));
-            this.biases = modelData.biases.map(b => new Float32Array(b));
+            this.weights = loadedWeights;
+            this.biases = loadedBiases;
             this.optimizer = modelData.optimizer;
             this.input_shape = modelData.input_shape
             const layerBuilder = new Layers();
@@ -399,15 +434,16 @@ class Neurex {
                     this.output_layers_templates.push(new Float32Array(outputSize));
                     this.parametric_layers.push(layerData.layer_name);
                 }
-                else if (layerData.layer_name === "transConv") {
-                    // recreate transpose convolutional layer
-                    newLayer = layerBuilder.transConvLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding, layerData.inputShape);
+                else if (layerData.layer_name === "recurrent_cell") {
+                    const units = layerData.units;
+                    const return_sequence = layerData.return_sequence || false;
+                    const return_state = layerData.return_state || false;
+                    newLayer = layerBuilder.recurrentCell(units, layerData.activation_function_name, return_sequence, return_state);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    const [H, W, D] = layerData.outputShape;
-                    const totalSize = H * W * D;
-                    this.output_layers_templates.push(new Float32Array(totalSize));
+                    newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
+                    this.output_layers_templates.push(new Float32Array(units));
                     this.parametric_layers.push(layerData.layer_name);
                 }
                 else {
@@ -902,6 +938,9 @@ class Neurex {
         }
     }
 
+    // build single function is used when adding layer individually. Usually executes if add_layer() is called
+    // it recieves layer data, same as `#build()` but instead of looping, it directly access the layer data being passed to
+    // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
         
         const {
@@ -931,13 +970,12 @@ class Neurex {
         layer_data.outputShape = outputShape || [];
     }
 
+    // backprop loop
     #backpropagation(activations, zs, deltas_array) {
         let deltas = deltas_array;
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        // Build a map: layer_index → weight pointer
-        // (same pointer logic as feedforward)
         const layerPointers = [];
         let p = 0;
         const parametric = this.parametric_layers;
@@ -947,18 +985,23 @@ class Neurex {
 
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
-            const next_layer = this.layers[layer_index + 1];
-            const next_delta = current_delta;
+            const next_layer    = this.layers[layer_index + 1];
 
-            // pointer for the NEXT layer (what backprop needs to un-do)
             const pointer = layerPointers[layer_index + 1];
 
-            const { current_delta: new_delta } = current_layer.backpropagate(
-                next_delta, zs, layer_index, current_layer,
-                this.weights, activations, next_layer, pointer
+            const dLda = next_layer.projectDeltaBackward(
+                current_delta,
+                pointer,
+                current_layer.outputShape,
+                next_layer
             );
 
-            current_delta = new_delta;
+            current_delta = current_layer.applyOwnDerivative(
+                dLda,
+                zs[layer_index],
+                current_layer
+            );
+
             deltas[layer_index] = current_delta;
             all_deltas.unshift(current_delta);
         }
@@ -995,25 +1038,56 @@ class Neurex {
             zs: zs
         };
     }
-    //saving model
-    #save(data, fileName) {
+
+    /**
+     * 
+     * @param {Object} data layer data 
+     * @param {Array<Float32Array>} weights array of weights
+     * @param {Array<Float32Array>} biases array of biases
+     * @param {String} fileName model filename 
+     */
+    #save(data, weights, biases, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
+
+
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);
 
-            // Serialize and compress the model data
-            const jsonString = JSON.stringify(data);
-            const compressedData = zlib.deflateSync(jsonString);
+            // Record tensor lengths (in elements, not bytes) so we can slice the
+            // binary block back into individual Float32Arrays on load.
+            data.weightLengths = weights.map(w => w.length);
+            data.biasLengths = biases.map(b => b.length);
+
+            // Metadata (architecture, hyperparams, shapes) is small text data,
+            // so JSON + deflate is fine here.
+            const metaJson = Buffer.from(JSON.stringify(data), 'utf-8');
+            const metaCompressed = zlib.deflateSync(metaJson);
+
+            // Weights/biases are large numeric tensors. Never run these through
+            // JSON.stringify: converting millions of floats to decimal text
+            // inflates a compact 4-byte-per-value Float32Array into a string many
+            // times larger, and at scale this exceeds V8's max string length
+            // (~512MB), throwing "RangeError: Invalid string length".
+            // Instead, view each Float32Array's underlying memory directly as a
+            // Buffer (zero-copy) and concatenate into one raw binary block.
+            const weightBuffers = weights.map(w => Buffer.from(w.buffer, w.byteOffset, w.byteLength));
+            const biasBuffers = biases.map(b => Buffer.from(b.buffer, b.byteOffset, b.byteLength));
+            const tensorBlock = Buffer.concat([...weightBuffers, ...biasBuffers]);
+            const tensorCompressed = zlib.deflateSync(tensorBlock);
 
             // Define file format:
-            // [HEADER (4 bytes)] + [VERSION (1 byte)] + [DATA (compressed)]
-            const header = Buffer.from("NRX3"); // Magic bytes
-            const version = Buffer.from([0x03]); // Version 3
+            // [HEADER (4 bytes)] + [VERSION (1 byte)] + [META_LENGTH (4 bytes, uint32 LE)]
+            // + [META (compressed JSON)] + [TENSOR BLOCK (compressed raw floats)]
+            const header = Buffer.from("NRX4"); // Magic bytes (bumped: new binary tensor format). Note: This is a breaking changes because. Loading models which are from the older version will cause an error because the loading model function will try to reconstruct how saved model function serialized the model
+            const version = Buffer.from([0x04]); // Version 4
+
+            const metaLengthBuf = Buffer.alloc(4);
+            metaLengthBuf.writeUInt32LE(metaCompressed.length, 0);
 
             // Combine all parts
-            const finalBuffer = Buffer.concat([header, version, compressedData]);
+            const finalBuffer = Buffer.concat([header, version, metaLengthBuf, metaCompressed, tensorCompressed]);
 
             const nrxFilePath = path.join(dir, `${fileName}.nrx`);
 
@@ -1060,6 +1134,7 @@ class Neurex {
         let H = this.input_shape[0];
         let W = this.input_shape[1];
         let D = this.input_shape[2];
+        let sequenceLength = 1;
 
         for (let i = 0; i < this.layers.length; i++) {
             const layer = this.layers[i];
@@ -1094,6 +1169,12 @@ class Neurex {
                 H = 1;
                 W = 1;
                 D = layer.maxSequenceLength * layer.embeddingDim;
+                sequenceLength = layer.maxSequenceLength;
+            }
+            else if (layer.layer_name === "recurrent_cell") {
+                H = 1;
+                W = 1;
+                D = layer.return_sequence ? (layer.units * layer.maxSequenceLength) : layer.units;
             }
         }
 

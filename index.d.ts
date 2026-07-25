@@ -474,18 +474,15 @@ declare module 'neurex' {
     export function Encode(sentence: String, buildWord2Id_output: Object, max_length: Number): Array<Number>;
 
     /**
-    * 
-    * 
-    * - Stacking layers will return the layer's information such as the layer_name, activation_function, layer_size, kernel_size (for convolutional), etc.
-    * 
-    * 
-    * available layers:
-    *  - inputShape() - This will tell the network that your input layer has this X number of input neuron.
-    *  - connectedLayer() - to build fully connected layers.
-    *  - convolutionalLayer() - to build Convolutional layers.
-    *  - maxPooling() - get the max value within a sliding window, use for downsampling operation greatly reducing computational load.
-    * @class Layers 
-    */
+     * The `Layers` class acts as a factory for generating neural network layer configurations.
+     * * Instead of holding network state directly, it provides a suite of callable builder methods. 
+     * Each method returns a structured configuration object containing the parameters, feedforward, 
+     * and backpropagation logic for that specific layer type. 
+     * * These configurations are designed to be stacked sequentially inside an array and passed 
+     * directly to `sequentialBuild()` to construct your model architecture.
+     *
+     * @class
+     */
     export class Layers {
         /**
         * @method inputShape
@@ -537,9 +534,20 @@ declare module 'neurex' {
         * @param {Number} strides It determines how much the pool window slides across the input tensor. Default is `1`
         * @param {String} padding `same` or `valid`. Default is `same`
         * @returns {Object} The max pooling layer configuration
-        * @throws {Error} - if any of the values are 0s or negative for the pool size and strides or the padding is invalid
+        * @throws {Error} if any of the values are 0s or negative for the pool size and strides or the padding is invalid
         */
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
+
+        /**
+         * @method `recurrentCell` is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
+         * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
+         * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
+         * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
+         * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
+         * @returns {Object} The Recurrent Cell configuration
+         * @throws {Error} if internal initialization and computational process has an error.
+         */
+        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean,  maxSequenceLength: Number, return_state: Boolean): Object;
     }
 
     /**
@@ -728,6 +736,15 @@ declare module 'neurex' {
          * A lightweight, deep convolutional neural network model. This template allows you to use `LiteNet` architecture where you can drop in the `sequentialBuild()`
          */
         export function LiteNet():Array<Object>;
+
+        /**
+         * 
+         * @param {Number} units_per_cell number of units per recurrent cells. Default is `3` 
+         * @param activation_function activation function to be used by recurrent cells. Default is `tanh`
+         * 
+         * A vanilla recurrent neural network with 3 recurrent cells.
+         */
+        export function VanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
 
         /**
          * A type of neural network which has an decoding and encoding parts

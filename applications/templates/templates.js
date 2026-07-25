@@ -69,20 +69,29 @@ exports.LiteNet = () => {
     ];
 }
 
+exports.VanillaRNN = (units_per_cell = 3, activation_function = "tanh") => {
+    return [
+        layer.recurrentCell(units_per_cell, activation_function, true),
+        layer.recurrentCell(units_per_cell, activation_function, true),
+        layer.recurrentCell(units_per_cell, activation_function, true),
+    ];
+}
+
 exports.AutoEncoder = () => {
     return [
         layer.connectedLayer('relu', 224),
-        layer.connectedLayer('relu', 112),
-        layer.connectedLayer('relu', 56),
-        layer.connectedLayer('relu', 28),
-        layer.connectedLayer('relu', 14),
-        layer.connectedLayer('relu', 7),
-        layer.connectedLayer('relu', 7),
-        layer.connectedLayer('relu', 7),
-        layer.connectedLayer('relu', 14),
-        layer.connectedLayer('relu', 28),
-        layer.connectedLayer('relu', 56),
-        layer.connectedLayer('relu', 112),
         layer.connectedLayer('relu', 224),
+        layer.connectedLayer('relu', 112),
+        layer.connectedLayer('relu', 112),
+        layer.connectedLayer('relu', 64),
+        layer.connectedLayer('relu', 64),
+        layer.connectedLayer('relu', 32),
+        layer.connectedLayer('relu', 32),
+        layer.connectedLayer('tanh', 64),
+        layer.connectedLayer('tanh', 64),
+        layer.connectedLayer('tanh', 112),
+        layer.connectedLayer('tanh', 112),
+        layer.connectedLayer('tanh', 224),
+        layer.connectedLayer('tanh', 224),
     ];
 }

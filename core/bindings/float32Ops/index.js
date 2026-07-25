@@ -107,6 +107,7 @@ exports.getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointe
 }
 
 exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
+    
     const embeddingDim = dim;
     
     for (let i = 0; i < activation_outputs.length; i++) {
@@ -151,7 +152,6 @@ exports.MatMul = (input, inputSize, outputSize, weights, biases, outputTemplateP
 }
 
 exports.DeltaMatMul = (delta, inputSize, outputSize, weights) => {
-
     const prevDelta = new Float32Array(inputSize);
 
     // In a normal MatMul, we do: Input (inputSize) * Weights (inputSize x outputSize) = Output (outputSize)
@@ -677,4 +677,112 @@ exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
         sum -= actuals[i] * Math.log(p) + (1 - actuals[i]) * Math.log(1 - p);
     }
     return sum / predictions.length;
+}
+
+exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
+    const { globalOutputTensorTemplate } = getGlobalParams();
+    // The weights were concatenated during initialization as:
+    // [input_weights..., recurrent_weights...]
+    const inputSize = inputWeightShape[0];
+    const units = inputWeightShape[1];
+    const range_input_weights = inputSize * units;
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    const input_weights = weights.subarray(0, range_input_weights);
+    const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
+
+    for (let j = 0; j < units; j++) {
+        let z = biases[j];
+
+        for (let i = 0; i < inputSize; i++) {
+            z += input[i] * input_weights[i * units + j];
+        }
+
+        for (let h = 0; h < units; h++) {
+            z += prevHiddenState[h] * recurrent_weights[h * units + j];
+        }
+
+        output[j] = z;
+    }
+
+    return output;
+}
+
+
+exports.recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
+    // input weight shape [feature_size, units]
+    // recurrent weight shape [units, units]
+    const a = inputWeightShape[0];
+    const b = inputWeightShape[1];
+    const c = recurrentWeightShape[0];
+    const d = recurrentWeightShape[1];
+
+    const offset = a * b;
+    const length = c * d;
+
+    const weights = weightParams.subarray(offset, offset + length); // get the array of recurrent weights
+    
+    const prevDelta = new Float32Array(delta);
+
+
+    for (let i = 0; i < c; i++) {
+        let sum = 0;
+        const offset = i * c;
+
+        for (let j = 0; j < d; j++) {
+
+            sum += weights[offset + j]  * delta[j];
+        }
+        prevDelta[i] = sum;
+    }
+
+    return prevDelta;
+}
+
+exports.recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
+    let [featureSize, units] = weightShape;
+    let output = weightGrads;
+
+    const totalInputWeights = featureSize * units; // offset where recurrent-weight block starts
+
+    for (let t = 0; t < sequenceLength; t++) {
+        const x_t = activation_outputs.subarray(t * featureSize, (t + 1) * featureSize);
+        const h_prev = t === 0 ? new Float32Array(units) : hiddenStates[t - 1];
+        const delta_t = deltaTs[t];
+
+        // dL/dW_x += outer(x_t, delta_t)      -- W_x is [featureSize, units], row-major
+        for (let i = 0; i < featureSize; i++) {
+            const xi = x_t[i];
+            const rowOffset = i * units;
+            for (let j = 0; j < units; j++) {
+                output[rowOffset + j] += xi * delta_t[j]
+            };
+        }
+
+        // dL/dW_h += outer(h_prev, delta_t)   -- W_h is [units, units], stored right after W_x
+        for (let i = 0; i < units; i++) {
+            const hi = h_prev[i];
+            const rowOffset = totalInputWeights + i * units;
+            for (let j = 0; j < units; j++) {
+                output[rowOffset + j] += hi * delta_t[j];
+            }
+        }
+    }
+
+    return output;
+
+}
+
+exports.recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => {
+    let output = biasGrads;
+
+    for (let t = 0; t < sequenceLength; t++) {
+        const delta_t = deltaTs[t];
+
+        for (let j = 0; j < units; j++) {
+            output[j] += delta_t[j];
+        }
+    }
+
+    return output;
 }
