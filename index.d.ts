@@ -422,34 +422,35 @@ declare module 'neurex' {
     /**
     * @async
     * @function load_images_from_directory
-    * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
-    * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
-    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @param {Number} limit_per_class - limit the number of items per class. Default is 0.
-    * @returns an object that contains the datasets, labels, and classes
+    * @param {String} targetDir target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+    * @param {Array<Number>} resize an array containing the values for resizing [H, W].
+    * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+    * @param {String} label_mode specifies how the target labels are encoded and shaped. It lets you match your label format directly to your loss function. Mode: `binary`, `categorical`, `sparse`
+    * @param {Number} limit_per_class limit the number of items per class
+    * @returns {Object}
     */
-    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, limit_per_class: number): Object;
+    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, label_mode: String, limit_per_class: number): { datasets: Array<Float32Array>, targetY: Array<Array<Number>>, labels: Array<Array<String>>, classes: Array<String>};
 
     /**
     * @async
-    * @function load_single_image allows you to load a single image
-    * @param {String} targetDir points to the directory of the image
-    * @param {Array<Number>} resize resize the image to [h][w][d]
-    * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @param {Boolean} showLog Shows a debugging log when loading an image file and if loaded successfully. Can be disable if  set to false. Default is `true`.
-    * @returns {Object} {datasets: [][], shape: [], filename: String}
+    * @function load_single_image This function allows you to load a single image by specifying it's path
+    * @param {String} file_path path to the image file (can be nested anywhere)
+    * @param {Array<Number>} resize resize the image to [H, W]
+    * @param {String} pixelFormat grayscale, rgb, or rgba.
+    * @param {Boolean} showLog when set to `true`, it will show the output logs after an image is loaded. Default value is `false`
+    * @returns {{datasets: Array<Float32Array>, shape: Array<Number>, filename: filename}}
     */
-    export function load_single_image(targetDir: String, resize: Number[], pixelFormat: String, showLog: Boolean): Object;
+    export function load_single_image(file_path: String, resize: Number[], pixelFormat: String, showLog: Boolean): {datasets: Array<Float32Array>, shape: Array<Number>, filename: String};
 
     /**
-    * 
-    * @function load_single_image allows you to load a single image
-    * @param {String} targetDir - points to the directory of the image
-    * @param {Array<Number>} resize - resize the image to [h][w][d]
-    * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @returns an array of normalized tensor maps
+    * @async
+    * @function load_multiple_images allows you to load a multiple images at once by specifying the folder that contains images
+    * @param {String} file_path path to the image file (can be nested anywhere)
+    * @param {Array<Number>} resize resize the image to [H, W]
+    * @param {String} pixelFormat grayscale, rgb, or rgba.
+    * @returns {{datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>}}
     */
-    export function load_multiple_images(targetDir: String, resize: Number[], pixelFormat: String): Object;
+    export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
 
     /**
      * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
@@ -714,7 +715,7 @@ declare module 'neurex' {
      * ]);
      * 
     */
-    export module templates {
+    export namespace templates {
         /**
          * A simple neural network having 3 hidden connected layers, having 5 neurons each layer. All uses `relu` activation function
          */
