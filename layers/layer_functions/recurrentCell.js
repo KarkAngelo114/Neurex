@@ -14,7 +14,8 @@ const initParams = (size, shape, layer_data) => {
     // 1. Correctly extract the sequence length and feature size from the embedding layer's output shape
     // shape format from embedding is: [1, 1, embeddingDim, maxSequenceLength]
     const feature_size = shape[2] || size; 
-    let maxSequenceLength = layer_data.maxSequenceLength|| shape[3] ||  1;
+    const spatialSteps = (shape[0] || 1) * (shape[1] || 1);
+    let maxSequenceLength = layer_data.maxSequenceLength || shape[3] || (spatialSteps > 1 ? spatialSteps : 1);
     
     const return_sequence = layer_data.return_sequence || false;
 
