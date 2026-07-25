@@ -2,16 +2,21 @@
 ### What's New
 - Introduced recurrent cell to support RNN modeling
 
+### What's Updated
+- arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it's now `connectedLayer(layer_size, activation_func)`. See the updated the documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
+- when using `load_images_from_directory()`, you can pass a string value in the `label_mode` argument. The label mode to use depends on the loss function you will going to use for training. See the updated documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#load_images_from_directory).
+
 ### Breaking Changes
 - supported model version has been bumped to `NRX4`. Old models cannot be loaded. 
-- passing arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it is now `connectedLayer(layer_size, activation_func)`.
+- due to arrangement of arguments on `connectedLayer()`, ensure that your training script/s also follows the format.
+
 
 # v0.0.9 (Latest)
 ### What's New
 - major overhaul of the entire core functionalities of the library to use float32array
 - 2x performance boost due to type arrays
 - uses native bindings written in C++ and are already precompiled so that you don't have to compile again (source code is in different repository)
-- introduced CNN layers. Now supports training Convolutional Neural Networks in the near future
+- introduced CNN layers. Now supports training Convolutional Neural Networks
 - added pooling layers
 - allows retraining and transfer learning
 - introduced Embedding layer

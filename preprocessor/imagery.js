@@ -3,16 +3,34 @@ const path = require('path');
 const { red, reset, green, lime } = require('../color-code')
 const fs = require('fs').promises;
 const sharp = require('sharp');
+const { OneHotEncoded, IntegerLabeling, BinaryLabeling } = require('../preprocessor/label_encoder')
 
 /**
+ * @async
  * @function load_images_from_directory
- * @param {String} targetDir - target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
- * @param {Array<Number>} resize - an array containing the values for resizing [H, W].
- * @param {String} pixelFormat - grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
- * @param {Number} limit_per_class - limit the number of items per class
- * @returns an object that contains the datasets, labels, and classes
+ * @param {String} targetDir target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+ * @param {Array<Number>} resize an array containing the values for resizing [H, W].
+ * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+ * @param {String} label_mode specifies how the target labels are encoded and shaped. It lets you match your label format directly to your loss function. Mode: `binary`, `categorical`, `sparse`
+ * @param {Number} limit_per_class limit the number of items per class
+ * @returns {{ datasets: Array<Float32Array>, targetY: Array<Array<Number>>, labels: Array<Array<String>>, classes: Array<String>}}
  */
-const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFormat = "grayscale", limit_per_class = 0) => {
+const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFormat = "grayscale", label_mode, limit_per_class = 0) => {
+
+    if (!label_mode) {
+        const error = `Label mode is "undefined"`;
+        console.error(`${red}[ERROR]------- ${error}${reset}`);
+        throw new Error('Label mode error');
+    }
+
+
+    const allowedLabelModes = ["binary", "categorical", "sparse"];
+
+    if (!allowedLabelModes.includes(label_mode.toLowerCase())) {
+        const error = `Label mode "${label_mode}" is invaid. Please use "binary", "categorical", or "sparse".`;
+        console.error(`${red}[ERROR]------- ${error}${reset}`);
+        throw new Error('Label mode error');
+    }
 
     const subdirs = []; // only subdirectories (class names)
     const datasets = []; // all images converted to tensors and already normalized.
@@ -75,8 +93,14 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
         console.log(`${green}[/]------- Successfully loaded datasets from "${targetDir}/"${reset}\n`);
         console.log(`- Found ${subdirs.length} classes`);
         console.log(`- Found ${datasets.length} items in total`);
+
+        // format labels
+        let labelMode = label_mode.toLowerCase();
+        const targetY = labelMode === "categorical" ? await OneHotEncoded(labels) : labelMode === "sparse" ? await IntegerLabeling(labels) : labelMode === "binary" ? await BinaryLabeling(labels) : null;
+
         return {
             datasets: datasets,
+            targetY: targetY,
             labels: labels,
             classes: subdirs
         }
@@ -87,13 +111,15 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
 }
 
 /**
- * 
- * @param {String} file_path - path to the image file (can be nested anywhere)
- * @param {Array<Number>} resize - resize the image to [H, W]
- * @param {String} pixelFormat - grayscale, rgb, or rgba.
- * @returns a normalized tensor map
+ * @async
+ * @function load_single_image This function allows you to load a single image by specifying it's path
+ * @param {String} file_path path to the image file (can be nested anywhere)
+ * @param {Array<Number>} resize resize the image to [H, W]
+ * @param {String} pixelFormat grayscale, rgb, or rgba.
+ * @param {Boolean} showLog when set to `true`, it will show the output logs after an image is loaded. Default value is `false`
+ * @returns {{datasets: Array<Float32Array>, shape: Array<Number>, filename: filename}}
  */
-const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale", showLog = true) => {
+const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "grayscale", showLog = false) => {
 
     try {
         
@@ -143,11 +169,12 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
 
 
 /**
- * 
- * @param {String} file_path - path to the image file (can be nested anywhere)
- * @param {Array<Number>} resize - resize the image to [H, W]
- * @param {String} pixelFormat - grayscale, rgb, or rgba.
- * @returns an object containing an array of tensor normalized tensor maps and their file path
+ * @async
+ * @function load_multiple_images allows you to load a multiple images at once by specifying the folder that contains images
+ * @param {String} file_path path to the image file (can be nested anywhere)
+ * @param {Array<Number>} resize resize the image to [H, W]
+ * @param {String} pixelFormat grayscale, rgb, or rgba.
+ * @returns {{datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>}}
  */
 const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = "grayscale") => {
 
