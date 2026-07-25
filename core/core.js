@@ -199,6 +199,13 @@ class Neurex {
                     params = paramCount.toLocaleString();
                     padding = "None"
                     break;
+                case "recurrent_cell":
+                    displayName = "Recurrent Cell";
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
+                    activation = activationName|| 'None';
+                    params = paramCount.toLocaleString();
+                    padding = "None"
+                    break;
                 default:
                     displayName = layerType;
                     outputShape = '-';
@@ -282,9 +289,12 @@ class Neurex {
                 inputShape: layer.inputShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
-                embeddingDim: layer.embeddingDim,
-                vocabSize: layer.vocabSize,
-                maxSequenceLength: layer.maxSequenceLength,
+                embeddingDim: layer.embeddingDim || 1,
+                vocabSize: layer.vocabSize || 1,
+                maxSequenceLength: layer.maxSequenceLength || 1,
+                units: layer.units || 1,
+                return_sequence: layer.return_sequence || false,
+                return_state: layer.return_state || false,
                 isParametric: layer.isParametric
 
             })),
@@ -424,15 +434,16 @@ class Neurex {
                     this.output_layers_templates.push(new Float32Array(outputSize));
                     this.parametric_layers.push(layerData.layer_name);
                 }
-                else if (layerData.layer_name === "transConv") {
-                    // recreate transpose convolutional layer
-                    newLayer = layerBuilder.transConvLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding, layerData.inputShape);
+                else if (layerData.layer_name === "recurrent_cell") {
+                    const units = layerData.units;
+                    const return_sequence = layerData.return_sequence || false;
+                    const return_state = layerData.return_state || false;
+                    newLayer = layerBuilder.recurrentCell(units, layerData.activation_function_name, return_sequence, return_state);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    const [H, W, D] = layerData.outputShape;
-                    const totalSize = H * W * D;
-                    this.output_layers_templates.push(new Float32Array(totalSize));
+                    newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
+                    this.output_layers_templates.push(new Float32Array(units));
                     this.parametric_layers.push(layerData.layer_name);
                 }
                 else {
@@ -927,6 +938,9 @@ class Neurex {
         }
     }
 
+    // build single function is used when adding layer individually. Usually executes if add_layer() is called
+    // it recieves layer data, same as `#build()` but instead of looping, it directly access the layer data being passed to
+    // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
         
         const {
@@ -956,51 +970,12 @@ class Neurex {
         layer_data.outputShape = outputShape || [];
     }
 
-    // #backpropagation(activations, zs, deltas_array) {
-    //     let deltas = deltas_array;
-    //     let current_delta = deltas[this.num_layers - 1];
-    //     let all_deltas = [current_delta];
-
-    //     // Build a map: layer_index → weight pointer
-    //     // (same pointer logic as feedforward)
-    //     const layerPointers = [];
-    //     let p = 0;
-    //     const parametric = this.parametric_layers;
-    //     for (let i = 0; i < this.layers.length; i++) {
-    //         layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
-    //     }
-
-    //     for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
-    //         const current_layer = this.layers[layer_index];
-    //         const next_layer = this.layers[layer_index + 1];
-    //         const next_delta = current_delta;
-
-    //         // pointer for the NEXT layer (what backprop needs to un-do)
-    //         const pointer = layerPointers[layer_index + 1];
-
-    //         const { current_delta: new_delta } = current_layer.backpropagate(
-    //             next_delta, 
-    //             zs, 
-    //             layer_index, 
-    //             current_layer,
-    //             next_layer, 
-    //             pointer
-    //         );
-
-    //         current_delta = new_delta;
-    //         deltas[layer_index] = current_delta;
-    //         all_deltas.unshift(current_delta);
-    //     }
-
-    //     return { deltas, all_deltas };
-    // }
-
+    // backprop loop
     #backpropagation(activations, zs, deltas_array) {
         let deltas = deltas_array;
         let current_delta = deltas[this.num_layers - 1];
         let all_deltas = [current_delta];
 
-        // Build layer_index → weight-pointer map (same logic as #Feedforward)
         const layerPointers = [];
         let p = 0;
         const parametric = this.parametric_layers;
@@ -1012,26 +987,19 @@ class Neurex {
             const current_layer = this.layers[layer_index];
             const next_layer    = this.layers[layer_index + 1];
 
-            // pointer for the NEXT layer — the one whose weights we're projecting through
             const pointer = layerPointers[layer_index + 1];
 
-            // Step 1 — project delta backward through NEXT layer's own transform.
-            //   JS dispatches to the correct layer type automatically; no branching here.
-            //   connectedLayer  → DeltaMatMul with its own weightShape
-            //   convolutionalLayer → dilate / pad / ConvolveDelta with its own kernels
-            //   maxPooling      → passthrough (no weights; unpooling is step 2's job)
             const dLda = next_layer.projectDeltaBackward(
                 current_delta,
                 pointer,
-                current_layer.outputShape,  // target shape the projected delta must match
-                next_layer                  // the layer itself, so it can read its own params
+                current_layer.outputShape,
+                next_layer
             );
 
-            // Step 2 — apply CURRENT layer's own activation derivative (or unpool for maxPooling).
             current_delta = current_layer.applyOwnDerivative(
                 dLda,
                 zs[layer_index],
-                current_layer   // the layer itself, so it can read its own params
+                current_layer
             );
 
             deltas[layer_index] = current_delta;
@@ -1071,10 +1039,18 @@ class Neurex {
         };
     }
 
-    //saving model
+    /**
+     * 
+     * @param {Object} data layer data 
+     * @param {Array<Float32Array>} weights array of weights
+     * @param {Array<Float32Array>} biases array of biases
+     * @param {String} fileName model filename 
+     */
     #save(data, weights, biases, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
+
+
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);
@@ -1104,7 +1080,7 @@ class Neurex {
             // Define file format:
             // [HEADER (4 bytes)] + [VERSION (1 byte)] + [META_LENGTH (4 bytes, uint32 LE)]
             // + [META (compressed JSON)] + [TENSOR BLOCK (compressed raw floats)]
-            const header = Buffer.from("NRX4"); // Magic bytes (bumped: new binary tensor format)
+            const header = Buffer.from("NRX4"); // Magic bytes (bumped: new binary tensor format). Note: This is a breaking changes because. Loading models which are from the older version will cause an error because the loading model function will try to reconstruct how saved model function serialized the model
             const version = Buffer.from([0x04]); // Version 4
 
             const metaLengthBuf = Buffer.alloc(4);
@@ -1158,6 +1134,7 @@ class Neurex {
         let H = this.input_shape[0];
         let W = this.input_shape[1];
         let D = this.input_shape[2];
+        let sequenceLength = 1;
 
         for (let i = 0; i < this.layers.length; i++) {
             const layer = this.layers[i];
@@ -1192,6 +1169,12 @@ class Neurex {
                 H = 1;
                 W = 1;
                 D = layer.maxSequenceLength * layer.embeddingDim;
+                sequenceLength = layer.maxSequenceLength;
+            }
+            else if (layer.layer_name === "recurrent_cell") {
+                H = 1;
+                W = 1;
+                D = layer.return_sequence ? (layer.units * layer.maxSequenceLength) : layer.units;
             }
         }
 

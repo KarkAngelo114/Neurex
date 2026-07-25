@@ -738,3 +738,51 @@ exports.recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, wei
 
     return prevDelta;
 }
+
+exports.recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
+    let [featureSize, units] = weightShape;
+    let output = weightGrads;
+
+    const totalInputWeights = featureSize * units; // offset where recurrent-weight block starts
+
+    for (let t = 0; t < sequenceLength; t++) {
+        const x_t = activation_outputs.subarray(t * featureSize, (t + 1) * featureSize);
+        const h_prev = t === 0 ? new Float32Array(units) : hiddenStates[t - 1];
+        const delta_t = deltaTs[t];
+
+        // dL/dW_x += outer(x_t, delta_t)      -- W_x is [featureSize, units], row-major
+        for (let i = 0; i < featureSize; i++) {
+            const xi = x_t[i];
+            const rowOffset = i * units;
+            for (let j = 0; j < units; j++) {
+                output[rowOffset + j] += xi * delta_t[j]
+            };
+        }
+
+        // dL/dW_h += outer(h_prev, delta_t)   -- W_h is [units, units], stored right after W_x
+        for (let i = 0; i < units; i++) {
+            const hi = h_prev[i];
+            const rowOffset = totalInputWeights + i * units;
+            for (let j = 0; j < units; j++) {
+                output[rowOffset + j] += hi * delta_t[j];
+            }
+        }
+    }
+
+    return output;
+
+}
+
+exports.recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => {
+    let output = biasGrads;
+
+    for (let t = 0; t < sequenceLength; t++) {
+        const delta_t = deltaTs[t];
+
+        for (let j = 0; j < units; j++) {
+            output[j] += delta_t[j];
+        }
+    }
+
+    return output;
+}

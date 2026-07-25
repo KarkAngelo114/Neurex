@@ -1,6 +1,6 @@
 const { XavierInitialization, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const activation = require('../../core/bindings');
-const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta } = require('../../core/bindings');
+const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta, recurrentWeightGradsAccumulation, recurrentBiasGradsAccumulation } = require('../../core/bindings');
 /**
  * Initialized parameters for this layer
  * @param {Number} size number of neurons for this layer 
@@ -14,7 +14,7 @@ const initParams = (size, shape, layer_data) => {
     // 1. Correctly extract the sequence length and feature size from the embedding layer's output shape
     // shape format from embedding is: [1, 1, embeddingDim, maxSequenceLength]
     const feature_size = shape[2] || size; 
-    let maxSequenceLength = shape[3] || layer_data.maxSequenceLength || 1;
+    let maxSequenceLength = layer_data.maxSequenceLength|| shape[3] ||  1;
     
     const return_sequence = layer_data.return_sequence || false;
 
@@ -30,7 +30,7 @@ const initParams = (size, shape, layer_data) => {
     const biasGrads = new Float32Array(totalBiases);
 
     const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
-    const output_template = new Float32Array(units);
+    const output_template = new Float32Array(units); // output template per timesteps
 
     const limit1 = XavierInitialization(feature_size, units); // Use feature_size
     const limit2 = XavierInitialization(units, units);
@@ -243,9 +243,11 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 
     for (let t = sequenceLength - 1; t >= 0; t--) {
         let dUpper = new Float32Array(units);
+
         if (layer_data.return_sequence) {
             dUpper.set(delta.subarray(t * units, (t + 1) * units));
-        } else if (t === sequenceLength - 1) {
+        } 
+        else if (t === sequenceLength - 1) {
             dUpper.set(delta);
         }
 
@@ -255,7 +257,7 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
         const delta_t = element_wise_mul(dTotal, dActivation(recurrentZs[t]));
         if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrentCell.projectDeltaBackward");
 
-        deltaTs[t] = delta_t; // <-- NEW
+        deltaTs[t] = delta_t;
 
         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer);
         const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer);
@@ -270,14 +272,33 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 const applyOwnDerivative = (delta, z, layer_data) => delta;
 
 const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
-    throw new Error("Not yet implemented. TODO: implement the gradient accumulation for recurrent cell's")
-    return weightGrads;
-}
+    const weightShape = layer_data.weightShape;
+    const sequenceLength = layer_data.maxSequenceLength;
+    const hiddenStates = layer_data.cache.hidden_states;
+    const deltaTs = layer_data.cache.deltaTs;
 
-const accumulateRecurrentBiasGrads = (biasgrads, deltas) => {
-    throw new Error("Not yet implemented. TODO: implement the gradient accumulation for recurrent cell's")
-    return biasgrads;
-}
+    if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeWeightGradients — missing cached per-timestep deltas");
+
+    const output = recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+
+    if (output.some(v => Number.isNaN(v))) throw new Error("recurrentCell weight grads have NaNs");
+
+    return output;
+};
+
+const accumulateRecurrentBiasGrads = (biasgrads, deltas, layer_data) => {
+    const units = layer_data.units;
+    const sequenceLength = layer_data.maxSequenceLength;
+    const deltaTs = layer_data.cache.deltaTs;
+
+    if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeBiasGradients");
+
+    const output = recurrentBiasGradsAccumulation(biasgrads, deltaTs, sequenceLength, units);
+
+    if (output.some(v => Number.isNaN(v))) throw new Error("recurrentCell bias grads have NaNs");
+
+    return output;
+};
 
 module.exports = {
     initParams,

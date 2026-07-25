@@ -488,19 +488,36 @@ const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeig
 
 
 /**
- * 
- * @param {*} input 
- * @param {*} inputWeightShape 
- * @param {*} recurrentWeightShape 
- * @param {*} pointer 
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} inputWeightShape 
+ * @param {Array<Number>} recurrentWeightShape 
+ * @param {Number} pointer 
  * @returns 
  */
-const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer) => float32_Modules.recurrentTimeDelta(
+const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer) => functions.recurrentTimeDelta(
     input, 
     inputWeightShape,
     recurrentWeightShape,
     getGlobalParams().globalWeights[pointer], 
 );
+
+/**
+ * "☑️"
+ * @param {Float32Array} activation_outputs 
+ * @param {Float32Array} deltas 
+ * @param {Array<Float32Array>} hiddenStates 
+ * @param {Array<Float32Array>} deltaTs 
+ * @param {Float32Array} weightGrads 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} sequenceLength 
+ * @returns 
+ */
+const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => functions.recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+
+
+
+const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => functions.recurrentBiasGradsAccumulation(biasGrads, deltaTs, sequenceLength, units);
 
 
 module.exports = {
@@ -537,6 +554,8 @@ module.exports = {
     binary_cross_entropy,
     recurrentMatMul,
     recurrentTimeDelta,
+    recurrentWeightGradsAccumulation,
+    recurrentBiasGradsAccumulation,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,
