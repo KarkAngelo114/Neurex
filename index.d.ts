@@ -227,8 +227,6 @@ declare module 'neurex' {
         * Default configurations:
         *   learning_rate: 0.001
         *   optimizer: 'adam'
-        *   randMin: -0.01
-        *   randMax: 0.01
         *
         * Available optimizers: 'sgd'and 'adam'
         */
@@ -262,17 +260,24 @@ declare module 'neurex' {
          * @returns the task type: regression | multi_class_classification | binary_classification
          */
         get_task_type(): String;
+
+        /**
+        * @method get_miscellaneous_data
+        * @returns {Object} Saved miscellaneous data upon model saving
+        */
+        get_miscellaneous_data(): Object;
         
         /**
         * 
-        @method saveModel()
-        @param {string} modelName - the filename of your model. If not provided, the filename of the model is date today.
-
-        saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
-        as a .nrx (neurex) model.
-        
+        * `saveModel()` allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+        *  as a .nrx (neurex) model
+        * 
+        * @method saveModel()
+        * @param {string} modelName the filename of your model
+        * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model size when adding miscellaneous.
+        *   
         */
-        saveModel(modelName: string): void;
+        saveModel(modelName: string, miscellaneous: object): void;
 
         /**
         * @method loadSavedModel()

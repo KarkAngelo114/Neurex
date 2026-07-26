@@ -62,7 +62,8 @@ class Neurex {
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
         this.isInit = false;
 
-        this.parametric_layers = []; 
+        this.parametric_layers = [];
+        this.miscellaneous = null;
     }
 
     /**
@@ -247,15 +248,23 @@ class Neurex {
     }
 
     /**
-    * 
-     @method saveModel()
-     @param {string} modelName - the filename of your model
+     * @method get_miscellaneous_data
+     * @returns {Object} Saved miscellaneous data upon model saving
+     */
+    get_miscellaneous_data() {
+        return this.miscellaneous;
+    }
 
-     saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
-     as a .nrx (neurex) model and a metadata.json will be generated along with the model file.
-        
-    */
-    saveModel(modelName = null) {
+    /**
+     * 
+     * saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+     *  as a .nrx (neurex) model
+     * @method saveModel()
+     * @param {string} modelName the filename of your model
+     * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model size when adding miscellaneous.
+     *   
+     */
+    saveModel(modelName = null, miscellaneous) {
         console.log("\n[TASK]------- Saving model's architecture...");
         let fileName = modelName;
         if (!modelName || modelName == null || modelName == undefined) {
@@ -296,8 +305,8 @@ class Neurex {
                 return_sequence: layer.return_sequence || false,
                 return_state: layer.return_state || false,
                 isParametric: layer.isParametric
-
             })),
+            "miscellaneous": miscellaneous
         };
 
         this.#save(data, this.weights, this.biases, fileName);
@@ -377,6 +386,7 @@ class Neurex {
             const loadedBiases = readTensors(modelData.biasLengths);
 
             // Assign properties
+            this.miscellaneous = modelData.miscellaneous;
             this.task = modelData.task;
             this.loss_function = modelData.loss_function;
             this.epoch_count = modelData.epoch;
@@ -1049,8 +1059,6 @@ class Neurex {
     #save(data, weights, biases, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
-
-
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);
