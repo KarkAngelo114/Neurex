@@ -263,7 +263,7 @@ declare module 'neurex' {
 
         /**
         * @method get_miscellaneous_data
-        * @returns {Object} Saved miscellaneous data upon model saving
+        * @returns {any} Saved miscellaneous data upon model saving
         */
         get_miscellaneous_data(): Object;
         
