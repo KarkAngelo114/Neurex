@@ -72,8 +72,8 @@ const layer = new Layers();
     // stack layers in sequential order
     nrx.sequentialBuild([
         layer.inputShape({ features:2 }),
-        layer.connectedLayer('relu', 4),
-        layer.connectedLayer('sigmoid',1)
+        layer.connectedLayer(4), // layer size: 4, activation: relu (by default)
+        layer.connectedLayer(1, 'sigmoid')
     ]);
 
 
@@ -134,7 +134,7 @@ const { Neurex, Layers } = require('neurex');
     // nrx.pop(); 
     // nrx.pop(); 
     // nrx.pop(); 
-    nrx.add_layer(layer.connectedLayer('softmax', 3)) // append a new layer with untrained parameters
+    nrx.add_layer(layer.connectedLayer(3,'softmax')) // append a new layer with untrained parameters
 
     nrx.modelSummary(); // prints the model summary
 })();
@@ -154,12 +154,12 @@ const { Neurex, Layers, templates } = require('neurex');
         layer.inputShape({features: 2}),
         // drop in a connected network having 3 hidden layers, 5 neurons each
         ...templates.simpleNeuralNetwork(),
-        layer.connectedLayer('sigmoid',1)
+        layer.connectedLayer(1, 'sigmoid')
     ])
 })();
 ```
 
-Learn more about neural network templates [here](https://neurex-documentation.vercel.app/api#templates).
+Learn more about neural network templates [here](https://neurex-documentation.vercel.app/javascript-nodejs#templates).
 
 # Test the Experimental Upcoming Updates 🔥
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.
@@ -169,6 +169,7 @@ If you'd like to try the upcoming major updates before it is officially released
 ```bash
 npm install git+https://github.com/KarkAngelo114/Neurex.git
 ```
+
 ## Notes
 
 * APIs may change without notice

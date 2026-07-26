@@ -725,8 +725,10 @@ declare module 'neurex' {
          *  A simple CNN having a two convolutional layers each having different number of filters, same strides and kernel sizes. Both uses `same` padding and `relu` activation functions.
          * After each convolutional layers comes with max pooling layer having `2x2` pool sizes, 2 strides and uses `valid` padding. Then it uses 3 connected layers having a
          * "funnel" shape architecture 
+         *
+         * @param {Boolean} isHeadless if set to `true`, it will only return the extractor layers (convolution and max pooling layers). Default value is `false`
          */
-        export function simpleCNN(): Array<Object>;
+        export function simpleCNN(isHeadless: Boolean): Array<Object>;
 
         /**
          * 
@@ -740,11 +742,11 @@ declare module 'neurex' {
         export function LiteNet():Array<Object>;
 
         /**
-         * 
+         *  A vanilla recurrent neural network with 3 recurrent cells.
          * @param {Number} units_per_cell number of units per recurrent cells. Default is `3` 
          * @param {String} activation_function activation function to be used by recurrent cells. Default is `tanh`
          * 
-         * A vanilla recurrent neural network with 3 recurrent cells.
+         *
          */
         export function vanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
 
