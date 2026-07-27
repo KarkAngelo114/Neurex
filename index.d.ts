@@ -274,7 +274,7 @@ declare module 'neurex' {
         * 
         * @method saveModel()
         * @param {string} modelName the filename of your model
-        * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model size when adding miscellaneous.
+        * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model file size when adding miscellaneous.
         *   
         */
         saveModel(modelName: string, miscellaneous: object): void;
@@ -472,9 +472,9 @@ declare module 'neurex' {
     export function buildWord2Id(vocab: String[]): Object;
 
     /**
-     * @function Encode - this function tokenize a sentence and assign token IDs returning an array of token IDs.
+     * @function Encode tokenize a sentence and assign token IDs returning an array of token IDs.
      * @param {String} sentence input sentence or prompt
-     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on based on the words in `buildWord2Id_output`
+     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on the words in `buildWord2Id_output`
      * @param {Number} max_length The length of the encoded token containing token IDs.
      * @returns {Array<Number>} an array of token IDs to be use for token embeddings in the embedding layer 
      */
