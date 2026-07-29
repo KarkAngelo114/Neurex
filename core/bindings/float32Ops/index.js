@@ -130,11 +130,8 @@ const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePoi
     
     const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
-    // 1. Initialize with Biases (Faster than adding them in a separate loop later)
     z_values.set(biases);
 
-    // 2. Perform Weighted Sum
-    // We iterate through each input neuron
     for (let i = 0; i < inputSize; i++) {
         const inputVal = input[i];
         
@@ -147,23 +144,24 @@ const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePoi
         }
     }
 
+
     return z_values;
 }
 
 const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     const prevDelta = new Float32Array(inputSize);
 
-    // In a normal MatMul, we do: Input (inputSize) * Weights (inputSize x outputSize) = Output (outputSize)
-    // In Delta MatMul, we do: Delta (outputSize) * Weights_Transposed (outputSize x inputSize) = PrevDelta (inputSize)
-
     for (let i = 0; i < inputSize; i++) {
+        const start = i * outputSize;
+        const end = start + outputSize;
+
+        const weight = weights.subarray(start, end);
         let sum = 0;
-        const offset = i * outputSize;
 
         for (let j = 0; j < outputSize; j++) {
-            // We multiply the j-th delta by the weight connecting input i to output j
-            sum += weights[offset + j]  * delta[j];
+            sum += delta[j] * weight[j];
         }
+
         prevDelta[i] = sum;
     }
 
@@ -278,6 +276,7 @@ const ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  */
 const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
 
+    
     const [numFilters, kernelH, kernelW, depth] = kernelShape;
     const [inputH, inputW] = inputShape;
     const [outputH, outputW] = outputShape;
@@ -806,6 +805,7 @@ module.exports = {
     Adam,
     ApplyPadding,
     Convolve,
+    ConvolveDelta,
     DilateInput,
     Convolve,
     computeBiasGradsForConv,

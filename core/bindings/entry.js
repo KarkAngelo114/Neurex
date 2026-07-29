@@ -299,7 +299,7 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer,
  * @param {Float32Array} input 
  * @param {Array<Number>} shape_array 
  * @param {Number} strides 
- * @returns {Object} {data, dilatedHeight, dilatedWidth}
+ * @returns {{data: Float32Array, dilatedHeight: Number, dilatedWidth: Number}} {data, dilatedHeight, dilatedWidth}
  */
 const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(input, shape_array, strides);
 

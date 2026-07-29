@@ -178,6 +178,14 @@ class Neurex {
                     padding = layer.padding || 'None';
                     break;
 
+                case 'transConvLayer':
+                    displayName = 'Trans Convolution';
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
+                    activation = activationName;
+                    params = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
+                    break;
+
                 case 'connected_layer':
                     displayName = 'Connected Layer';
                     outputShape = `(1 x 1 x ${layer.layer_size})`;

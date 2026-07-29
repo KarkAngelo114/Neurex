@@ -147,10 +147,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     else if (tasktype === "regression") {
         if (preds.length != actuals.length) throw new Error("Predictions array is not equal to actuals array");
 
-        const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs); 
-
-        dOutputLayer = scaleDiff(preds, actuals, dAct);
+        dOutputLayer = element_wise_sub(preds, actuals);
 
         if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
 
