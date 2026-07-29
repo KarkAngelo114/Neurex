@@ -206,6 +206,8 @@ declare module 'neurex' {
         onFLoat32Module?: true | false;
         /** set mode to `cpu`, `gpu` or `auto`. Default is `cpu`*/
         mode?: "cpu" | "gpu" | "auto";
+        /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
+        lr_scheduler?: (params: any) => number;
     }
 
     /**
@@ -774,4 +776,39 @@ declare module 'neurex' {
          */
         export function AutoEncoder(): Array<Object>;
     }
+
+    /**
+     * @function stepDecay Reduces the learning rate by a fixed factor after a set number of epochs.
+     * @param {Number} dropFactor A drop factor in a learning rate scheduler is the multiplier used to reduce the learning rate. Default is `0.5`
+     * @param {Number} dropEvery dropEvery (or drop_every) is a custom parameter used in step-decay learning rate schedulers to define the number of epochs or steps that pass before the learning rate drops by a specific multi-factor value. Default is `10`.
+     */
+    export function stepDecay(dropFactor: Number, dropEvery: Number): Number;
+
+    /**
+     * @function exponentialDecay Multiplies the learning rate by a decay constant raised to the power of the epoch or step.
+     * @param {Number} decayRate is a multiplier factor that scales down the learning rate at each step or epoch. Default is `0.96`
+     */
+    export function exponentialDecay(decayRate: Number): Number;
+
+    /**
+     * @function consineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
+     * @param {Numnber} totalEpochs 
+     * @param {Number} minLR 
+     */
+    export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
+
+
+    export interface ReduceOnPlateauConfig {
+        /** Reduces the learning rate by multiplying it by this value. Default value is 0.5 */
+        factor?: Number;
+        /**Counts the number of epochs to wait with no improvement in the monitored metric before making a reduction. Default value is `5`*/
+        patience?: Number;
+        /** Sets a lower bound on the learning rate so it does not drop below this specific value. Default value is `1e-6`*/
+        minLR?: Number;
+    }
+    /**
+     * @function reduceOnPlateau Monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
+     * @param {ReduceOnPlateauConfig} config 
+     */
+    export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
 }

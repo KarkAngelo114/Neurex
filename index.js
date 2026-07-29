@@ -22,6 +22,7 @@ const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
 const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN } = require('./applications/templates');
 const { Encode, buildVocab, buildWord2Id } = require('./preprocessor/tokenizer');
+const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 
 
 module.exports= {
@@ -51,6 +52,10 @@ module.exports= {
     buildWord2Id,
     buildVocab,
     Encode,
+    stepDecay,
+    exponentialDecay,
+    cosineAnnealing,
+    reduceOnPlateau,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,

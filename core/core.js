@@ -48,6 +48,8 @@ class Neurex {
         // default configs
         this.optimizer = 'sgd';
         this.learning_rate = 0.001;
+        this.initial_learning_rate = 0.001;
+        this.lr_scheduler = null;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -89,7 +91,11 @@ class Neurex {
     * randMax: 1
     */
     configure(configs) {
-        if (configs.learning_rate !== undefined) this.learning_rate = configs.learning_rate;
+        if (configs.learning_rate !== undefined) {
+            this.learning_rate = configs.learning_rate;
+            this.initial_learning_rate = configs.learning_rate;
+        }
+        if (configs.lr_scheduler !== undefined) this.lr_scheduler = configs.lr_scheduler || null;
         if (configs.optimizer !== undefined) this.optimizer = configs.optimizer;
 
         if (configs.checkpoint_per_epoch < 0) {
@@ -688,9 +694,20 @@ class Neurex {
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
             let logMessage;
+            let previousEpochLoss = 0;
             let startTime;
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
+                
+                if (this.lr_scheduler && current_epoch > 0) {
+                    this.learning_rate = this.lr_scheduler(
+                        current_epoch,
+                        this.learning_rate,
+                        previousEpochLoss,
+                        this.initial_learning_rate
+                    );
+                }
+
                 startTime = performance.now();
                 let totalepochLoss = 0;
                 let numBatches = 0; // Added to count batches
@@ -818,6 +835,8 @@ class Neurex {
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
                 let end = performance.now();
                 let totalDuration = (end - startTime) / 1000;
+
+                previousEpochLoss = AverageEpochLoss;
                 
                 logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 

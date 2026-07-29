@@ -28,4 +28,8 @@ export const {
     buildWord2Id,
     buildVocab,
     Encode,
+    stepDecay,
+    exponentialDecay,
+    cosineAnnealing,
+    reduceOnPlateau,
 } = pkg;
