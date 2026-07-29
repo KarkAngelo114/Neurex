@@ -24,5 +24,8 @@ export const {
     softmax,
     linear,
     detectGPU,
-    templates
+    templates,
+    buildWord2Id,
+    buildVocab,
+    Encode,
 } = pkg;
