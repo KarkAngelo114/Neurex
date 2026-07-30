@@ -5,7 +5,10 @@ const { ApplySGD, ApplyAdam } = require('../core/bindings');
 module.exports = {
     SGD: (momentum = 0.9) => {
         // Name the inner function sgd
-        return function SGD(params, grads, state = {}, lr) {
+        return function SGD(data) {
+
+            const {params, grads, state: state = {}, lr} = data;
+
             if (params.length !== grads.length) {
                 console.log(grads, params);
                 throw new Error("SGD: Params and grads size mismatch");
@@ -27,7 +30,10 @@ module.exports = {
 
     Adam: (beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8) => {
         // Name the inner function adam
-        return function Adam(params, grads, state = {}, lr) {
+        return function Adam(data) {
+
+            const {params, grads, state: state = {}, lr} = data;
+
             if (params.length !== grads.length) {
                 console.log(grads, params);
                 throw new Error("Adam: Params and grads size mismatch");

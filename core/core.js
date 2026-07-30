@@ -19,7 +19,7 @@ const color = require('../color-code');
 const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration, calculateTransConvOutputShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init, gradientClipping } = require('./bindings');
+const { init, gradientClipping, scaleGrads } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 
 class Neurex {
@@ -815,10 +815,10 @@ class Neurex {
                         }
 
                         // scale weight gradients
-                        weightGrads[pointer] = layer_data_obj.scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
+                        weightGrads[pointer] = scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
 
                         // scale bias gradients
-                        biasGrads[pointer] = layer_data_obj.scaleGrads(biasGrads[pointer], actualBatchSize);
+                        biasGrads[pointer] = scaleGrads(biasGrads[pointer], actualBatchSize);
                         
                         // clip accumulated weight gradients using a threshold
                         weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
@@ -827,10 +827,10 @@ class Neurex {
                         biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
                         // update Weights using the optimizer
-                        const res1 = this.optimizer(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
+                        const res1 = this.optimizer({params: this.weights[pointer], grads: weightGrads[pointer], state: this.optimizerStates.weights[pointer], lr: this.learning_rate});
 
                         // Update biases using the optimizer
-                        const res2 = this.optimizer(this.biases[pointer], biasGrads[pointer], this.optimizerStates.biases[pointer], this.learning_rate);
+                        const res2 = this.optimizer({params: this.biases[pointer], grads: biasGrads[pointer], state: this.optimizerStates.biases[pointer], lr: this.learning_rate});
 
                         // assigned updated weights to it's current index position relative to the layer's index
                         this.weights[pointer] = res1.params;
