@@ -195,11 +195,18 @@ declare module 'neurex' {
         inverseTransform(data: number[]): number[];
     }
 
+    export interface onChangeConfig {
+        /** set the epoch when to change the optimizer automatically. */
+        targetEpoch?: Number;
+        /** Optimizer function to use. */
+        optimizer?: (params: any) => Function;
+    }
+
     export interface NeurexConfig {
         /** Learning rate for training. Default: 0.001 */
         learning_rate?: number;
-        /** Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ]. Default: 'adam' */
-        optimizer?: 'sgd' | 'adam';
+        /** Optimizer function to use. */
+        optimizer?: (params: any) => Function;
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
         /** if set to true, it won't use the compiled binaries, but instead uses the JS modules */
@@ -207,9 +214,11 @@ declare module 'neurex' {
         /** set mode to `cpu`, `gpu` or `auto`. Default is `cpu`*/
         mode?: "cpu" | "gpu" | "auto";
         /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
-        lr_scheduler?: (params: any) => number;
+        lr_scheduler?: (params: any) => Function;
         /** A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `1.0`*/
         clip_norm_value?: Number;
+        /** on change config to automate changing of optimizer mid-training.*/
+        onChange_optimizer?: onChangeConfig;
     }
 
     /**
@@ -812,4 +821,18 @@ declare module 'neurex' {
      * @param {ReduceOnPlateauConfig} config 
      */
     export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
+
+    /**
+     * @function SGD or `Stochastic Gradient Descent a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.`
+     * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
+     */
+    export function SGD(momentum: Number): Function;
+
+    /**
+     * @function Adam or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
+     * @param {Number} beta1 The exponential decay rate for the moving average of past gradients (the first moment or mean). Default value is `0.9`.
+     * @param {Number} beta2 The exponential decay rate for the moving average of squared past gradients (the second moment or uncentered variance). Default value is `0.999`.
+     * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
+     */
+    export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
 }

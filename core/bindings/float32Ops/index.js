@@ -225,15 +225,20 @@ const gradientClipping = (grads, threshold) => {
     return output;
 }
 
-const SGD = (params, grads, lr) => {
-    const output = params;
+const SGD = (params, grads, velocity, lr, momentum = 0.9) => {
 
-    for (let i = 0; i < output.length; i++) {
-        output[i] -= lr * grads[i];
+    for (let i = 0; i < params.length; i++) {
+
+        velocity[i] = momentum * velocity[i] + grads[i];
+
+        params[i] -= lr * velocity[i];
     }
 
-    return output;
-}
+    return {
+        params: params,
+        velocity: velocity
+    };
+};
 
 const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
     const output = params;

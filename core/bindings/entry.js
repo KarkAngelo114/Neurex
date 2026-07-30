@@ -327,10 +327,12 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
  * "✅☑️"
  * @param {Float32Array} params - flattened array of parameters 
  * @param {Float32Array} grads - flattened array of grads 
+ * @param {Float32Array} velocity - array of calculated velocity
  * @param {Number} learning_rate - learning rate value
- * @returns 
+ * @param {Number} momentum - momentum value
+ * @returns {{params: Float32Array, velocity: Float32Array}}
  */
-const ApplySGD = (params, grads, learning_rate ) => functions.SGD(params, grads, learning_rate);
+const ApplySGD = (params, grads, velocity, lr, momentum = 0.9) => functions.SGD(params, grads, velocity, lr, momentum = 0.9);
 
 /**
  * 

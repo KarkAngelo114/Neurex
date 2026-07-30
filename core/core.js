@@ -46,11 +46,12 @@ class Neurex {
         this.hasBuilt = false;
 
         // default configs
-        this.optimizer = 'sgd';
+        this.optimizer = null;
         this.learning_rate = 0.001;
         this.initial_learning_rate = 0.001;
         this.lr_scheduler = null;
-        this.clip_norm_value = 1.0
+        this.clip_norm_value = 1.0;
+        this.onChange_optimizer = null;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -99,7 +100,6 @@ class Neurex {
             this.initial_learning_rate = configs.learning_rate;
         }
         if (configs.lr_scheduler !== undefined) this.lr_scheduler = configs.lr_scheduler || null;
-        if (configs.optimizer !== undefined) this.optimizer = configs.optimizer;
 
         if (configs.checkpoint_per_epoch < 0) {
             this.isfailed = true;
@@ -115,7 +115,15 @@ class Neurex {
 
         modeConfiguration(configs.mode || "cpu");
         onFloat32Module(configs.onFLoat32Module || false);
+
+        this.optimizer = configs.optimizer || optimizers.SGD();
         
+        if (configs.onChange_optimizer !== undefined) {
+            this.onChange_optimizer = {
+                targetEpoch: configs.onChange_optimizer.targetEpoch,
+                optimizer: configs.onChange_optimizer.optimizer
+            }
+        }
 
         init();
         this.isInit = true;
@@ -296,7 +304,6 @@ class Neurex {
             "loss_function":this.loss_function,
             "epoch":this.epoch_count,
             "batch_size":this.batch_size,
-            "optimizer":this.optimizer,
             "learning_rate":this.learning_rate,
             "input_size":this.input_size,
             "input_shape":this.input_shape,
@@ -416,14 +423,12 @@ class Neurex {
             this.loss_function = modelData.loss_function;
             this.epoch_count = modelData.epoch;
             this.batch_size = modelData.batch_size;
-            this.optimizer = modelData.optimizer;
             this.learning_rate = modelData.learning_rate;
             this.input_size = modelData.input_size;
             this.output_size = modelData.output_size;
             this.num_layers = modelData.num_layers;
             this.weights = loadedWeights;
             this.biases = loadedBiases;
-            this.optimizer = modelData.optimizer;
             this.input_shape = modelData.input_shape;
             this.clip_norm_value = modelData.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
@@ -669,7 +674,6 @@ class Neurex {
         let lastLayer = this.layers[this.layers.length - 1];
         this.loss_function = loss.toLowerCase();
         const loss_function = lossFunctions[this.loss_function.toLowerCase()];
-        const optimizerFn = optimizers[this.optimizer.toLowerCase()];
             
         this.epoch_count = epoch;
         this.batch_size = batch_size;
@@ -700,11 +704,6 @@ class Neurex {
             const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
             this.task = taskType;
 
-            if (!optimizerFn) {
-                this.isfailed = true;
-                throw new Error(`${color.red}Unknown optimizer: ${this.optimizer} ${color.reset}`)
-            };
-
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
@@ -721,6 +720,15 @@ class Neurex {
                         previousEpochLoss,
                         this.initial_learning_rate
                     );
+                }
+
+                // this logic is for automated changing of optimizer mid training. 
+                // changing optimizer must change before the target epoch so that the target epoch will use the optimizer
+                if (this.onChange_optimizer && current_epoch > 0) {
+                    if (current_epoch == this.onChange_optimizer.targetEpoch - 1) {
+                        console.log(`\n${color.yellow}[Note]${color.reset} Changing optimizer on Epoch ${current_epoch+1}. Using ${color.yellow}${this.onChange_optimizer.optimizer.name || "Custom Optimizer"}${color.reset}...\n`)
+                        this.optimizer = this.onChange_optimizer.optimizer;
+                    }
                 }
 
                 startTime = performance.now();
@@ -818,11 +826,11 @@ class Neurex {
                         // clip accumulated bias gradients using a threshold
                         biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
-                        // update Weights
-                        const res1 = optimizerFn(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
+                        // update Weights using the optimizer
+                        const res1 = this.optimizer(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
 
-                        // Update biases
-                        const res2 = optimizerFn(this.biases[pointer], biasGrads[pointer], this.optimizerStates.biases[pointer], this.learning_rate);
+                        // Update biases using the optimizer
+                        const res2 = this.optimizer(this.biases[pointer], biasGrads[pointer], this.optimizerStates.biases[pointer], this.learning_rate);
 
                         // assigned updated weights to it's current index position relative to the layer's index
                         this.weights[pointer] = res1.params;
