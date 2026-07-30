@@ -141,6 +141,9 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
     else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
         dOutputLayer.set(preds);
+        if (!dOutputLayer[actuals[0]]) {
+            throw new Error(`Actual index value not exist in range. Actual target label: ${actuals[0]} | Output layer size: ${preds.length}`)
+        }
         dOutputLayer[actuals[0]] -= 1;
                         
     }
