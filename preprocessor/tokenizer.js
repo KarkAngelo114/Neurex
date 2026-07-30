@@ -3,7 +3,7 @@ const tokenize = (sentence) => {
         sentence
             .toLowerCase()
             .match(
-                /<\/?[a-z][a-z0-9-]*>|[a-z]+(?:'[a-z]+)*|\d+|[^\w\s]/g
+                /<\/?[\p{L}][\p{L}\p{N}-]*>|[\p{L}]+(?:'[\p{L}]+)*|\p{N}+|[^\p{L}\p{N}\s]/gu
             ) || []
     );
 };
