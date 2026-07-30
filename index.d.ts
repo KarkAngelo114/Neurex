@@ -208,6 +208,8 @@ declare module 'neurex' {
         mode?: "cpu" | "gpu" | "auto";
         /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
         lr_scheduler?: (params: any) => number;
+        /** A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `1.0`*/
+        clip_norm_value?: Number;
     }
 
     /**
@@ -282,13 +284,12 @@ declare module 'neurex' {
         saveModel(modelName: string, miscellaneous: object): void;
 
         /**
-        * @method loadSavedModel()
-        * @param {String} model - the trained model
-
-        The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
-
+        * @method loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
+        * @param {String} model the trained model file name
+        * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
+        * @returns {void}
         */
-        loadSavedModel(model: string): void;
+        loadSavedModel(model: string, showLog: Boolean): void;
 
         /**
         * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning

@@ -206,6 +206,25 @@ const scaleGrad = (grads, batchSize) => {
     return output;
 }
 
+const gradientClipping = (grads, threshold) => {
+    const output = new Float32Array(grads);
+    let norm = 0;
+    
+    for (let i = 0; i < output.length; i++) {
+        norm += output[i] * output[i];
+    }
+    norm = Math.sqrt(norm);
+
+    if (norm > threshold) {
+        let scalingValue = threshold / norm;
+        for (let i = 0; i < output.length; i++) {
+            output[i] *= scalingValue;
+        }
+    }
+
+    return output;
+}
+
 const SGD = (params, grads, lr) => {
     const output = params;
 
@@ -783,6 +802,7 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
 }
 
 
+
 module.exports = {
     Relu,
     Sigmoid,
@@ -823,5 +843,6 @@ module.exports = {
     recurrentMatMul,
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
-    recurrentBiasGradsAccumulation
+    recurrentBiasGradsAccumulation,
+    gradientClipping
 }

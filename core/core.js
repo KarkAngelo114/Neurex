@@ -19,7 +19,7 @@ const color = require('../color-code');
 const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration, calculateTransConvOutputShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init } = require('./bindings');
+const { init, gradientClipping } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 
 class Neurex {
@@ -50,6 +50,7 @@ class Neurex {
         this.learning_rate = 0.001;
         this.initial_learning_rate = 0.001;
         this.lr_scheduler = null;
+        this.clip_norm_value = 1.0
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -66,6 +67,7 @@ class Neurex {
 
         this.parametric_layers = [];
         this.miscellaneous = null;
+        
     }
 
     /**
@@ -91,6 +93,7 @@ class Neurex {
     * randMax: 1
     */
     configure(configs) {
+        
         if (configs.learning_rate !== undefined) {
             this.learning_rate = configs.learning_rate;
             this.initial_learning_rate = configs.learning_rate;
@@ -104,6 +107,8 @@ class Neurex {
         }
 
         if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch;
+
+        if (configs.clip_norm_value !== undefined) this.clip_norm_value = configs.clip_norm_value || 1.0;
 
         // mode: gpu | cpu | auto
         // onFLoat32Module: true | false
@@ -297,6 +302,7 @@ class Neurex {
             "input_shape":this.input_shape,
             "output_size":this.output_size,
             "num_layers":this.num_layers,
+            "clip_norm_value": this.clip_norm_value,
             "layers": this.layers.map(layer => ({
                 layer_name: layer.layer_name,
                 activation_function_name: layer.activation_function ? layer.activation_function.name : null,
@@ -329,9 +335,10 @@ class Neurex {
 
     /**
      * 
-     * @param {String} model - path to your model
+     * @param {String} model path to your model
+     * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`. 
      */
-    loadSavedModel(model) {
+    loadSavedModel(model, showLog = true) {
         try {
             if (!model) {
                 throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
@@ -345,7 +352,10 @@ class Neurex {
             const dir = process.cwd();
             const model_file = path.join(dir, `${model}`);
 
-            console.log(`${color.yellow}[INFO]------- Loading model from ${model_file}${color.reset}`)
+            if (showLog) {
+                console.log(`${color.yellow}[INFO]------- Loading model from ${model_file}${color.reset}`)
+            }
+            
 
             // Check extension
             if (path.extname(model_file) !== '.nrx') {
@@ -401,6 +411,7 @@ class Neurex {
 
             // Assign properties
             this.miscellaneous = modelData.miscellaneous;
+            this.initial_learning_rate = modelData.learning_rate || 0.001;
             this.task = modelData.task;
             this.loss_function = modelData.loss_function;
             this.epoch_count = modelData.epoch;
@@ -413,7 +424,8 @@ class Neurex {
             this.weights = loadedWeights;
             this.biases = loadedBiases;
             this.optimizer = modelData.optimizer;
-            this.input_shape = modelData.input_shape
+            this.input_shape = modelData.input_shape;
+            this.clip_norm_value = modelData.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
                 let newLayer;
@@ -484,7 +496,10 @@ class Neurex {
                 this.biasGrads.push(new Float32Array(this.biases[i].length).fill(0));
             }
             
-            console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+            if (showLog) {
+                console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+            }
+            
         } catch (error) {
             console.log(error);
         }
@@ -796,6 +811,12 @@ class Neurex {
 
                         // scale bias gradients
                         biasGrads[pointer] = layer_data_obj.scaleGrads(biasGrads[pointer], actualBatchSize);
+                        
+                        // clip accumulated weight gradients using a threshold
+                        weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
+
+                        // clip accumulated bias gradients using a threshold
+                        biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
                         // update Weights
                         const res1 = optimizerFn(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
