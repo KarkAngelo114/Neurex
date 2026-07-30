@@ -21,7 +21,7 @@ const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, element_wise_sub
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
 const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN } = require('./applications/templates');
-const { Encode, buildVocab, buildWord2Id } = require('./preprocessor/tokenizer');
+const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam } = require('./optimizers');
 
@@ -50,6 +50,7 @@ module.exports= {
     softmax,
     linear,
     detectGPU,
+    tokenize,
     buildWord2Id,
     buildVocab,
     Encode,

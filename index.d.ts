@@ -470,6 +470,13 @@ declare module 'neurex' {
     export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
 
     /**
+     * @function tokenize allows you to tokenize a sentence
+     * @param {String} sentence input sentence
+     * @returns {Array<String>} array of tokenized words 
+     */
+    export function tokenize(sentence: String): String[];
+
+    /**
      * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
      * @param sentences an array of sentences or large corpus
      * @returns {Array<String>} an array of tokenized words

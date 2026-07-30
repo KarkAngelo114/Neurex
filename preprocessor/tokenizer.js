@@ -8,7 +8,7 @@ const tokenize = (sentence) => {
     );
 };
 
-exports.buildVocab = (sentences) => {
+const buildVocab = (sentences) => {
     const data = Array.isArray(sentences)
         ? sentences
         : [sentences];
@@ -17,7 +17,7 @@ exports.buildVocab = (sentences) => {
 };
 
 
-exports.buildWord2Id = (vocab) => {
+const buildWord2Id = (vocab) => {
     const SPECIAL_TOKENS = ["<PAD>", "<UNK>"];
     return Object.fromEntries(
         [...SPECIAL_TOKENS, ...vocab].map((word, i) => [word, i])
@@ -25,7 +25,7 @@ exports.buildWord2Id = (vocab) => {
 };
 
 // Encode now just uses the pre-built word2id
-exports.Encode = (sentence, word2id, max_length) => {
+const Encode = (sentence, word2id, max_length) => {
 
     let token_array = tokenize(sentence).map(word => word2id[word] ?? word2id["<UNK>"]);
 
@@ -44,3 +44,10 @@ exports.Encode = (sentence, word2id, max_length) => {
 
     return token_array;
 };
+
+module.exports = {
+    tokenize,
+    buildVocab,
+    buildWord2Id,
+    Encode
+}

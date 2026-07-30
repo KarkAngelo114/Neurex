@@ -25,6 +25,7 @@ export const {
     linear,
     detectGPU,
     templates,
+    tokenize,
     buildWord2Id,
     buildVocab,
     Encode,
