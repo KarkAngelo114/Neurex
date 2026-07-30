@@ -830,7 +830,7 @@ declare module 'neurex' {
     export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
 
     /**
-     * @function SGD or `Stochastic Gradient Descent a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.`
+     * @function SGD or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
      * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
      */
     export function SGD(momentum: Number): Function;
