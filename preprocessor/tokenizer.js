@@ -1,7 +1,11 @@
 const tokenize = (sentence) => {
-    return sentence
-        .toLowerCase()
-        .match(/[a-z]+|\d+|[^\w\s]/g) || [];
+    return (
+        sentence
+            .toLowerCase()
+            .match(
+                /<\/?[a-z][a-z0-9-]*>|[a-z]+(?:'[a-z]+)*|\d+|[^\w\s]/g
+            ) || []
+    );
 };
 
 exports.buildVocab = (sentences) => {
