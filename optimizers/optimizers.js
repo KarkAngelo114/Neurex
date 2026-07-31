@@ -7,7 +7,7 @@ module.exports = {
         // Name the inner function sgd
         return function SGD(data) {
 
-            const {params, grads, state: state = {}, lr} = data;
+            const {params, grads, lr, state: state = {}, previousEpochLoss, current_epoch, batchSize} = data;
 
             if (params.length !== grads.length) {
                 console.log(grads, params);
@@ -32,7 +32,7 @@ module.exports = {
         // Name the inner function adam
         return function Adam(data) {
 
-            const {params, grads, state: state = {}, lr} = data;
+            const {params, grads, lr, state: state = {}, previousEpochLoss, current_epoch, batchSize} = data;
 
             if (params.length !== grads.length) {
                 console.log(grads, params);

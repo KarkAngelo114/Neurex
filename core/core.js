@@ -714,12 +714,15 @@ class Neurex {
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
                 
                 if (this.lr_scheduler && current_epoch > 0) {
-                    this.learning_rate = this.lr_scheduler(
-                        current_epoch,
-                        this.learning_rate,
-                        previousEpochLoss,
-                        this.initial_learning_rate
-                    );
+                    this.learning_rate = this.lr_scheduler({
+                        current_epoch: current_epoch,
+                        learning_rate: this.learning_rate,
+                        previousEpochLoss: previousEpochLoss,
+                        initial_learning_rate: this.initial_learning_rate,
+                        batchSize: batchSize,
+                        totalEpochs: epoch,
+                        trainingFeatureSize: trainX[0].length
+                    });
                 }
 
                 // this logic is for automated changing of optimizer mid training. 
@@ -827,10 +830,10 @@ class Neurex {
                         biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
                         // update Weights using the optimizer
-                        const res1 = this.optimizer({params: this.weights[pointer], grads: weightGrads[pointer], state: this.optimizerStates.weights[pointer], lr: this.learning_rate});
+                        const res1 = this.optimizer({params: this.weights[pointer], grads: weightGrads[pointer], state: this.optimizerStates.weights[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
 
                         // Update biases using the optimizer
-                        const res2 = this.optimizer({params: this.biases[pointer], grads: biasGrads[pointer], state: this.optimizerStates.biases[pointer], lr: this.learning_rate});
+                        const res2 = this.optimizer({params: this.biases[pointer], grads: biasGrads[pointer], state: this.optimizerStates.biases[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
 
                         // assigned updated weights to it's current index position relative to the layer's index
                         this.weights[pointer] = res1.params;
