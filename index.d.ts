@@ -808,9 +808,9 @@ declare module 'neurex' {
     export function exponentialDecay(decayRate: Number): Number;
 
     /**
-     * @function consineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
-     * @param {Numnber} totalEpochs 
-     * @param {Number} minLR 
+     * @function cosineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
+     * @param {Number} totalEpochs The total number of epochs or steps over which the learning rate should decay following a cosine schedule.
+     * @param {Number} minLR The minimum learning rate to decay toward.
      */
     export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
 
