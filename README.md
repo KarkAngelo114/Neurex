@@ -176,7 +176,7 @@ Thanks to the updated core engine and flexible API, you can now write and plug y
 const { Neurex } = require('neurex');
 
 function MyOptimizer() {
-    return function AweomeOptimizer(data) {
+    return function AwesomeOptimizer(data) {
         // destructure to extract the data use for computation
         // tip: log the whole data object to know what the engine gives you for optimizing params
         const { params, grads, state: state = {}, lr } = data; 
