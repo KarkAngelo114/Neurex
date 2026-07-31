@@ -39,11 +39,10 @@ Neurex is a Javascript-based, GPU-Accelerated, deep learning library for Node.js
 Here's an example on how you can use `Neurex` to train on XOR problem.
 
 ```Javascript
-const {Neurex, Layers} = require('neurex');
+const {Neurex, Layers, Adam, SGD, stepDecay} = require('neurex');
 
 const nrx = new Neurex();
 const layer = new Layers();
-
 
 
 (async () => {
@@ -63,10 +62,19 @@ const layer = new Layers();
 
     // configurations
     nrx.configure({
-        optimizer:'adam',
-        learning_rate:0.1,
-        checkpoint_per_epoch: 100, // if you want to save the model for every N epochs (let's say every 100 epochs like in this example)
-        mode:"cpu", /* "gpu" or "auto" */
+        optimizer: Adam(), // use built-in optimizers or plug your own optimizer function here!
+        lr_scheduler: stepDecay() // use built-in scheduler or plug your own!
+        learning_rate:0.0001, // learning rate value
+        checkpoint_per_epoch: 10, // if set, it saved the model every N epoch.
+        mode: "cpu", // "gpu" or "auto"
+        clip_norm_value: 5.0, // value to clip gradients
+        // onFloat32Module: true, if set to true, it won't use its native bindings and rather use the JS implementation fallback
+
+        // config to use Neurex auto-switch optimizer feature
+        onChange_optimizer: {
+            optimizer: SGD(), // optimizer to use (use the built-in or plug your own)
+            targetEpoch: 50 // when it reach the specific target epoch, it will swap the optimizer with the one you set in this config
+        }
     });
 
     // stack layers in sequential order
@@ -157,9 +165,58 @@ const { Neurex, Layers, templates } = require('neurex');
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();
-```
+``` 
 
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/javascript-nodejs#templates).
+
+# Experiment and plug your own optimizer and learning rate scheduler
+Thanks to the updated core engine and flexible API, you can now write and plug your own optimizer and learning rate scheduler!
+
+```Javascript
+const { Neurex } = require('neurex');
+
+function MyOptimizer() {
+    return function AweomeOptimizer(data) {
+        // destructure to extract the data use for computation
+        // tip: log the whole data object to know what the engine gives you for optimizing params
+        const { params, grads, state: state = {}, lr } = data; 
+        
+
+        // your actual implementation...
+
+
+        // ALWAYS RETURN UPDATED PARAM AND STATE
+        return {
+            params: params,
+            state: state,
+        };
+    };
+}
+
+function CustomScheduler() {
+    return function scheduler(data) {
+        // destructure to extract the data use for computation
+        // tip: log the whole data object to know what the engine gives you for calculating new learning rate
+        const {current_epoch, learning_rate, previousEpochLoss } = data;
+
+        // your actual implementation...
+
+        // ALWAYS RETURN NEWLY CALCULATED LEARNING RATE
+        return updated_learning_rate;
+    }
+}
+
+
+(() => {
+    const nrx = new Neurex();
+
+    nrx.configure({
+        optimizer: MyOptimizer(),
+        lr_scheduler: CustomScheduler(),
+        /* other configs */
+    });
+})();
+```
 
 # Test the Experimental Upcoming Updates 🔥
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.

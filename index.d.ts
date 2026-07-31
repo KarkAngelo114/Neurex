@@ -237,11 +237,6 @@ declare module 'neurex' {
         *
         * You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
         *
-        * Default configurations:
-        *   learning_rate: 0.001
-        *   optimizer: 'adam'
-        *
-        * Available optimizers: 'sgd'and 'adam'
         */
         
         configure(configs: NeurexConfig): void;
