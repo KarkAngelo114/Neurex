@@ -10,16 +10,25 @@ exports.simpleNeuralNetwork = () => {
     ];
 }
 
-exports.simpleCNN = () => {
-    return [
+exports.simpleCNN = (isHeadless = false) => {
+
+    const layers = [
         layer.convolutionalLayer(8, 1, [3, 3], 'relu', 'same'),
         layer.maxPooling([2, 2], 2, 'valid'),
         layer.convolutionalLayer(12, 1, [3, 3], 'relu', 'same'),
         layer.maxPooling([2, 2], 2, 'valid'),
-        layer.connectedLayer(128),
-        layer.connectedLayer(64),
-        layer.connectedLayer(32),
     ];
+
+    let startingLayerSize = 128;
+    if (!isHeadless) {
+        // if not headless, adds the 3 connected layer
+        for (let i = 0; i < 3; i++) {
+            layers.push(layer.connectedLayer(startingLayerSize));
+            startingLayerSize /= 2;
+        }
+    }
+
+    return layers;
 }
 
 

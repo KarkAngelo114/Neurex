@@ -19,7 +19,7 @@ const color = require('../color-code');
 const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration, calculateTransConvOutputShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init } = require('./bindings');
+const { init, gradientClipping, scaleGrads } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 
 class Neurex {
@@ -46,8 +46,12 @@ class Neurex {
         this.hasBuilt = false;
 
         // default configs
-        this.optimizer = 'sgd';
+        this.optimizer = null;
         this.learning_rate = 0.001;
+        this.initial_learning_rate = 0.001;
+        this.lr_scheduler = null;
+        this.clip_norm_value = 1.0;
+        this.onChange_optimizer = null;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -62,7 +66,9 @@ class Neurex {
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
         this.isInit = false;
 
-        this.parametric_layers = []; 
+        this.parametric_layers = [];
+        this.miscellaneous = null;
+        
     }
 
     /**
@@ -88,8 +94,12 @@ class Neurex {
     * randMax: 1
     */
     configure(configs) {
-        if (configs.learning_rate !== undefined) this.learning_rate = configs.learning_rate;
-        if (configs.optimizer !== undefined) this.optimizer = configs.optimizer;
+        
+        if (configs.learning_rate !== undefined) {
+            this.learning_rate = configs.learning_rate;
+            this.initial_learning_rate = configs.learning_rate;
+        }
+        if (configs.lr_scheduler !== undefined) this.lr_scheduler = configs.lr_scheduler || null;
 
         if (configs.checkpoint_per_epoch < 0) {
             this.isfailed = true;
@@ -98,12 +108,22 @@ class Neurex {
 
         if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch;
 
+        if (configs.clip_norm_value !== undefined) this.clip_norm_value = configs.clip_norm_value || 1.0;
+
         // mode: gpu | cpu | auto
         // onFLoat32Module: true | false
 
         modeConfiguration(configs.mode || "cpu");
         onFloat32Module(configs.onFLoat32Module || false);
+
+        this.optimizer = configs.optimizer || optimizers.SGD();
         
+        if (configs.onChange_optimizer !== undefined) {
+            this.onChange_optimizer = {
+                targetEpoch: configs.onChange_optimizer.targetEpoch,
+                optimizer: configs.onChange_optimizer.optimizer
+            }
+        }
 
         init();
         this.isInit = true;
@@ -171,6 +191,14 @@ class Neurex {
             switch (layerType) {
                 case 'convolutionalLayer':
                     displayName = 'Convolutional Layer';
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
+                    activation = activationName;
+                    params = paramCount.toLocaleString();
+                    padding = layer.padding || 'None';
+                    break;
+
+                case 'transConvLayer':
+                    displayName = 'Trans Convolution';
                     outputShape = `(${layer.outputShape.join(' x ')})`;
                     activation = activationName;
                     params = paramCount.toLocaleString();
@@ -247,15 +275,23 @@ class Neurex {
     }
 
     /**
-    * 
-     @method saveModel()
-     @param {string} modelName - the filename of your model
+     * @method get_miscellaneous_data
+     * @returns {Object} Saved miscellaneous data upon model saving
+     */
+    get_miscellaneous_data() {
+        return this.miscellaneous;
+    }
 
-     saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
-     as a .nrx (neurex) model and a metadata.json will be generated along with the model file.
-        
-    */
-    saveModel(modelName = null) {
+    /**
+     * 
+     * saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+     *  as a .nrx (neurex) model
+     * @method saveModel()
+     * @param {string} modelName the filename of your model
+     * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model size when adding miscellaneous.
+     *   
+     */
+    saveModel(modelName = null, miscellaneous) {
         console.log("\n[TASK]------- Saving model's architecture...");
         let fileName = modelName;
         if (!modelName || modelName == null || modelName == undefined) {
@@ -268,12 +304,12 @@ class Neurex {
             "loss_function":this.loss_function,
             "epoch":this.epoch_count,
             "batch_size":this.batch_size,
-            "optimizer":this.optimizer,
             "learning_rate":this.learning_rate,
             "input_size":this.input_size,
             "input_shape":this.input_shape,
             "output_size":this.output_size,
             "num_layers":this.num_layers,
+            "clip_norm_value": this.clip_norm_value,
             "layers": this.layers.map(layer => ({
                 layer_name: layer.layer_name,
                 activation_function_name: layer.activation_function ? layer.activation_function.name : null,
@@ -296,8 +332,8 @@ class Neurex {
                 return_sequence: layer.return_sequence || false,
                 return_state: layer.return_state || false,
                 isParametric: layer.isParametric
-
             })),
+            "miscellaneous": miscellaneous
         };
 
         this.#save(data, this.weights, this.biases, fileName);
@@ -306,9 +342,10 @@ class Neurex {
 
     /**
      * 
-     * @param {String} model - path to your model
+     * @param {String} model path to your model
+     * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`. 
      */
-    loadSavedModel(model) {
+    loadSavedModel(model, showLog = true) {
         try {
             if (!model) {
                 throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
@@ -322,7 +359,10 @@ class Neurex {
             const dir = process.cwd();
             const model_file = path.join(dir, `${model}`);
 
-            console.log(`${color.yellow}[INFO]------- Loading model from ${model_file}${color.reset}`)
+            if (showLog) {
+                console.log(`${color.yellow}[INFO]------- Loading model from ${model_file}${color.reset}`)
+            }
+            
 
             // Check extension
             if (path.extname(model_file) !== '.nrx') {
@@ -377,19 +417,20 @@ class Neurex {
             const loadedBiases = readTensors(modelData.biasLengths);
 
             // Assign properties
+            this.miscellaneous = modelData.miscellaneous;
+            this.initial_learning_rate = modelData.learning_rate || 0.001;
             this.task = modelData.task;
             this.loss_function = modelData.loss_function;
             this.epoch_count = modelData.epoch;
             this.batch_size = modelData.batch_size;
-            this.optimizer = modelData.optimizer;
             this.learning_rate = modelData.learning_rate;
             this.input_size = modelData.input_size;
             this.output_size = modelData.output_size;
             this.num_layers = modelData.num_layers;
             this.weights = loadedWeights;
             this.biases = loadedBiases;
-            this.optimizer = modelData.optimizer;
-            this.input_shape = modelData.input_shape
+            this.input_shape = modelData.input_shape;
+            this.clip_norm_value = modelData.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
                 let newLayer;
@@ -460,7 +501,10 @@ class Neurex {
                 this.biasGrads.push(new Float32Array(this.biases[i].length).fill(0));
             }
             
-            console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+            if (showLog) {
+                console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+            }
+            
         } catch (error) {
             console.log(error);
         }
@@ -630,7 +674,6 @@ class Neurex {
         let lastLayer = this.layers[this.layers.length - 1];
         this.loss_function = loss.toLowerCase();
         const loss_function = lossFunctions[this.loss_function.toLowerCase()];
-        const optimizerFn = optimizers[this.optimizer.toLowerCase()];
             
         this.epoch_count = epoch;
         this.batch_size = batch_size;
@@ -661,18 +704,36 @@ class Neurex {
             const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
             this.task = taskType;
 
-            if (!optimizerFn) {
-                this.isfailed = true;
-                throw new Error(`${color.red}Unknown optimizer: ${this.optimizer} ${color.reset}`)
-            };
-
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
             const totalBatches = Math.ceil(trainX.length / batchSize);
             let logMessage;
+            let previousEpochLoss = 0;
             let startTime;
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
+                
+                if (this.lr_scheduler && current_epoch > 0) {
+                    this.learning_rate = this.lr_scheduler({
+                        current_epoch: current_epoch,
+                        learning_rate: this.learning_rate,
+                        previousEpochLoss: previousEpochLoss,
+                        initial_learning_rate: this.initial_learning_rate,
+                        batchSize: batchSize,
+                        totalEpochs: epoch,
+                        trainingFeatureSize: trainX[0].length
+                    });
+                }
+
+                // this logic is for automated changing of optimizer mid training. 
+                // changing optimizer must change before the target epoch so that the target epoch will use the optimizer
+                if (this.onChange_optimizer && current_epoch > 0) {
+                    if (current_epoch == this.onChange_optimizer.targetEpoch - 1) {
+                        console.log(`\n${color.yellow}[Note]${color.reset} Changing optimizer on Epoch ${current_epoch+1}. Using ${color.yellow}${this.onChange_optimizer.optimizer.name || "Custom Optimizer"}${color.reset}...\n`)
+                        this.optimizer = this.onChange_optimizer.optimizer;
+                    }
+                }
+
                 startTime = performance.now();
                 let totalepochLoss = 0;
                 let numBatches = 0; // Added to count batches
@@ -757,16 +818,22 @@ class Neurex {
                         }
 
                         // scale weight gradients
-                        weightGrads[pointer] = layer_data_obj.scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
+                        weightGrads[pointer] = scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
 
                         // scale bias gradients
-                        biasGrads[pointer] = layer_data_obj.scaleGrads(biasGrads[pointer], actualBatchSize);
+                        biasGrads[pointer] = scaleGrads(biasGrads[pointer], actualBatchSize);
+                        
+                        // clip accumulated weight gradients using a threshold
+                        weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
 
-                        // update Weights
-                        const res1 = optimizerFn(this.weights[pointer], weightGrads[pointer], this.optimizerStates.weights[pointer], this.learning_rate);
+                        // clip accumulated bias gradients using a threshold
+                        biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
-                        // Update biases
-                        const res2 = optimizerFn(this.biases[pointer], biasGrads[pointer], this.optimizerStates.biases[pointer], this.learning_rate);
+                        // update Weights using the optimizer
+                        const res1 = this.optimizer({params: this.weights[pointer], grads: weightGrads[pointer], state: this.optimizerStates.weights[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
+
+                        // Update biases using the optimizer
+                        const res2 = this.optimizer({params: this.biases[pointer], grads: biasGrads[pointer], state: this.optimizerStates.biases[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
 
                         // assigned updated weights to it's current index position relative to the layer's index
                         this.weights[pointer] = res1.params;
@@ -800,6 +867,8 @@ class Neurex {
                                 AverageEpochLoss > 0.03 ? color.lime : color.green;
                 let end = performance.now();
                 let totalDuration = (end - startTime) / 1000;
+
+                previousEpochLoss = AverageEpochLoss;
                 
                 logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
@@ -1049,8 +1118,6 @@ class Neurex {
     #save(data, weights, biases, fileName) {
         if (this.isfailed) {
             console.log('[FAILED]------- Failed to save model');
-
-
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);

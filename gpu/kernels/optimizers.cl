@@ -1,7 +1,9 @@
 __kernel void sgd(
     __global float* params,
     __global const float* grads,
+    __global float* velocity,
     const float lr,
+    const float momentum,
     const int paramSize
 ) {
 
@@ -9,8 +11,8 @@ __kernel void sgd(
 
     if (i >= paramSize) return;
 
-    params[i] -= lr * grads[i];
-
+    velocity[i] = momentum * velocity[i] + grads[i];
+    params[i] -= lr * velocity[i];
 }
 
 __kernel void adam(

@@ -1,6 +1,6 @@
 const { getGlobalParams, replaceWeightParamByIndex } = require("../../../gpu/globals");
 
-exports.Relu = (arr) => {
+const Relu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = output[i] > 0 ? output[i] : 0;
@@ -8,7 +8,7 @@ exports.Relu = (arr) => {
     return output;
 };
 
-exports.Sigmoid = (arr) => {
+const Sigmoid = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = 1 / (1 + Math.exp(-output[i]));
@@ -16,7 +16,7 @@ exports.Sigmoid = (arr) => {
     return output;
 };
 
-exports.Tanh = (arr) => {
+const Tanh = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = Math.tanh(output[i]);
@@ -24,7 +24,7 @@ exports.Tanh = (arr) => {
     return output;
 };
 
-exports.Softmax = (arr) => {
+const Softmax = (arr) => {
     const output = new Float32Array(arr);
     const maxVal = Math.max(...output);
     let sum = 0;
@@ -41,11 +41,11 @@ exports.Softmax = (arr) => {
     return output;
 };
 
-exports.Linear = (arr) => {
+const Linear = (arr) => {
     return new Float32Array(arr);
 };
 
-exports.DReLu = (arr) => {
+const DReLu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         output[i] = output[i] > 0 ? 1 : 0;
@@ -53,7 +53,7 @@ exports.DReLu = (arr) => {
     return output;
 };
 
-exports.DSigmoid = (arr) => {
+const DSigmoid = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         const s = 1 / (1 + Math.exp(-output[i]));
@@ -62,7 +62,7 @@ exports.DSigmoid = (arr) => {
     return output;
 };
 
-exports.DTanh = (arr) => {
+const DTanh = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
         const t = Math.tanh(output[i]);
@@ -71,19 +71,18 @@ exports.DTanh = (arr) => {
     return output;
 };
 
-exports.DSoftmax = (arr) => {
+const DSoftmax = (arr) => {
 
     return new Float32Array(arr.length).fill(1);
 };
 
-exports.DLinear = (arr) => {
+const DLinear = (arr) => {
     const output = new Float32Array(arr.length);
     output.fill(1);
     return output;
 };
 
-
-exports.getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointer) => {
+const getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointer) => {
     const {globalOutputTensorTemplate} = getGlobalParams();
 
     const output = globalOutputTensorTemplate[outputTemplatePointer];
@@ -106,7 +105,7 @@ exports.getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointe
     return output;
 }
 
-exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
+const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     
     const embeddingDim = dim;
     
@@ -126,16 +125,13 @@ exports.returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     return weightGrads;
 }
 
-exports.MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
+const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
     const {globalOutputTensorTemplate} = getGlobalParams();
     
     const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
-    // 1. Initialize with Biases (Faster than adding them in a separate loop later)
     z_values.set(biases);
 
-    // 2. Perform Weighted Sum
-    // We iterate through each input neuron
     for (let i = 0; i < inputSize; i++) {
         const inputVal = input[i];
         
@@ -148,30 +144,31 @@ exports.MatMul = (input, inputSize, outputSize, weights, biases, outputTemplateP
         }
     }
 
+
     return z_values;
 }
 
-exports.DeltaMatMul = (delta, inputSize, outputSize, weights) => {
+const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     const prevDelta = new Float32Array(inputSize);
 
-    // In a normal MatMul, we do: Input (inputSize) * Weights (inputSize x outputSize) = Output (outputSize)
-    // In Delta MatMul, we do: Delta (outputSize) * Weights_Transposed (outputSize x inputSize) = PrevDelta (inputSize)
-
     for (let i = 0; i < inputSize; i++) {
+        const start = i * outputSize;
+        const end = start + outputSize;
+
+        const weight = weights.subarray(start, end);
         let sum = 0;
-        const offset = i * outputSize;
 
         for (let j = 0; j < outputSize; j++) {
-            // We multiply the j-th delta by the weight connecting input i to output j
-            sum += weights[offset + j]  * delta[j];
+            sum += delta[j] * weight[j];
         }
+
         prevDelta[i] = sum;
     }
 
     return prevDelta;
 }
 
-exports.computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => {
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => {
     const output = weightGrads;
     // We iterate through every connection
     for (let i = 0; i < inputSize; i++) {
@@ -189,7 +186,7 @@ exports.computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, 
     return output;
 }
 
-exports.computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
+const computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
     const output = biasGrads;
 
     for (let i = 0; i < delta.length; i++) {
@@ -199,7 +196,7 @@ exports.computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
     return output;
 }
 
-exports.scaleGrad = (grads, batchSize) => {
+const scaleGrad = (grads, batchSize) => {
     const output = grads;
 
     for (let i = 0; i < grads.length; i++) {
@@ -209,17 +206,41 @@ exports.scaleGrad = (grads, batchSize) => {
     return output;
 }
 
-exports.SGD = (params, grads, lr) => {
-    const output = params;
-
+const gradientClipping = (grads, threshold) => {
+    const output = new Float32Array(grads);
+    let norm = 0;
+    
     for (let i = 0; i < output.length; i++) {
-        output[i] -= lr * grads[i];
+        norm += output[i] * output[i];
+    }
+    norm = Math.sqrt(norm);
+
+    if (norm > threshold) {
+        let scalingValue = threshold / norm;
+        for (let i = 0; i < output.length; i++) {
+            output[i] *= scalingValue;
+        }
     }
 
     return output;
 }
 
-exports.Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
+const SGD = (params, grads, velocity, lr, momentum = 0.9) => {
+
+    for (let i = 0; i < params.length; i++) {
+
+        velocity[i] = momentum * velocity[i] + grads[i];
+
+        params[i] -= lr * velocity[i];
+    }
+
+    return {
+        params: params,
+        velocity: velocity
+    };
+};
+
+const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
     const output = params;
     const output_M = m;
     const output_V = v;
@@ -246,7 +267,7 @@ exports.Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) =>
 
 }
 
-exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
+const ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
     const newH = inputH + padTop + padBottom;
     const newW = inputW + padLeft + padRight;
     const output = new Float32Array(newH * newW * channels);
@@ -277,8 +298,9 @@ exports.ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padL
  * @param {Float32Array} biases
  * @returns 
  */
-exports.Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
 
+    
     const [numFilters, kernelH, kernelW, depth] = kernelShape;
     const [inputH, inputW] = inputShape;
     const [outputH, outputW] = outputShape;
@@ -343,7 +365,7 @@ exports.Convolve = (input, strides, outputShape, kernelShape, inputShape, weight
 };
 
 
-exports.DilateInput = (input, shape, stride) => {
+const DilateInput = (input, shape, stride) => {
     const [H, W, C] = shape;
     const dilatedH = (H - 1) * stride + 1;
     const dilatedW = (W - 1) * stride + 1;
@@ -401,7 +423,7 @@ const RotateKernels = (F, KH, KW, D, weights) => {
  * @param {Number} stride 
  * @returns 
  */
-exports.ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights, stride) => {
+const ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights, stride) => {
 
     const [Hp, Wp, C_in] = delta_shape;
     const [F, KH, KW, C_k] = kernels_shape;
@@ -446,7 +468,7 @@ exports.ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights
     return output;
 };
 
-exports.computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
+const computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     for (let f = 0; f < numFilters; f++) {
         let sum = 0;
 
@@ -474,7 +496,7 @@ exports.computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
  * @param {Array<Number>} stride 
  * @returns 
  */
-exports.computeKernelGradients = (input, delta, weightGrads, inputShape, outputShape, kernelSize, stride) => {
+const computeKernelGradients = (input, delta, weightGrads, inputShape, outputShape, kernelSize, stride) => {
 
     const [inputH, inputW, Cin] = inputShape;
     const [H, W, Cout] = outputShape; 
@@ -543,8 +565,7 @@ exports.computeKernelGradients = (input, delta, weightGrads, inputShape, outputS
     return weightGrads;
 }
 
-
-exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
+const MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
     const {globalOutputTensorTemplate} = getGlobalParams();
     const [poolH, poolW] = pool_size;
     const [inputH, inputW, inputD] = inputShape;
@@ -592,7 +613,7 @@ exports.MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTe
     };
 }
 
-exports.MaxPoolDelta = (delta, indices, H, W, D) => {
+const MaxPoolDelta = (delta, indices, H, W, D) => {
     const output = new Float32Array(H * W * D);
 
     for (let i = 0; i < indices.length; i++) {
@@ -604,7 +625,7 @@ exports.MaxPoolDelta = (delta, indices, H, W, D) => {
 
 }
 
-exports.element_wise_mul = (arr1, arr2) => {
+const element_wise_mul = (arr1, arr2) => {
     let output = new Float32Array(arr1.length);
 
     for (let i = 0; i < arr1.length; i++) {
@@ -614,7 +635,7 @@ exports.element_wise_mul = (arr1, arr2) => {
     return output;
 }
 
-exports.scaleDiff = (arr1, arr2, arr3) => {
+const scaleDiff = (arr1, arr2, arr3) => {
     let output = new Float32Array(arr1.length);
 
     for (let i = 0; i < output.length; i++) {
@@ -624,7 +645,7 @@ exports.scaleDiff = (arr1, arr2, arr3) => {
     return output;
 }
 
-exports.element_wise_sub = (arr1, arr2) => {
+const element_wise_sub = (arr1, arr2) => {
     let output = new Float32Array(arr1.length);
 
     for (let i = 0; i < output.length; i++) {
@@ -634,7 +655,7 @@ exports.element_wise_sub = (arr1, arr2) => {
     return output;
 }
 
-exports.mse = (predictions, actuals) => {
+const mse = (predictions, actuals) => {
     let occurrence = predictions.length;
     let sum = 0;
     for (let i = 0; i < occurrence; i++) {
@@ -645,7 +666,7 @@ exports.mse = (predictions, actuals) => {
     return sum / occurrence;
 }   
 
-exports.mae = (predictions, actuals) => {
+const mae = (predictions, actuals) => {
     let occurrence = predictions.length;
     let sum = 0;
     for (let i = 0; i < occurrence; i++) {
@@ -655,7 +676,7 @@ exports.mae = (predictions, actuals) => {
     return sum / occurrence;
 }
 
-exports.categorical_cross_entropy = (predictions, actuals, epsilon) => {
+const categorical_cross_entropy = (predictions, actuals, epsilon) => {
     let loss = 0;
     for (let i = 0; i < predictions.length; i++) {
         loss -= actuals[i] * Math.log(Math.max(predictions[i], epsilon));
@@ -664,13 +685,12 @@ exports.categorical_cross_entropy = (predictions, actuals, epsilon) => {
     return loss;
 }
 
-
-exports.sparse_categorical_cross_entropy = (predictions, actuals, epsilon) => {
+const sparse_categorical_cross_entropy = (predictions, actuals, epsilon) => {
     const p = Math.max(predictions[actuals[0]], epsilon); // actuals being passed here can be use to index the predicted output because the actuals are like this: [0], [4], [1], and so on
     return -Math.log(p);
 }
 
-exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
+const binary_cross_entropy = (predictions, actuals, epsilon) => {
     let sum = 0;
     for (let i = 0; i < predictions.length; i++) {
         const p = Math.max(Math.min(predictions[i], 1 - epsilon), epsilon);
@@ -679,7 +699,7 @@ exports.binary_cross_entropy = (predictions, actuals, epsilon) => {
     return sum / predictions.length;
 }
 
-exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
+const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
     const { globalOutputTensorTemplate } = getGlobalParams();
     // The weights were concatenated during initialization as:
     // [input_weights..., recurrent_weights...]
@@ -708,8 +728,7 @@ exports.recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentW
     return output;
 }
 
-
-exports.recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
+const recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
     // input weight shape [feature_size, units]
     // recurrent weight shape [units, units]
     const a = inputWeightShape[0];
@@ -739,7 +758,7 @@ exports.recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, wei
     return prevDelta;
 }
 
-exports.recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
+const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
     let [featureSize, units] = weightShape;
     let output = weightGrads;
 
@@ -773,7 +792,7 @@ exports.recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenSt
 
 }
 
-exports.recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => {
+const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => {
     let output = biasGrads;
 
     for (let t = 0; t < sequenceLength; t++) {
@@ -785,4 +804,50 @@ exports.recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, un
     }
 
     return output;
+}
+
+
+
+module.exports = {
+    Relu,
+    Sigmoid,
+    Tanh,
+    Softmax,
+    Linear,
+    DReLu,
+    DSigmoid,
+    DTanh,
+    DSoftmax,
+    DLinear,
+    getEmbeddings,
+    returnEmbeddings,
+    MatMul,
+    DeltaMatMul,
+    computeWeightGradientsForWeightsInConnectedLayer,
+    computeBiasGradsForConnected_Layer,
+    scaleGrad,
+    SGD,
+    Adam,
+    ApplyPadding,
+    Convolve,
+    ConvolveDelta,
+    DilateInput,
+    Convolve,
+    computeBiasGradsForConv,
+    computeKernelGradients,
+    MaxPooling,
+    MaxPoolDelta,
+    element_wise_mul,
+    scaleDiff,
+    element_wise_sub,
+    mse,
+    mae,
+    categorical_cross_entropy,
+    sparse_categorical_cross_entropy,
+    binary_cross_entropy,
+    recurrentMatMul,
+    recurrentTimeDelta,
+    recurrentWeightGradsAccumulation,
+    recurrentBiasGradsAccumulation,
+    gradientClipping
 }

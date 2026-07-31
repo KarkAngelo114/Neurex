@@ -299,7 +299,7 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer,
  * @param {Float32Array} input 
  * @param {Array<Number>} shape_array 
  * @param {Number} strides 
- * @returns {Object} {data, dilatedHeight, dilatedWidth}
+ * @returns {{data: Float32Array, dilatedHeight: Number, dilatedWidth: Number}} {data, dilatedHeight, dilatedWidth}
  */
 const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(input, shape_array, strides);
 
@@ -327,10 +327,12 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
  * "✅☑️"
  * @param {Float32Array} params - flattened array of parameters 
  * @param {Float32Array} grads - flattened array of grads 
+ * @param {Float32Array} velocity - array of calculated velocity
  * @param {Number} learning_rate - learning rate value
- * @returns 
+ * @param {Number} momentum - momentum value
+ * @returns {{params: Float32Array, velocity: Float32Array}}
  */
-const ApplySGD = (params, grads, learning_rate ) => functions.SGD(params, grads, learning_rate);
+const ApplySGD = (params, grads, velocity, lr, momentum = 0.9) => functions.SGD(params, grads, velocity, lr, momentum = 0.9);
 
 /**
  * 
@@ -467,7 +469,7 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTempla
 const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input input vector
  * @param {Float32Array} prevHiddenState hidden temporal state
  * @param {Array<Number>} inputWeightShape input weight shape
@@ -488,7 +490,7 @@ const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeig
 
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Array<Number>} inputWeightShape 
  * @param {Array<Number>} recurrentWeightShape 
@@ -503,7 +505,7 @@ const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, point
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} activation_outputs 
  * @param {Float32Array} deltas 
  * @param {Array<Float32Array>} hiddenStates 
@@ -524,7 +526,7 @@ const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStat
 );
 
 /**
- * 
+ * "✅☑️"
  * @param {Float32Array} biasGrads 
  * @param {Array<Float32Array>} deltaTs 
  * @param {Number} sequenceLength 
@@ -537,6 +539,14 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     sequenceLength, 
     units
 );
+
+/**
+ * "☑️"
+ * @param {Float32Array} grads 
+ * @param {Number} threshold 
+ * @returns {Float32Array}
+ */
+const gradientClipping = (grads, threshold) => float32_Modules.gradientClipping(grads, threshold);
 
 
 module.exports = {
@@ -575,6 +585,7 @@ module.exports = {
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
+    gradientClipping,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

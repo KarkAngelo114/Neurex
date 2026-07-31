@@ -195,17 +195,30 @@ declare module 'neurex' {
         inverseTransform(data: number[]): number[];
     }
 
+    export interface onChangeConfig {
+        /** set the epoch when to change the optimizer automatically. */
+        targetEpoch?: Number;
+        /** Optimizer function to use. */
+        optimizer?: (params: any) => Function;
+    }
+
     export interface NeurexConfig {
         /** Learning rate for training. Default: 0.001 */
         learning_rate?: number;
-        /** Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ]. Default: 'adam' */
-        optimizer?: 'sgd' | 'adam';
+        /** Optimizer function to use. */
+        optimizer?: (params: any) => Function;
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
         /** if set to true, it won't use the compiled binaries, but instead uses the JS modules */
         onFLoat32Module?: true | false;
         /** set mode to `cpu`, `gpu` or `auto`. Default is `cpu`*/
         mode?: "cpu" | "gpu" | "auto";
+        /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
+        lr_scheduler?: (params: any) => Function;
+        /** A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `1.0`*/
+        clip_norm_value?: Number;
+        /** on change config to automate changing of optimizer mid-training.*/
+        onChange_optimizer?: onChangeConfig;
     }
 
     /**
@@ -224,13 +237,6 @@ declare module 'neurex' {
         *
         * You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
         *
-        * Default configurations:
-        *   learning_rate: 0.001
-        *   optimizer: 'adam'
-        *   randMin: -0.01
-        *   randMax: 0.01
-        *
-        * Available optimizers: 'sgd'and 'adam'
         */
         
         configure(configs: NeurexConfig): void;
@@ -262,26 +268,32 @@ declare module 'neurex' {
          * @returns the task type: regression | multi_class_classification | binary_classification
          */
         get_task_type(): String;
+
+        /**
+        * @method get_miscellaneous_data
+        * @returns {any} Saved miscellaneous data upon model saving
+        */
+        get_miscellaneous_data(): Object;
         
         /**
         * 
-        @method saveModel()
-        @param {string} modelName - the filename of your model. If not provided, the filename of the model is date today.
-
-        saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
-        as a .nrx (neurex) model.
-        
+        * `saveModel()` allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
+        *  as a .nrx (neurex) model
+        * 
+        * @method saveModel()
+        * @param {string} modelName the filename of your model
+        * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model file size when adding miscellaneous.
+        *   
         */
-        saveModel(modelName: string): void;
+        saveModel(modelName: string, miscellaneous: object): void;
 
         /**
-        * @method loadSavedModel()
-        * @param {String} model - the trained model
-
-        The loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
-
+        * @method loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
+        * @param {String} model the trained model file name
+        * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
+        * @returns {void}
         */
-        loadSavedModel(model: string): void;
+        loadSavedModel(model: string, showLog: Boolean): void;
 
         /**
         * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
@@ -453,6 +465,13 @@ declare module 'neurex' {
     export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
 
     /**
+     * @function tokenize allows you to tokenize a sentence
+     * @param {String} sentence input sentence
+     * @returns {Array<String>} array of tokenized words 
+     */
+    export function tokenize(sentence: String): String[];
+
+    /**
      * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
      * @param sentences an array of sentences or large corpus
      * @returns {Array<String>} an array of tokenized words
@@ -467,9 +486,9 @@ declare module 'neurex' {
     export function buildWord2Id(vocab: String[]): Object;
 
     /**
-     * @function Encode - this function tokenize a sentence and assign token IDs returning an array of token IDs.
+     * @function Encode tokenize a sentence and assign token IDs returning an array of token IDs.
      * @param {String} sentence input sentence or prompt
-     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on based on the words in `buildWord2Id_output`
+     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on the words in `buildWord2Id_output`
      * @param {Number} max_length The length of the encoded token containing token IDs.
      * @returns {Array<Number>} an array of token IDs to be use for token embeddings in the embedding layer 
      */
@@ -550,6 +569,20 @@ declare module 'neurex' {
          * @throws {Error} if internal initialization and computational process has an error.
          */
         recurrentCell(units: Number, activation_function: String, return_sequence: Boolean,  maxSequenceLength: Number, return_state: Boolean): Object;
+
+        /**
+        * 
+        * @method transConvLayer `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
+        * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
+        * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
+        * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
+        * @param {String} activation_function the activation function to be use for this layer
+        * @param {String} padding adds N amount of padding on all sides. Default is `same`
+        * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize]) 
+        * @return {Object} transConv layer configs
+        * @throws {Error} if any of the parameters are invalid.
+        */
+        transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: String, inputShape: Number[]): Object;
     }
 
     /**
@@ -725,8 +758,10 @@ declare module 'neurex' {
          *  A simple CNN having a two convolutional layers each having different number of filters, same strides and kernel sizes. Both uses `same` padding and `relu` activation functions.
          * After each convolutional layers comes with max pooling layer having `2x2` pool sizes, 2 strides and uses `valid` padding. Then it uses 3 connected layers having a
          * "funnel" shape architecture 
+         *
+         * @param {Boolean} isHeadless if set to `true`, it will only return the extractor layers (convolution and max pooling layers). Default value is `false`
          */
-        export function simpleCNN(): Array<Object>;
+        export function simpleCNN(isHeadless: Boolean): Array<Object>;
 
         /**
          * 
@@ -740,11 +775,11 @@ declare module 'neurex' {
         export function LiteNet():Array<Object>;
 
         /**
-         * 
+         *  A vanilla recurrent neural network with 3 recurrent cells.
          * @param {Number} units_per_cell number of units per recurrent cells. Default is `3` 
          * @param {String} activation_function activation function to be used by recurrent cells. Default is `tanh`
          * 
-         * A vanilla recurrent neural network with 3 recurrent cells.
+         *
          */
         export function vanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
 
@@ -753,4 +788,53 @@ declare module 'neurex' {
          */
         export function AutoEncoder(): Array<Object>;
     }
+
+    /**
+     * @function stepDecay Reduces the learning rate by a fixed factor after a set number of epochs.
+     * @param {Number} dropFactor A drop factor in a learning rate scheduler is the multiplier used to reduce the learning rate. Default is `0.5`
+     * @param {Number} dropEvery dropEvery (or drop_every) is a custom parameter used in step-decay learning rate schedulers to define the number of epochs or steps that pass before the learning rate drops by a specific multi-factor value. Default is `10`.
+     */
+    export function stepDecay(dropFactor: Number, dropEvery: Number): Number;
+
+    /**
+     * @function exponentialDecay Multiplies the learning rate by a decay constant raised to the power of the epoch or step.
+     * @param {Number} decayRate is a multiplier factor that scales down the learning rate at each step or epoch. Default is `0.96`
+     */
+    export function exponentialDecay(decayRate: Number): Number;
+
+    /**
+     * @function cosineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
+     * @param {Number} totalEpochs The total number of epochs or steps over which the learning rate should decay following a cosine schedule.
+     * @param {Number} minLR The minimum learning rate to decay toward.
+     */
+    export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
+
+
+    export interface ReduceOnPlateauConfig {
+        /** Reduces the learning rate by multiplying it by this value. Default value is 0.5 */
+        factor?: Number;
+        /**Counts the number of epochs to wait with no improvement in the monitored metric before making a reduction. Default value is `5`*/
+        patience?: Number;
+        /** Sets a lower bound on the learning rate so it does not drop below this specific value. Default value is `1e-6`*/
+        minLR?: Number;
+    }
+    /**
+     * @function reduceOnPlateau Monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
+     * @param {ReduceOnPlateauConfig} config 
+     */
+    export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
+
+    /**
+     * @function SGD or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
+     * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
+     */
+    export function SGD(momentum: Number): Function;
+
+    /**
+     * @function Adam or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
+     * @param {Number} beta1 The exponential decay rate for the moving average of past gradients (the first moment or mean). Default value is `0.9`.
+     * @param {Number} beta2 The exponential decay rate for the moving average of squared past gradients (the second moment or uncentered variance). Default value is `0.999`.
+     * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
+     */
+    export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
 }

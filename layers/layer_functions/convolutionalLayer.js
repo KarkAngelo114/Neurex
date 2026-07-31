@@ -224,11 +224,12 @@ const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_d
         weightGrads,
         [inH, inW, inDepth],
         [outH, outW, filters],
-        [kH, kW]);
+        [kH, kW]
+    );
 
-        if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
+    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
 
-        return output;
+    return output;
 }
 
 /**

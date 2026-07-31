@@ -1,12 +1,17 @@
 # v0.1.0 (In Development)
 ### What's New
 - Introduced recurrent cell to support RNN modeling
+- added learning rate schedulers
+- added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
+- You can now add you own optimizers and learning rate scheduler. See the latest documentation about [optimizers](https://neurex-documentation.vercel.app/javascript-nodejs#optimizers), and [lr_schedulers](https://neurex-documentation.vercel.app/javascript-nodejs#schedulers), and how to plug in your own.
 
 ### What's Updated
 - arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it's now `connectedLayer(layer_size, activation_func)`. See the updated the documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 - when using `load_images_from_directory()`, you can pass a string value in the `label_mode` argument. The label mode to use depends on the loss function you will going to use for training. See the updated documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#load_images_from_directory).
+- in the `optimizer` property when setting config, it can only now accepts factory functions rather than string name of an optimizer allowing you to plug your own custom optimizer.
 
 ### Breaking Changes
+- because the `optimizer` property when setting config can only now accepts factory functions rather than string name of an optimizer, any training scripts that uses the same config will break.
 - supported model version has been bumped to `NRX4`. Old models cannot be loaded. 
 - due to arrangement of arguments on `connectedLayer()`, ensure that your training script/s also follows the format.
 

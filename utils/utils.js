@@ -24,6 +24,65 @@ const calculateTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth
 
 /**
  * 
+ * @param {Number} inputHeight 
+ * @param {Number} inputWidth 
+ * @param {Number} kernelHeight 
+ * @param {Number} kernelWidth 
+ * @param {Number} outputDepth 
+ * @param {Number} stride 
+ * @param {String} padding 
+ * @returns {{OutputHeight: Number, OutputWidth: Number, CalculatedTensorShape: Number}}
+ */
+const calculateTransposedTensorShape = (inputHeight, inputWidth, kernelHeight, kernelWidth, outputDepth, stride = 1,  padding = "same") => {
+    let oH, oW;
+
+    if (padding === "same") {
+        // "SAME" padding aims to scale spatial dimensions directly by the stride
+        oH = inputHeight * stride;
+        oW = inputWidth * stride;
+    } else {
+        // "VALID" padding (no extra padding added to the output boundary)
+        oH = (inputHeight - 1) * stride + kernelHeight;
+        oW = (inputWidth - 1) * stride + kernelWidth;
+    }
+
+    return {
+        OutputHeight: oH,
+        OutputWidth: oW,
+        CalculatedTensorShape: oH * oW * outputDepth
+    };
+};
+
+/**
+ * 
+ * @param {Number} inputH 
+ * @param {Number} inputW 
+ * @param {Number} kernelH 
+ * @param {Number} kernelW 
+ * @param {Number} stride 
+ * @param {String} padding 
+ * @returns {{top: Number, left: Number, dilatedH: number, dilatedW: Number}}
+ */
+const getTransposedPaddingSizes = (inputH, inputW, kernelH, kernelW, stride, padding) => {
+    const dilatedH = (inputH - 1) * stride + 1;
+    const dilatedW = (inputW - 1) * stride + 1;
+
+    const targetH = padding === "valid" ? (inputH - 1) * stride + kernelH : inputH * stride;
+    const targetW = padding === "valid" ? (inputW - 1) * stride + kernelW : inputW * stride;
+
+    const totalPadH = targetH - dilatedH + kernelH - 1;
+    const totalPadW = targetW - dilatedW + kernelW - 1;
+
+    return {
+        top: Math.floor(totalPadH / 2), bottom: totalPadH - Math.floor(totalPadH / 2),
+        left: Math.floor(totalPadW / 2), right: totalPadW - Math.floor(totalPadW / 2),
+        dilatedH: dilatedH, 
+        dilatedW: dilatedW
+    };
+};
+
+/**
+ * 
  * @param {Number} inputH - height of the input
  * @param {Number} inputW - width of the input 
  * @param {Number} kernelH - height of the kernel
@@ -123,10 +182,12 @@ const concatenateFloat32Array = (chunks) => {
 
 module.exports = {
     calculateTensorShape,
+    calculateTransposedTensorShape,
     getPaddingSizes,
     XavierInitialization,
     ifOneHotEndcoded,
     getTotalMB,
     formatDuration,
-    concatenateFloat32Array
+    concatenateFloat32Array,
+    getTransposedPaddingSizes
 }
