@@ -218,6 +218,38 @@ function CustomScheduler() {
 })();
 ```
 
+Monitor loss during training in real-time using built-in monitor tool!
+
+```JavaScript
+const { Neurex, Layers, VisualizerBoard } = require('neurex');
+
+(async () => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+    
+    nrx.sequentialBuild([
+        layer.embeddingLayer(VOCAB_SIZE, EMBEDDING_DIM, MAX_SEQUENCE),
+        layer.recurrentCell(30, 'tanh', true),
+        layer.recurrentCell(30, 'tanh', true),
+        layer.recurrentCell(30, 'tanh'),
+        layer.connectedLayer(1, 'sigmoid'),
+    ]);
+
+    nrx.configure({
+        /* ... other configs */
+        plugins: {
+            trainingVisualizer: VisualizerBoard(),
+        }
+    })
+
+    await nrx.train(X, Y, 'binary_cross_entropy', 1000, 12);
+
+})()
+```
+
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785594743/Screenshot_737_qkup71.png)
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785594743/Screenshot_738_ccuvcy.png)
+
 # Test the Experimental Upcoming Updates 🔥
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.
 

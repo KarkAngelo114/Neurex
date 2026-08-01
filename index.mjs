@@ -33,4 +33,5 @@ export const {
     exponentialDecay,
     cosineAnnealing,
     reduceOnPlateau,
+    VisualizerBoard
 } = pkg;

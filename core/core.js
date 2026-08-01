@@ -21,6 +21,7 @@ const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, gradientClipping, scaleGrads } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
+const version = require('../package.json').version;
 
 class Neurex {
     constructor () {
@@ -52,6 +53,7 @@ class Neurex {
         this.lr_scheduler = null;
         this.clip_norm_value = 1.0;
         this.onChange_optimizer = null;
+        this.plugins = null;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -123,6 +125,10 @@ class Neurex {
                 targetEpoch: configs.onChange_optimizer.targetEpoch,
                 optimizer: configs.onChange_optimizer.optimizer
             }
+        }
+
+        if (configs.plugins !== undefined) {
+            this.plugins = configs.plugins;
         }
 
         init();
@@ -698,6 +704,12 @@ class Neurex {
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
             }
 
+            if (this.plugins?.trainingVisualizer) {
+                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                await this.plugins.trainingVisualizer.initialize();
+                await delay(10000);
+            }
+
             // Infer task type based on output layer and loss/activation
             let lastLayerObject = this.layers[this.layers.length - 1];
             // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
@@ -877,13 +889,16 @@ class Neurex {
                     logMessage += duration;
                 }
 
+                let accuracy = 0;
+                let duration = "";
 
                 if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                     let epochPredictions = [];
                     for (let i = 0; i < trainX.length; i++) {
                         epochPredictions.push(this.#Feedforward(trainX[i]).predictions);
                     }
-                    const accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, this.task);
+
+                    accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, this.task);
 
                     let accuracyColor = accuracy > 90 ? color.green :
                                     accuracy > 85 ? color.lime :
@@ -891,9 +906,40 @@ class Neurex {
                                     accuracy >= 60 ? color.orange : color.red;
 
                     logMessage += ` | [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
-                    let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
+                    duration = `| [took: ${formatDuration(totalDuration)} to finish]`
                     logMessage += duration;
                 }
+
+                if (this.plugins?.trainingVisualizer) {
+
+                    await new Promise(resolve => setImmediate(resolve));
+                    // pass data to the visualizer plugin and call the visualize() factory function. 
+                    // Note: any visualizer plugins must expose a visualize() function and accepts an Object argument.
+                    // The object contains data to be visualize in a moving graph for loss and accuracy (if needed).
+
+                    const visualizerData = {
+                        epoch: current_epoch + 1,
+                        loss: AverageEpochLoss,
+                        task: this.task,
+                        totalEpoch: epoch,
+                        totalBatchSize: batchSize,
+                        optimizer: this.optimizer.name || "Custom Optimizer",
+                        learningRate: this.learning_rate,
+                        duration: duration,
+                        version: version
+                    }
+
+                    if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
+                        visualizerData.accuracy = accuracy;
+                    }
+
+                    // dispatch the data to the plugin
+                    await this.plugins.trainingVisualizer.visualize(visualizerData);
+
+                    
+                }
+
+
                 process.stdout.write('\r'+logMessage);
                 // if the checkpoint is not 0 (assume it was configured), proceed to saving the model after showing the latest training information
                 if (this.checkpoint > 0 && (current_epoch + 1) % this.checkpoint === 0) {

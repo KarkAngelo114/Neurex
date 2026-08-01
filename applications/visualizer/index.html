@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name = "viewport" content="width=device-width, initial-scale = 1.0">
+        <link rel="stylesheet" href = "style.css"/>
+        <link rel="stylesheet" href = "gradient-background.css"/>
+        <title></title>
+    </head>
+    <body>
+        <header class="solar-flare-gradient-bg"></header>
+        
+        <section class="dashboard">
+            <aside>
+                <div class="right-div">
+                    <img src="logo.png" class="logo"/>
+                    <div style="text-align: left; height:70vh;">
+                        <p>Learning Rate: <span id = "learning-rate"></span></p>
+                        <p>Current Optimizer: <span id="optimizer"></span></p>
+                        <p>Batch Size: <span id = "batch-size"></span></p>
+                    </div>
+                    <p class="version_tag">Version: Neurex v<span id = "version"></span></p>
+                </div>
+            </aside>
+            <section class="left-div">
+                <div class="chart-container">
+                    <div class="chart-wrapper">
+                        <canvas id="chart"></canvas>
+                    </div>
+                </div>
+                
+                <div>
+                    <p>Current Epoch: <span id = "epoch"></span> <span id = "duration"></span></p>
+                    <p>Training Loss: <span id = "loss"></span></p>
+                    <p id = "accuracy-label"></p>
+                    <br/>
+                    <p><i>Tip: use mouse wheel to zoom in or out while hovering your cursor over the graph. Click and slide left and right to view history.</i></p>
+                </div>
+            </section>
+        </section>
+    </body>
+    <script src="chart.min.js"></script>
+    <script src="hammer.min.js"></script>
+    <script src="chartjs-plugin-zoom.min.js"></script>
+    <script src="api.js"></script>
+</html>

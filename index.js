@@ -24,6 +24,7 @@ const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN 
 const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam } = require('./optimizers');
+const { VisualizerBoard } = require('./applications/visualizer');
 
 
 module.exports= {
@@ -60,6 +61,7 @@ module.exports= {
     reduceOnPlateau,
     SGD,
     Adam,
+    VisualizerBoard,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,

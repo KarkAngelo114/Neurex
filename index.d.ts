@@ -202,6 +202,11 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function;
     }
 
+    export interface pluginConfig {
+        /** a plugin for visualizing training process. */
+        trainingVisualizer?: () => Function;
+    }
+
     export interface NeurexConfig {
         /** Learning rate for training. Default: 0.001 */
         learning_rate?: number;
@@ -219,6 +224,8 @@ declare module 'neurex' {
         clip_norm_value?: Number;
         /** on change config to automate changing of optimizer mid-training.*/
         onChange_optimizer?: onChangeConfig;
+        /** plug-in configs.  */
+        plugins?:pluginConfig;
     }
 
     /**
@@ -837,4 +844,9 @@ declare module 'neurex' {
      * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
      */
     export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
+
+    /**
+     * A built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
+     */
+    export function VisualizerBoard(): Function;
 }
