@@ -1,5 +1,5 @@
 const WebSocket = require('ws'); 
-const { yellow, reset } = require('../../color-code'); 
+const { yellow, reset } = require('../../../color-code'); 
 const http = require('http'); const fs = require('fs'); 
 const path = require('path'); 
 const MIME_TYPES = { 
@@ -14,14 +14,15 @@ const MIME_TYPES = {
     '.ico': 'image/x-icon' 
 }; 
 
-function VisualizerBoard() { 
+function lossVisualizer() { 
     let port = 7777; 
     let clients = new Set(); 
-    return { 
+    let server;
+    let wss; 
+    return {
         initialize: () => {
-            console.log('\nInitializing Dashboard....');
-            let wss; // initiate once so that static files will be serve on the browser 
-            const server = http.createServer((req, res) => { 
+            // initiate once so that static files will be serve on the browser 
+            server = http.createServer((req, res) => { 
                 const targetPath = path.join(__dirname, req.url === "/" ? "index.html" : req.url); 
                 fs.readFile(targetPath, (err, content) => { 
                     if (err) { 
@@ -69,10 +70,32 @@ function VisualizerBoard() {
                 } 
             } 
         }, 
-        abort: () => { 
-            process.exit(0); 
-        } 
+        abort: () => {
+            
+            return new Promise((resolve, reject) => {
+
+                for (const client of clients) {
+                    client.close(1001, `${yellow}[NOTICE]${reset} Server shutting down...`);  
+                }
+
+                clients.clear(); 
+
+                wss.close((err) => {
+                    if (err) console.error('Error closing WSS:', err);
+
+
+                    server.close((serverErr) => {
+                        if (serverErr) {
+                            return reject(serverErr);
+                        }
+
+                        console.log(`\n${yellow}[NOTICE]${reset}Visualizer server completely stopped.`);
+                        resolve();
+                    });
+                });
+            });
+        }
     } 
 } 
 
-module.exports = { VisualizerBoard, }
+module.exports = { lossVisualizer, }

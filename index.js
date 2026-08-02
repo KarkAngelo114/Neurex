@@ -4,7 +4,7 @@
  Centralized imports to tbe main script. 
 
  Example Usage:
- const {Neurex, Interpreter, MinMaxScaler, ...} = require('neurex');
+ const {Neurex, MinMaxScaler, ...} = require('neurex');
 
  */
 
@@ -24,7 +24,8 @@ const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN 
 const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam } = require('./optimizers');
-const { VisualizerBoard } = require('./applications/visualizer');
+const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
+
 
 
 module.exports= {
@@ -61,7 +62,7 @@ module.exports= {
     reduceOnPlateau,
     SGD,
     Adam,
-    VisualizerBoard,
+    lossVisualizer,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,

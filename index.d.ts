@@ -202,9 +202,18 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function;
     }
 
+    export interface VisualizerPlugin {
+        /** initialize the plugin visualizer. This can be a localhost web server, websocket server, etc. */
+        initilaize?: () => void;
+        /** broadcast data */
+        visualize?: (data: object) => void;
+        /** Every visualizer plugins must have an functional `abort` function. The core engine might use this to stop any running services (like ocalhost web server, websocket server, etc) when an error occurred in the core itself.*/
+        abort?: () => void;
+    }
+
     export interface pluginConfig {
-        /** a plugin for visualizing training process. */
-        trainingVisualizer?: () => Function;
+        /** an array of plugin visualizers. These plugins runs during training*/
+        trainingVisualizer?: VisualizerPlugin[];
     }
 
     export interface NeurexConfig {
@@ -846,7 +855,7 @@ declare module 'neurex' {
     export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
 
     /**
-     * A built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
+     * @function lossVisualizer is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
      */
-    export function VisualizerBoard(): Function;
+    export function lossVisualizer(): Object;
 }

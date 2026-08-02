@@ -11,7 +11,7 @@ const version = document.getElementById('version');
     const socket = new WebSocket("ws://localhost:7777");
 
     let hasAccuracyDataset = false;
-    let isUserInteracting = false; // Flag to check if user scrolled back
+    let isUserInteracting = false; 
 
     const accuracyDatasetConfig = {
         label: 'Accuracy (%)',

@@ -169,7 +169,7 @@ const { Neurex, Layers, templates } = require('neurex');
 
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/javascript-nodejs#templates).
 
-# Experiment and plug your own optimizer and learning rate scheduler
+# Experiment and plug your own optimizer and learning rate scheduler (in Development)
 Thanks to the updated core engine and flexible API, you can now write and plug your own optimizer and learning rate scheduler!
 
 ```Javascript
@@ -218,10 +218,11 @@ function CustomScheduler() {
 })();
 ```
 
-Monitor loss during training in real-time using built-in monitor tool!
+# Use pluggable monitoring tools (in Development)
+Use monitoring tool plugins to monitor training in real-time!
 
 ```JavaScript
-const { Neurex, Layers, VisualizerBoard } = require('neurex');
+const { Neurex, Layers, lossVisualizer } = require('neurex');
 
 (async () => {
     const nrx = new Neurex();
@@ -238,7 +239,9 @@ const { Neurex, Layers, VisualizerBoard } = require('neurex');
     nrx.configure({
         /* ... other configs */
         plugins: {
-            trainingVisualizer: VisualizerBoard(),
+            trainingVisualizer: [
+                lossVisualizer() // built-in monitoring tool
+            ]
         }
     })
 

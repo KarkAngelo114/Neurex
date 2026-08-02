@@ -706,8 +706,17 @@ class Neurex {
 
             if (this.plugins?.trainingVisualizer) {
                 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-                await this.plugins.trainingVisualizer.initialize();
-                await delay(10000);
+                for (const visualizer of this.plugins.trainingVisualizer) {
+                    if (typeof visualizer?.initialize !== 'function') {
+                        this.isfailed = true;
+                        throw new Error("A plugin function doesn't have a callable initialize() function.");
+                    }
+
+                    await visualizer?.initialize();
+
+                    await delay(5000);
+
+                }
             }
 
             // Infer task type based on output layer and loss/activation
@@ -912,7 +921,6 @@ class Neurex {
 
                 if (this.plugins?.trainingVisualizer) {
 
-                    await new Promise(resolve => setImmediate(resolve));
                     // pass data to the visualizer plugin and call the visualize() factory function. 
                     // Note: any visualizer plugins must expose a visualize() function and accepts an Object argument.
                     // The object contains data to be visualize in a moving graph for loss and accuracy (if needed).
@@ -933,9 +941,14 @@ class Neurex {
                         visualizerData.accuracy = accuracy;
                     }
 
-                    // dispatch the data to the plugin
-                    await this.plugins.trainingVisualizer.visualize(visualizerData);
-
+                    // dispatch the data to the plugin visualizers
+                    for (const visualizer of this.plugins.trainingVisualizer) {
+                        if (typeof visualizer?.visualize !== 'function') {
+                            this.isfailed = true;
+                            throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                        }
+                        await visualizer.visualize(visualizerData);
+                    }
                     
                 }
 
@@ -948,6 +961,17 @@ class Neurex {
                     this.saveModel(`Checkpoint_Epoch_${current_epoch + 1}`);
                 }
                 console.log();
+            }
+
+            if (this.plugins?.trainingVisualizer) {
+                for (const visualizer of this.plugins.trainingVisualizer) {
+                    if (typeof visualizer?.abort !== 'function') {
+                        this.isfailed = true;
+                        throw new Error("Failed to use a visualizer plugin. No callable 'abort()' function.");
+                    }
+
+                    await visualizer.abort();
+                }
             }
             
         }
