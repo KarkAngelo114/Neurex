@@ -131,6 +131,23 @@ class Neurex {
             this.plugins = configs.plugins;
         }
 
+        if (this.plugins?.trainingVisualizer) {
+            // const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            for (const visualizer of this.plugins.trainingVisualizer) {
+                if (typeof visualizer?.initialize !== 'function') {
+                    this.isfailed = true;
+                    throw new Error("A plugin function doesn't have a callable initialize() function.");
+                }
+
+                
+                
+                setTimeout(() => {
+                    visualizer?.initialize();
+                },1000);
+                // await delay(5000);
+            }
+        }
+
         init();
         this.isInit = true;
     }
@@ -702,21 +719,6 @@ class Neurex {
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
-            }
-
-            if (this.plugins?.trainingVisualizer) {
-                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-                for (const visualizer of this.plugins.trainingVisualizer) {
-                    if (typeof visualizer?.initialize !== 'function') {
-                        this.isfailed = true;
-                        throw new Error("A plugin function doesn't have a callable initialize() function.");
-                    }
-
-                    await visualizer?.initialize();
-
-                    await delay(5000);
-
-                }
             }
 
             // Infer task type based on output layer and loss/activation

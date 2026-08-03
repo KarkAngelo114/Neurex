@@ -34,7 +34,7 @@ const version = document.getElementById('version');
         if (data.learningRate) learningRate.textContent = data.learningRate;
         if (data.totalBatchSize) batchSize.textContent = data.totalBatchSize;
         if (data.duration) duration.textContent = data.duration;
-        if (data.version) version.textContent = data.version;
+        if (data.version) version.textContent = `Neurex v${data.version}`;
 
         // Push data to chart
         myLineChart.data.labels.push(data.epoch);
@@ -60,7 +60,6 @@ const version = document.getElementById('version');
             accuracy.style.display = 'none';
         }
 
-        // Only move view window if user is NOT scrolling back in history
         if (!isUserInteracting) {
             const windowSize = 20;
             if (data.epoch > windowSize) {
@@ -72,7 +71,6 @@ const version = document.getElementById('version');
             }
         }
 
-        // Use 'none' mode for fast updates (prevents jittering at ~0.14ms/epoch)
         myLineChart.update('none');
     };
 
@@ -100,7 +98,7 @@ const version = document.getElementById('version');
             maintainAspectRatio: false,
             scales: {
                 x: {
-                    type: 'linear', // Use linear scale for numerical epoch spacing
+                    type: 'linear', 
                     min: 1,
                     max: 20
                 },
@@ -108,7 +106,7 @@ const version = document.getElementById('version');
                     type: 'linear',
                     position: 'left',
                     min: 0,
-                    max: 1,
+                    suggestedMax: 1,
                     title: { display: true, text: 'Loss' }
                 },
                 yAccuracy: {
@@ -128,7 +126,6 @@ const version = document.getElementById('version');
                         mode: 'x',
                         onPanStart: () => { isUserInteracting = true; },
                         onPanComplete: ({ chart }) => {
-                            // If user scrolled back to the very end, resume autoscroll
                             const currentMax = chart.scales.x.max;
                             const totalDataPoints = chart.data.labels.length;
                             if (currentMax >= totalDataPoints - 1) {

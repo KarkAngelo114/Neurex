@@ -52,61 +52,72 @@ const lossFunctions = {
 
 ws.onmessage = async (event) => {
     const payload = JSON.parse(event.data);
-
-    console.log('receiving data...');
-
     if (payload.type !== '3D_LANDSCAPE_DATA') return;
 
     try {
-        const { modelJson, trainX, trainY, lossFunction, resolutionSize, range = 1.0, batchSize } = payload;
-
-        const subsampleX = structuredClone(trainX.slice(0, batchSize));
-        const subSampleY = structuredClone(trainY.slice(0, batchSize));
-
-        // 2. Load model into NeurexRuntime
+        const { modelJson, trainX, trainY, lossFunction, resolutionSize, range = 1.0 } = payload;
+        
+        const subsampleX = structuredClone(trainX.slice(0, 8));
+        const subSampleY = structuredClone(trainY.slice(0, 8));
         const runtime = new NeurexRuntime.Runtime();
-
-        // 3. Select loss function from registry
         const lossFunc = lossFunctions[lossFunction.toLowerCase()] || lossFunctions.mse;
 
-        // 4. Compute 3D Landscape Grid on Client
-        const { x, y, z } = await computeGridLandscape(runtime, subsampleX, subSampleY, lossFunc, resolutionSize, range, modelJson);
+        // 1. Pre-calculate X and Y axis coordinate ranges
+        const stepSize = (range * 2) / (resolutionSize - 1);
+        const xCoord = Array.from({ length: resolutionSize }, (_, i) => -range + (i * stepSize));
+        const yCoord = Array.from({ length: resolutionSize }, (_, j) => -range + (j * stepSize));
 
-        // 5. Update UI & Plotly
+        // 2. Initialize a 2D array filled with `null`
+        const zGrid = Array.from({ length: resolutionSize }, () => new Array(resolutionSize).fill(0));
+
+        // 3. Render the initial empty Plotly surface
+        const trace = {
+            z: zGrid,
+            x: xCoord,
+            y: yCoord,
+            type: 'surface',
+            colorscale: 'Rainbow',
+            lighting: { ambient: 0.8, diffuse: 0.8, fresnel: 0.2, specular: 0.5, roughness: 0.5 },
+            contours: { z: { show: true, usecolormap: true } }  
+        };
+
+        const layout = {
+            autosize: true,
+            scene: {
+                xaxis: { tickformat: 'd' }, // Forces standard digits/hyphens
+                yaxis: { tickformat: 'd' },
+                zaxis: { tickformat: 'd' }
+            }
+        };
+
+        Plotly.react('plot', [trace], layout, { autosize: true });
+
+        // 4. Update UI labels
         document.getElementById('learning-rate').innerText = payload.learningRate || '-';
         document.getElementById('optimizer').innerText = payload.optimizer || '-';
         document.getElementById('batch-size').innerText = payload.batchSize || '-';
-        document.getElementById('version').innerText = payload.version || '1.0.0';
+        document.getElementById('version').innerText = `Neurex v${payload.version}` || '1.0.0';
+        document.getElementById('epoch').innerText = payload.current_epoch || 0;
 
-        const trace = {
-            z: z,
-            x: x,
-            y: y,
-            type: 'surface',
-            colorscale: 'Rainbow'
-        };
+        // 5. Start progressive rendering pipeline
+        await computeGridLandscapeProgressive(
+            runtime, 
+            subsampleX, 
+            subSampleY, 
+            lossFunc, 
+            resolutionSize, 
+            range, 
+            modelJson, 
+            zGrid, 
+            xCoord, 
+            yCoord
+        );
 
-        Plotly.react('plot', [trace], { autosize: true });
     } catch (error) {
-        // Without this, a failure here (bad payload, shape mismatch, etc.)
-        // becomes a silent unhandled rejection and the dashboard just freezes
-        // on the previous frame with no indication anything went wrong.
         console.error('[LandscapeVisualizer] Failed to render epoch payload:', error);
     }
 };
 
-// Rescales a random direction vector so its L2 norm matches the L2 norm of
-// the actual trained weight layer it will perturb. Without this, a single
-// fixed alpha/beta range (e.g. -1..1) is meaningless across layers: a layer
-// whose real weights are small gets swamped by comparatively huge raw
-// random noise (producing spiky, meaningless perturbations), while a layer
-// with naturally large weights barely moves. This depends on the *actual
-// trained* weight magnitudes, not layer shape, so a shape-based scheme like
-// Xavier init can't substitute for it here -- two identically-shaped layers
-// can end up with very different trained norms (e.g. one regularized,
-// one not), and this model also mixes EmbeddingLayer / recurrent_cell /
-// connected_layer types where "fan-in/fan-out" isn't even well-defined the
-// way it is for a plain dense layer.
 function normalizeDirection(direction, weights) {
     let weightNormSq = 0;
     let dirNormSq = 0;
@@ -125,48 +136,16 @@ function normalizeDirection(direction, weights) {
     return direction;
 }
 
-/**
- * Grid Calculation Engine on Client Thread
- */
-async function computeGridLandscape(runtime, trainX, trainY, lossFunc, resolutionSize, range, originalModelJson) {
-    // 1. Extract baseline weights directly from modelJson
+async function computeGridLandscapeProgressive(runtime, trainX, trainY, lossFunc, resolutionSize, range, originalModelJson, zGrid, xCoord, yCoord) {
     const origW = originalModelJson.weights.map(w => new Float32Array(w));
 
-    // 2. (Re)initialize direction vectors whenever we don't have any yet, or
-    //    the model's weight shape no longer matches the ones we generated
-    //    previously (e.g. a new/different model started training). Reusing
-    //    stale directions against a mismatched shape would silently produce
-    //    a meaningless (or crashing) landscape. Each direction is normalized
-    //    per-layer to match that layer's actual trained weight norm (see
-    //    normalizeDirection above), so alpha/beta represent a comparable,
-    //    meaningful step size across every layer instead of raw noise.
-    const shapeChanged = !deltaDirs
-        || deltaDirs.length !== origW.length
-        || deltaDirs.some((d, l) => d.length !== origW[l].length);
-
+    // Handle direction vectors
+    const shapeChanged = !deltaDirs || deltaDirs.length !== origW.length || deltaDirs.some((d, l) => d.length !== origW[l].length);
     if (shapeChanged) {
-        deltaDirs = origW.map(w =>
-            normalizeDirection(new Float32Array(w.length).map(() => (Math.random() - 0.5) * 2), w)
-        );
-        etaDirs = origW.map(w =>
-            normalizeDirection(new Float32Array(w.length).map(() => (Math.random() - 0.5) * 2), w)
-        );
+        deltaDirs = origW.map(w => normalizeDirection(new Float32Array(w.length).map(() => (Math.random() - 0.5) * 2), w));
+        etaDirs = origW.map(w => normalizeDirection(new Float32Array(w.length).map(() => (Math.random() - 0.5) * 2), w));
     }
 
-    const stepSize = (range * 2) / (resolutionSize - 1);
-    const xCoord = [], yCoord = [], zGrid = [];
-
-    // 3. `loadSavedModel` refuses to reload once a runtime instance already
-    //    has layers built (see neurex-runtime core.js), so calling it again
-    //    per grid cell was a no-op after the very first cell -- every
-    //    "perturbed" prediction was actually running against the same
-    //    unperturbed baseline weights. It also expects snake_case
-    //    `input_size` / `input_shape`, while the trainer serializes those as
-    //    `inputSize` / `inputShape`, so shape validation inside predict()
-    //    would throw on an untouched payload. Normalize once, load once,
-    //    then mutate the runtime's own Float32Array weights directly per
-    //    grid cell -- this also avoids rebuilding all layers resolutionSize^2
-    //    times, which is the more expensive fix anyway.
     const normalizedModelJson = {
         ...originalModelJson,
         input_size: originalModelJson.input_size ?? originalModelJson.inputSize,
@@ -175,74 +154,49 @@ async function computeGridLandscape(runtime, trainX, trainY, lossFunc, resolutio
 
     await runtime.loadSavedModel(normalizedModelJson);
 
-    // Fail fast with a clear message if trainX isn't shaped the way
-    // predict() expects: an array of samples, each sample itself an array
-    // of exactly `input_size` numbers. The most common way this breaks for
-    // embedding/sequence models is sending a single flat token sequence
-    // (e.g. [3, 588, 12, ...]) instead of an array of sequences
-    // (e.g. [[3, 588, 12, ...], [...], ...]) -- in that case `input[i]` is a
-    // *number*, not an array, and its `.length` is `undefined`, which is
-    // exactly the symptom of "Input size/shape: undefined" from the runtime.
-    const expectedInputSize = normalizedModelJson.input_size;
-    if (!Array.isArray(trainX) || trainX.length === 0) {
-        throw new Error(`trainX must be a non-empty array of samples; got: ${JSON.stringify(trainX)?.slice(0, 100)}`);
-    }
-    trainX.forEach((sample, idx) => {
-        if (!Array.isArray(sample) && !(sample instanceof Float32Array)) {
-            throw new Error(
-                `trainX[${idx}] is not an array (got ${typeof sample}: ${JSON.stringify(sample)}). ` +
-                `Did you send a single flat sequence instead of an array of samples? ` +
-                `Expected an array of samples, each with length ${expectedInputSize}.`
-            );
-        }
-        if (sample.length !== expectedInputSize) {
-            throw new Error(
-                `trainX[${idx}] has length ${sample.length}, but the model's input_size is ${expectedInputSize}. ` +
-                `Each sample must be a fixed-length sequence matching input_size / input_shape.`
-            );
-        }
-    });
+    const CHUNK_SIZE = 2; // Number of rows to process before updating the plot
 
     for (let i = 0; i < resolutionSize; i++) {
-        const alpha = -range + (i * stepSize);
-        if (i % 2 === 0) await new Promise(r => setTimeout(r, 0));
-        xCoord.push(alpha);
-        yCoord.push(alpha);
-        zGrid[i] = [];
+        const alpha = xCoord[i];
 
         for (let j = 0; j < resolutionSize; j++) {
-            const beta = -range + (j * stepSize);
+            const beta = yCoord[j];
 
-            // Perturb weights in place on the loaded runtime: θ = θ* + α·δ + β·η
+            // Perturb weights
             for (let l = 0; l < origW.length; l++) {
                 for (let k = 0; k < origW[l].length; k++) {
                     runtime.weights[l][k] = origW[l][k] + alpha * deltaDirs[l][k] + beta * etaDirs[l][k];
                 }
             }
 
-            // Run prediction feedforward via neurex-runtime
             const preds = await runtime.predict(trainX);
-
             if (!preds) {
-                console.error(`Prediction failed at grid position [${i}, ${j}]`);
                 zGrid[i][j] = null;
                 continue;
             }
 
-            // Evaluate loss across sample batch
             let batchLoss = 0;
             for (let s = 0; s < preds.length; s++) {
                 batchLoss += lossFunc(preds[s], trainY[s]);
             }
 
-            zGrid[i][j] = batchLoss / preds.length;
+            // Optional cap at 25 to match your existing colorbar scale cleanly
+            zGrid[i][j] = Math.min(batchLoss / preds.length, 25);
+        }
+
+        // --- PROGRESSIVE RENDER STEP ---
+        // Render every `CHUNK_SIZE` rows, or on the final row
+        if (i % CHUNK_SIZE === 0 || i === resolutionSize - 1) {
+            // Plotly.restyle efficient update: only re-passes matrix data without resetting camera view
+            Plotly.restyle('plot', { z: [zGrid] });
+            
+            // Yield execution to the browser event loop so UI stays smooth & rotatable!
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
     }
 
-    // Restore original baseline weights on the runtime
+    // Restore original baseline weights
     for (let l = 0; l < origW.length; l++) {
         runtime.weights[l].set(origW[l]);
     }
-
-    return { x: xCoord, y: yCoord, z: zGrid };
 }

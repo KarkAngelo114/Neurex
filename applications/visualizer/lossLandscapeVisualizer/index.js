@@ -28,7 +28,7 @@ function typedArrayReplacer(key, value) {
     return value;
 }
 
-function lossLandscapeVisualizer({ range = 1.0, renderEveryTargetEpoch = 100} = {}) {
+function lossLandscapeVisualizer({ renderEveryTargetEpoch = 100 } = {}) {
     let port = 7002; 
     let clients = new Set(); 
     let server;
@@ -95,7 +95,8 @@ function lossLandscapeVisualizer({ range = 1.0, renderEveryTargetEpoch = 100} = 
                 optimizer: data.optimizer,
                 batchSize: data.totalBatchSize,
                 version: data.version,
-                resolutionSize: 21
+                resolutionSize: 30,
+                current_epoch: data.epoch
             }, typedArrayReplacer);
 
             for (const client of clients) {

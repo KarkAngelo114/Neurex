@@ -861,13 +861,13 @@ declare module 'neurex' {
 
 
     export interface lossLandscapeOption {
-        /** Set the resolution size. Default value is `21` translate to `21x21` */
-        resolutionSize?: number;
+        /** re-render the loss landscape every N epoch. */
+        renderEveryTargetEpoch?: number;
     }
 
     /**
      * 
-     * @param {lossLandscapeOption} options config object
+     * @param {Object} options config object
      */
-    export function lossLandscapeVisualizer(options: Object): Object;
+    export function lossLandscapeVisualizer(options: lossLandscapeOption): Object;
 }

@@ -5,6 +5,7 @@
         <meta name="viewport" content = "width=device-width, initial-scale = 1.0">
         <link rel="stylesheet" href = "style.css"/>
         <link rel="stylesheet" href = "gradient-background.css"/>
+        <script src="https://cdn.plot.ly/plotly-3.6.0.min.js" charset="utf-8"></script>
         <title>Loss Landscape Visualizer</title>
     </head>
     <body>
@@ -15,18 +16,18 @@
                 <div class="right-div">
                     <img src="logo.png" class="logo"/>
                     <div style="text-align: left; height:60vh;">
-                        <p>Learning Rate: <span id = "learning-rate"></span></p>
-                        <p>Current Optimizer: <span id="optimizer"></span></p>
-                        <p>Batch Size: <span id = "batch-size"></span></p>
+                        <p>Learning Rate: <span id = "learning-rate">Fetching data...</span></p>
+                        <p>Current Optimizer: <span id="optimizer">Fetching data...</span></p>
+                        <p>Batch Size: <span id = "batch-size">Fetching data...</span></p>
+                        <p>Last Epoch Rendered: <span id = "epoch">Fetching data...</span></p>
                     </div>
-                    <p class="version_tag">Version: Neurex v<span id = "version"></span></p>
+                    <p class="version_tag">Version: <span id = "version">Fetching data...</span></p>
                 </div>
             </aside>
             <section class="left-div">
                 <div id="plot" style="width:100%; height:inherit;"></div>
             </section>
         </section>
-        <script src="plotly.min.js"></script>
         <script src="neurex-runtime.umd.js"></script>
         <script src="api.js"></script>
     </body>
