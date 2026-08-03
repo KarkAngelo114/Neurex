@@ -33,4 +33,6 @@ export const {
     exponentialDecay,
     cosineAnnealing,
     reduceOnPlateau,
+    lossLandscapeVisualizer,
+    lossVisualizer
 } = pkg;

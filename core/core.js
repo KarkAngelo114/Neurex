@@ -934,11 +934,22 @@ class Neurex {
                         optimizer: this.optimizer.name || "Custom Optimizer",
                         learningRate: this.learning_rate,
                         duration: duration,
-                        version: version
+                        version: version,
+                        lossFunction: lossLower
                     }
 
                     if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                         visualizerData.accuracy = accuracy;
+                    }
+
+                    const modelData = {
+                        loss_function: lossLower,
+                        input_size: this.input_size,
+                        input_shape: this.input_shape,
+                        num_layers: this.num_layers,
+                        layers: this.layers,
+                        weights: this.weights,
+                        biases: this.biases
                     }
 
                     // dispatch the data to the plugin visualizers
@@ -947,7 +958,7 @@ class Neurex {
                             this.isfailed = true;
                             throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
                         }
-                        await visualizer.visualize(visualizerData);
+                        await visualizer.visualize(visualizerData, modelData, trainX, trainY);
                     }
                     
                 }

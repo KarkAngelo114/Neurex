@@ -8,7 +8,7 @@ const duration = document.getElementById('duration');
 const version = document.getElementById('version');
 
 (async () => {
-    const socket = new WebSocket("ws://localhost:7777");
+    const socket = new WebSocket("ws://localhost:7001");
 
     let hasAccuracyDataset = false;
     let isUserInteracting = false; 

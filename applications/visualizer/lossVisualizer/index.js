@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const { yellow, reset } = require('../../../color-code'); 
 const http = require('http'); const fs = require('fs'); 
 const path = require('path'); 
+
 const MIME_TYPES = { 
     '.html': 'text/html', 
     '.css': 'text/css', 
@@ -15,7 +16,7 @@ const MIME_TYPES = {
 }; 
 
 function lossVisualizer() { 
-    let port = 7777; 
+    let port = 7001; 
     let clients = new Set(); 
     let server;
     let wss; 
@@ -56,7 +57,7 @@ function lossVisualizer() {
                         
             return new Promise(resolve => { 
                 server.listen(port, 'localhost', () => { 
-                    console.log(`\n${yellow}[NOTICE]${reset} 🌐 Visualizer Board running on: http://localhost:${port}🌐\n`); 
+                    console.log(`\n${yellow}[NOTICE]${reset} 🌐  Loss Visualizer running on: http://localhost:${port}🌐\n`); 
                     resolve(); 
                 }); 
             }); 

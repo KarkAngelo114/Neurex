@@ -858,4 +858,16 @@ declare module 'neurex' {
      * @function lossVisualizer is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
      */
     export function lossVisualizer(): Object;
+
+
+    export interface lossLandscapeOption {
+        /** Set the resolution size. Default value is `21` translate to `21x21` */
+        resolutionSize?: number;
+    }
+
+    /**
+     * 
+     * @param {lossLandscapeOption} options config object
+     */
+    export function lossLandscapeVisualizer(options: Object): Object;
 }

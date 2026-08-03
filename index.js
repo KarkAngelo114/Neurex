@@ -25,6 +25,7 @@ const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/t
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam } = require('./optimizers');
 const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
+const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLandscapeVisualizer');
 
 
 
@@ -63,6 +64,7 @@ module.exports= {
     SGD,
     Adam,
     lossVisualizer,
+    lossLandscapeVisualizer,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,
