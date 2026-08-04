@@ -51,14 +51,20 @@ const lossFunctions = {
 
 
 ws.onmessage = async (event) => {
-    const payload = JSON.parse(event.data);
+    const rawMsg = JSON.parse(event.data);
+    
+    // Extract real payload whether sent live or from historical replay
+    const payload = rawMsg.payload || rawMsg; 
+    
     if (payload.type !== '3D_LANDSCAPE_DATA') return;
 
     try {
         const { modelJson, trainX, trainY, lossFunction, resolutionSize, range = 1.0 } = payload;
-        
-        const subsampleX = structuredClone(trainX.slice(0, 8));
-        const subSampleY = structuredClone(trainY.slice(0, 8));
+
+        let maxSampleSize = trainX.length > 30 ? 30 : trainX.length; // cap max sample size if samples greater than 30, otherwise, use the sample size of trainX
+
+        const subsampleX = structuredClone(trainX.slice(0, maxSampleSize));
+        const subSampleY = structuredClone(trainY.slice(0, maxSampleSize));
         const runtime = new NeurexRuntime.Runtime();
         const lossFunc = lossFunctions[lossFunction.toLowerCase()] || lossFunctions.mse;
 

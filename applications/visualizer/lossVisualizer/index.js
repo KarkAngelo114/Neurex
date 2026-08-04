@@ -1,4 +1,3 @@
-// lossVisualizer.js
 const { Worker } = require('worker_threads');
 const path = require('path');
 const { yellow, reset } = require('../../../color-code');
@@ -19,7 +18,7 @@ function lossVisualizer() {
 
                 worker.on('message', (msg) => {
                     if (msg.type === 'SERVER_READY') {
-                        console.log(`\n${yellow}[NOTICE]${reset} 🌐 Loss Visualizer running on worker thread: http://localhost:${msg.port} 🌐\n`);
+                        console.log(`${yellow}[NOTICE]${reset} 🌐 Loss Visualizer running on worker thread: http://localhost:${msg.port} 🌐`);
                         resolve();
                     }
                 });

@@ -18,6 +18,7 @@ const MIME_TYPES = {
 
 const clients = new Set();
 const history = []; // Stores metric history so refreshed clients get caught up
+const limit  = 5; // to avoid massive collection of data, we limit it
 
 const server = http.createServer((req, res) => {
     // 2. Resolve relative to staticDir instead of __dirname
@@ -60,6 +61,11 @@ parentPort.on('message', (msg) => {
 
     if (msg.type === 'VISUALIZE') {
         history.push(msg.payload);
+
+        if (history.length > limit) {
+            history.shift(); // Remove the oldest entry
+        }
+
         const liveData = JSON.stringify({ type: 'LIVE_DATA', ...msg.payload });
 
         for (const client of clients) {
