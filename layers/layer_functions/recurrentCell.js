@@ -64,7 +64,7 @@ const initParams = (size, shape, layer_data) => {
         weightGrads: weightGrads,
         biasGrads: biasGrads,
         outputTensors: output_template,
-        inputShape: [],
+        inputShape: [1, 1, size],
         outputShape: updatedShape,
         paramShape: weightShape,
     }

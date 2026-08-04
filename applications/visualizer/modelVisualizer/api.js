@@ -4,6 +4,8 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 const ws = new WebSocket(`ws://${location.host}`);
 const viewer = document.getElementById('renderer');
 const tooltip = document.getElementById('tooltip');
+const list = document.getElementById('list');
+
 
 let scene = null;
 let camera = null;
@@ -15,6 +17,8 @@ let mouse = new THREE.Vector2();
 let hoveredObject = null;
 let originalEmissive = null;
 let dataFlowGroup = null;
+const size = 500;
+const divisions = 100;
 
 let clock = new THREE.Clock();
 let animatedLayers = []; // Track objects that have a sliding window
@@ -52,13 +56,15 @@ ws.onmessage = async (event) => {
     let formattedB = b.map(biasArray => biasArray.map(bias => bias.toFixed(4)));
 
     document.getElementById('inputShape').innerText = `[${data.inputShape}]`;
-    document.getElementById('version').innerText = `Neurex v${data.version}` || '1.0.0';
 
     renderModel(layers, formattedW, formattedB);
+
+    listLayers(layers);
+
+
 }
 
 function renderModel(layer_data, weights, biases) {
-    console.log(layer_data)
     
     modelGroup.clear();
     animatedLayers = []; // Reset tracked layers
@@ -208,6 +214,101 @@ function renderModel(layer_data, weights, biases) {
                 tooltip.style.top = `${event.clientY + 12}px`;
             });
         }
+        else if (layer.layer_name === "EmbeddingLayer") {
+            // Determine 3D cube dimensions (Width: EmbeddingDim, Height: Sequence Length)
+            const visualWidth = Math.min(Math.max(layer.embeddingDim / 2, 2), 30);
+            const visualHeight = Math.min(Math.max(layer.maxSequenceLength / 2, 2), 30);
+            const visualDepth = 2;
+            pointer += layer.isParametric ? 1 : 0;
+
+            cube = createCube({
+                height: visualHeight,
+                width: visualWidth,
+                depth: visualDepth,
+                color: 0x9B51E0, // Purple for Embeddings
+                outlineColor: 0xBB6BD9,
+                opacity: 0.6
+            });
+
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ);
+            currentZ += visualDepth / 2 + baseGap;
+
+            cube.userData = {
+                name: "Embedding Layer",
+                inputShape: [1, 1, layer.maxSequenceLength],
+                outputShape: [1, 1, layer.embeddingDim, layer.maxSequenceLength],
+                desc: "Maps discrete token IDs into dense continuous vector representations using a trainable lookup table."
+            };
+
+            // Row-scan highlight: a full-width bar that sweeps top -> bottom,
+            // one sequence-position "row" at a time. Reuses the same
+            // sliding-window animation loop as the conv/pooling/dense layers:
+            // winW == boundsW pins horizontal movement to a single step, so
+            // only the vertical (row) step advances.
+            const numRows = Math.min(Math.max(Math.round(layer.maxSequenceLength), 2), 20);
+            const rowHeight = visualHeight / numRows;
+            const windowMesh = createSlidingWindow(visualWidth, rowHeight, visualDepth + 0.1, 0xffffff);
+            cube.add(windowMesh);
+
+            animatedLayers.push({
+                parentCube: cube,
+                windowMesh: windowMesh,
+                boundsW: visualWidth,
+                boundsH: visualHeight,
+                winW: visualWidth,   // full width -> no horizontal movement
+                winH: rowHeight,
+                strideX: visualWidth,
+                strideY: rowHeight
+            });
+
+            modelGroup.add(cube);
+        } 
+        else if (layer.layer_name === "recurrent_cell") {
+            const visualWidth = Math.min(Math.max(layer.units / 2, 2), 30);
+            const visualHeight = 4;
+            const visualDepth = 4;
+            pointer += layer.isParametric ? 1 : 0;
+
+            cube = createCube({
+                height: visualHeight,
+                width: visualWidth,
+                depth: visualDepth,
+                color: 0xFF69B4,
+                outlineColor: 0xFF69B4,
+                opacity: 0.6
+            });
+
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ);
+            currentZ += visualDepth / 2 + baseGap;
+
+            // Encircling Recurrence Loops (as drawn in your diagram)
+            const recurrenceLoop = createRecurrenceLoop(visualWidth, visualHeight, visualDepth);
+            cube.add(recurrenceLoop);
+
+            animatedLayers.push({
+                type: "rnn",
+                parentCube: cube,
+                recurrenceLoop: recurrenceLoop,
+                boundsW: visualWidth,
+                boundsH: visualHeight,
+                boundsD: visualDepth
+            });
+
+            cube.userData = {
+                name: "Recurrent Cell (RNN)",
+                inputShape: layer.inputShape,
+                outputShape: layer.outputShape,
+                desc: "is the fundamental building block of a Recurrent Neural Network (RNN) <br/> designed to process sequential data. It maintains an internal `memory` by <br/> taking its output from the previous time step and feeding <br/> it back into itself alongside the new input."
+            };
+
+            modelGroup.add(cube);
+        }
     });
 
     if (dataFlowGroup) {
@@ -285,26 +386,39 @@ function animate() {
 
     // Update sliding windows
     animatedLayers.forEach(item => {
-        const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
+        if (item.type === "rnn") {
+            const {recurrenceLoop, boundsW } = item;
 
-        // Calculate maximum visual steps based on strides
-        const maxStepsX = Math.max(1, Math.floor((boundsW - winW) / strideX) + 1);
-        const maxStepsY = Math.max(1, Math.floor((boundsH - winH) / strideY) + 1);
-        const totalSteps = maxStepsX * maxStepsY;
+            // Rotate loops around the X axis (spinning vertically around the layer geometry)
+            if (recurrenceLoop) {
+                recurrenceLoop.children.forEach((loop, i) => {
 
-        // Calculate active step sequence over time
-        const step = Math.floor(elapsedTime * 4) % totalSteps;
-        const stepX = step % maxStepsX;
-        const stepY = Math.floor(step / maxStepsX);
+                    // slow spin
+                    loop.rotation.z = elapsedTime * 1.5;
 
-        // Convert grid step to local coordinates centered inside the parent box
-        const startX = -boundsW / 2 + winW / 2;
-        const startY = boundsH / 2 - winH / 2;
+                });
+            }
+        } 
+        else {
+            // --- Standard Conv / Dense / Embedding Sliding Window Logic ---
+            const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
 
-        const posX = startX + stepX * strideX;
-        const posY = startY - stepY * strideY;
+            const maxStepsX = Math.max(1, Math.floor((boundsW - winW) / strideX) + 1);
+            const maxStepsY = Math.max(1, Math.floor((boundsH - winH) / strideY) + 1);
+            const totalSteps = maxStepsX * maxStepsY;
 
-        windowMesh.position.set(posX, posY, 0);
+            const step = Math.floor(elapsedTime * 4) % totalSteps;
+            const stepX = step % maxStepsX;
+            const stepY = Math.floor(step / maxStepsX);
+
+            const startX = -boundsW / 2 + winW / 2;
+            const startY = boundsH / 2 - winH / 2;
+
+            const posX = startX + stepX * strideX;
+            const posY = startY - stepY * strideY;
+
+            windowMesh.position.set(posX, posY, 0);
+        }
     });
 
     raycaster.setFromCamera(mouse, camera);
@@ -366,6 +480,7 @@ function animate() {
     controls.update();
 }
 
+// helper function to create cubes, because why not?
 const createCube = ({width = 1, height = 1, depth = 1, color = 0x4f8cff, opacity = 0.8, outlineColor = null} = {}) => {
     const maxHeight = height > 224 ? 224 : height;
     const maxWidth = width > 224 ? 224 : width;
@@ -389,6 +504,68 @@ const createCube = ({width = 1, height = 1, depth = 1, color = 0x4f8cff, opacity
 
     return mesh;
 };
+
+function createRecurrenceLoop(width, height, depth) {
+    const group = new THREE.Group();
+
+    const radius = height * 0.95;
+    const loops = Math.min(Math.max(Math.floor(width / 6), 2), 3);
+
+    const spacing = width / (loops + 1);
+
+    for (let i = 0; i < loops; i++) {
+
+        const loop = new THREE.Group();
+
+        const curve = new THREE.EllipseCurve(
+            0, 0,
+            radius, radius,
+            0,
+            Math.PI * 2,
+            false,
+            0
+        );
+
+        const points = curve.getPoints(80);
+
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+        const material = new THREE.LineBasicMaterial({
+            color: 0x00ffff
+        });
+
+        const circle = new THREE.LineLoop(
+            geometry,
+            material
+        );
+
+
+        const arrowGeom = new THREE.ConeGeometry(0.28, 0.8, 8);
+        const arrowMat = new THREE.MeshBasicMaterial({
+            color: 0x00ffff
+        });
+
+        const arrow = new THREE.Mesh(
+            arrowGeom,
+            arrowMat
+        );
+
+        arrow.position.set(radius, 0, 0);
+
+        // Tangent direction
+        arrow.rotation.z = -Math.PI / 2;
+
+        loop.add(circle);
+        loop.add(arrow);
+
+        loop.position.x = -width / 2 + spacing * (i + 1);
+        loop.rotation.y = Math.PI / 2;
+
+        group.add(loop);
+    }
+
+    return group;
+}
 
 function createDataFlowParticles(animatedLayers) {
     const particleGroup = new THREE.Group();
@@ -453,10 +630,26 @@ viewer.addEventListener("pointermove", (event) => {
     mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
 });
 
-
-const size = 500;
-const divisions = 100;
-
 const gridHelper = new THREE.GridHelper(size, divisions);
 gridHelper.position.y = -20;
 scene.add(gridHelper);
+
+
+function listLayers(layers) {
+    list.innerHTML = '';
+
+    layers.forEach(layer => {
+        const p = document.createElement('p');
+        p.innerHTML = `
+
+            <div style = "display: flex; justify-content: flex-start; gap: 10px; align-items: center; widthL 100%">
+                <div style = "height: 5px; width: 5px; background: red"/>
+                <p>${layer.layer_name}</p>
+            </div>
+        `;
+
+        list.appendChild(p);
+    });
+
+
+}
