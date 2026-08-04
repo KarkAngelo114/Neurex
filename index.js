@@ -26,6 +26,7 @@ const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = requir
 const { SGD, Adam } = require('./optimizers');
 const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
 const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLandscapeVisualizer');
+const { modelVisualizer } = require('./applications/visualizer/modelVisualizer');
 
 
 
@@ -65,6 +66,7 @@ module.exports= {
     Adam,
     lossVisualizer,
     lossLandscapeVisualizer,
+    modelVisualizer,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,

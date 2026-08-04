@@ -5,7 +5,7 @@
         <meta name = "viewport" content="width=device-width, initial-scale = 1.0">
         <link rel="stylesheet" href = "style.css"/>
         <link rel="stylesheet" href = "gradient-background.css"/>
-        <title>Loss Visualizer</title>
+        <title>Model Visualizer</title>
     </head>
     <body>
         <header class="solar-flare-gradient-bg"></header>
@@ -14,10 +14,8 @@
             <aside>
                 <div class="right-div">
                     <img src="logo.png" class="logo"/>
-                    <div style="text-align: left; height:50vh;">
-                        <p>Learning Rate: <span id = "learning-rate">Fething data...</span></p>
-                        <p>Current Optimizer: <span id="optimizer">Fething data...</span></p>
-                        <p>Batch Size: <span id = "batch-size">Fething data...</span></p>
+                    <div style="text-align: left; height:70vh;">
+                        
                     </div>
                     <p class="version_tag">Version: <span id = "version">Fething data...</span></p>
                 </div>
@@ -30,16 +28,10 @@
                 </div>
                 
                 <div>
-                    <p>Current Epoch: <span id = "epoch">Fething data...</span> <span id = "duration"></span></p>
-                    <p>Training Loss: <span id = "loss">Fething data...</span></p>
-                    <p id = "accuracy-label"></p>
-                    <p style="font-size: 0.8rem;"><i>Tip: use mouse wheel to zoom in or out while hovering your cursor over the graph. Click and slide left and right to view history.</i></p>
+                    <!-- Show model architeture here -->
                 </div>
             </section>
         </section>
     </body>
-    <script src="chart.min.js"></script>
-    <script src="hammer.min.js"></script>
-    <script src="chartjs-plugin-zoom.min.js"></script>
     <script src="api.js"></script>
 </html>

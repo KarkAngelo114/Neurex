@@ -34,5 +34,6 @@ export const {
     cosineAnnealing,
     reduceOnPlateau,
     lossLandscapeVisualizer,
-    lossVisualizer
+    lossVisualizer,
+    modelVisualizer
 } = pkg;

@@ -961,6 +961,8 @@ class Neurex {
                             throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
                         }
                         await visualizer.visualize(visualizerData, modelData, trainX, trainY);
+
+                        await new Promise(resolve => setImmediate(resolve));
                     }
                     
                 }

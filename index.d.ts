@@ -870,4 +870,10 @@ declare module 'neurex' {
      * @param {Object} options config object
      */
     export function lossLandscapeVisualizer(options: lossLandscapeOption): Object;
+    
+
+    /**
+     * a visualizer tool that visualize model architecture and parameters
+     */
+    export function modelVisualizer(): Object;
 }

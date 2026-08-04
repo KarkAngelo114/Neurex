@@ -1,102 +1,55 @@
-const WebSocket = require('ws'); 
-const { yellow, reset } = require('../../../color-code'); 
-const http = require('http'); const fs = require('fs'); 
-const path = require('path'); 
+// lossVisualizer.js
+const { Worker } = require('worker_threads');
+const path = require('path');
+const { yellow, reset } = require('../../../color-code');
 
-const MIME_TYPES = { 
-    '.html': 'text/html', 
-    '.css': 'text/css', 
-    '.js': 'text/javascript', 
-    '.json': 'application/json', 
-    '.png': 'image/png', 
-    '.jpg': 'image/jpeg', 
-    '.gif': 'image/gif', 
-    '.svg': 'image/svg+xml', 
-    '.ico': 'image/x-icon' 
-}; 
+function lossVisualizer() {
+    let worker = null;
+    const port = 7001;
 
-function lossVisualizer() { 
-    let port = 7001; 
-    let clients = new Set(); 
-    let server;
-    let wss; 
     return {
         initialize: () => {
-            // initiate once so that static files will be serve on the browser 
-            server = http.createServer((req, res) => { 
-                const targetPath = path.join(__dirname, req.url === "/" ? "index.html" : req.url); 
-                fs.readFile(targetPath, (err, content) => { 
-                    if (err) { 
-                        if (err.code === "ENOENT") { 
-                            res.writeHead(404, {'Content-Type':'text/plain'}); 
-                            res.end('Dashboard asset not found :( Please create an issue on: https://github.com/KarkAngelo114/Neurex/issues') 
-                        }
-                        else { 
-                            res.writeHead(500, {'Content-Type':'text/plain'}); 
-                            res.end("I've messed up, please report this issue on: https://github.com/KarkAngelo114/Neurex/issues") 
-                        } 
-                    } 
-                    else { 
-                        const ext = path.extname(targetPath).toLowerCase(); 
-                        const contentType = MIME_TYPES[ext] || 'application/octet-stream'; 
-                        res.writeHead(200, { 'Content-Type': contentType }); 
-                        res.end(content, 'utf-8'); 
-                    } 
-                }); 
-            }); 
-            
-            wss = new WebSocket.Server({ server }); 
-
-            wss.on('connection', ws => { 
-                clients.add(ws);
-
-                ws.on('close', () => { 
-                    clients.delete(ws); 
-                }) 
-            }); 
-                        
-            return new Promise(resolve => { 
-                server.listen(port, 'localhost', () => { 
-                    console.log(`\n${yellow}[NOTICE]${reset} 🌐  Loss Visualizer running on: http://localhost:${port}🌐\n`); 
-                    resolve(); 
-                }); 
-            }); 
-        }, 
-        visualize: (data) => { 
-            const liveData = JSON.stringify(data); 
-
-            for (const client of clients) { 
-                if (client.readyState === WebSocket.OPEN) { 
-                    client.send(liveData); 
-                } 
-            } 
-        }, 
-        abort: () => {
-            
             return new Promise((resolve, reject) => {
 
-                for (const client of clients) {
-                    client.close(1001, `${yellow}[NOTICE]${reset} Server shutting down...`);  
-                }
+                const staticDirectory = path.join(__dirname);
 
-                clients.clear(); 
+                worker = new Worker(path.join(__dirname, "..",'globalWorker.js'), {
+                    workerData: { port:port, staticDir: staticDirectory  }
+                });
 
-                wss.close((err) => {
-                    if (err) console.error('Error closing WSS:', err);
-
-
-                    server.close((serverErr) => {
-                        if (serverErr) {
-                            return reject(serverErr);
-                        }
-
-                        console.log(`\n${yellow}[NOTICE]${reset}Visualizer server completely stopped.`);
+                worker.on('message', (msg) => {
+                    if (msg.type === 'SERVER_READY') {
+                        console.log(`\n${yellow}[NOTICE]${reset} 🌐 Loss Visualizer running on worker thread: http://localhost:${msg.port} 🌐\n`);
                         resolve();
-                    });
+                    }
+                });
+
+                worker.on('error', reject);
+                worker.on('exit', (code) => {
+                    if (code !== 0) console.error(`Visualizer Worker stopped with exit code ${code}`);
+                });
+            });
+        },
+
+        visualize: (data) => {
+            if (worker) {
+                // Non-blocking postMessage transfer to the worker thread
+                worker.postMessage({ type: 'VISUALIZE', payload: data });
+            }
+        },
+
+        abort: () => {
+            return new Promise((resolve) => {
+                if (!worker) return resolve();
+                
+                worker.postMessage({ type: 'ABORT' });
+                worker.on('exit', () => {
+                    console.log(`\n${yellow}[NOTICE]${reset} Visualizer server completely stopped.`);
+                    resolve();
                 });
             });
         }
-    } 
-} 
+    };
+}
 
-module.exports = { lossVisualizer, }
+module.exports = { lossVisualizer };
