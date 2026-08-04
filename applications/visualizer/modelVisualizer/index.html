@@ -5,6 +5,14 @@
         <meta name = "viewport" content="width=device-width, initial-scale = 1.0">
         <link rel="stylesheet" href = "style.css"/>
         <link rel="stylesheet" href = "gradient-background.css"/>
+        <script type="importmap">
+        {
+            "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+            }
+        }
+        </script>
         <title>Model Visualizer</title>
     </head>
     <body>
@@ -14,24 +22,18 @@
             <aside>
                 <div class="right-div">
                     <img src="logo.png" class="logo"/>
-                    <div style="text-align: left; height:70vh;">
-                        
+                    <div style="text-align: left; height:50vh;">
+                        <p>Input shape: <span id = "inputShape">Fetching data...</span></p>
                     </div>
                     <p class="version_tag">Version: <span id = "version">Fetching data...</span></p>
                 </div>
             </aside>
             <section class="left-div">
-                <div class="chart-container">
-                    <div class="chart-wrapper">
-                        <canvas id="chart"></canvas>
-                    </div>
-                </div>
-                
-                <div>
-                    <!-- Show model architeture here -->
-                </div>
+                <!-- model renderer -->
+                <div id = "renderer"></div>
+                <div id = "tooltip"></div>
             </section>
         </section>
     </body>
-    <script src="api.js"></script>
+    <script type="module" src="api.js"></script>
 </html>

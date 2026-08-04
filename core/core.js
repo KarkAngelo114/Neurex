@@ -1065,10 +1065,12 @@ class Neurex {
                     outputTensors, 
                     inputShape, 
                     outputShape, 
-                    paramShape, isParametric, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
+                    paramShape, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
                 this.currentSize = updatedSize;
                 this.currentShape = updatedShape;
+                const isParametric = layer_data.isParametric;
+                
 
                 if (weights.length > 0) this.weights.push(weights);
                 if (biases.length > 0) this.biases.push(biases);

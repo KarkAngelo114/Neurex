@@ -8,7 +8,7 @@ const { getEmbeddings, DeltaMatMul, returnEmbeddings, recurrentTimeDelta } = req
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>, isParametric: Boolean}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     // Embedding layer can be added without input shape. So, we don't need to rely on the initial `size` and `shape` as it is just the default values from the constructor
@@ -57,7 +57,6 @@ const initParams = (size, shape, layer_data) => {
         inputShape: [],
         outputShape: updatedShape,
         paramShape: weightShape,
-        isParametric: true,
         overrides: {
             // on core.js, the this.input_shape and this.input_size will be overwritten by these values
             input_shape: [1, 1, maxSequenceLength], // this tells that the input vector going to the embedding layer is 1 * 1 * maxSequenceLength. The length of the input vector must match the max sequence length

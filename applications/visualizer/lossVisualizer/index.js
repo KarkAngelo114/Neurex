@@ -32,7 +32,7 @@ function lossVisualizer() {
 
         visualize: (data) => {
             if (worker) {
-                // Non-blocking postMessage transfer to the worker thread
+
                 worker.postMessage({ type: 'VISUALIZE', payload: data });
             }
         },

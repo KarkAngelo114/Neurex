@@ -9,7 +9,7 @@ const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddi
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>, isParametric: Boolean}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
 
@@ -68,7 +68,6 @@ const initParams = (size, shape, layer_data) => {
         inputShape: layer_data.inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
-        isParametric: true,
     }
     
 }

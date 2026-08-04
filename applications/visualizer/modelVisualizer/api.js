@@ -1,9 +1,462 @@
-const ws = new WebSocket(`ws://${location.host}`);
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+const ws = new WebSocket(`ws://${location.host}`);
+const viewer = document.getElementById('renderer');
+const tooltip = document.getElementById('tooltip');
+
+let scene = null;
+let camera = null;
+let renderer = null;
+let controls = null;
+let modelGroup = null;
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2();
+let hoveredObject = null;
+let originalEmissive = null;
+let dataFlowGroup = null;
+
+let clock = new THREE.Clock();
+let animatedLayers = []; // Track objects that have a sliding window
+
+let height = viewer.clientHeight;
+let width = viewer.clientWidth;
+
+(() => {
+    createScene();
+    animate();
+})();
 
 ws.onmessage = async (event) => {
-    const {layers, weights, biases, version} = JSON.parse(event.data);
+    const wsData = JSON.parse(event.data);
+
+    let data = null;
+    let layers = [];
+    let weights = [];
+    let biases = [];
+
+    if (wsData.type === "HISTORICAL_DATA") {
+        data = wsData.payload.at(-1);
+    } else {
+        data = wsData;
+    }
+
+    layers = data.layers;
+    weights = data.weights;
+    biases = data.biases;
+
+    let w = weights.map(w => Array.isArray(w) ? w : Object.values(w));
+    let b = biases.map(b => Array.isArray(b) ? b : Object.values(b));
     
-    document.getElementById('version').innerText = `Neurex v${version}` || '1.0.0';
-    console.log(layers);
+    let formattedW = w.map(weightArray => weightArray.map(weight => weight.toFixed(4)));
+    let formattedB = b.map(biasArray => biasArray.map(bias => bias.toFixed(4)));
+
+    document.getElementById('inputShape').innerText = `[${data.inputShape}]`;
+    document.getElementById('version').innerText = `Neurex v${data.version}` || '1.0.0';
+
+    renderModel(layers, formattedW, formattedB);
 }
+
+function renderModel(layer_data, weights, biases) {
+    console.log(layer_data)
+    
+    modelGroup.clear();
+    animatedLayers = []; // Reset tracked layers
+    
+    let pointer = 0; // if isParametric ? pointer++ : pointer;
+    let currentZ = 0; 
+    const baseGap = 15; 
+    const maxParamsToDisplay = 10; // use to get the first N items from the current weights[i] and biases[i]. Each layer has flat 1D array  of params (since Neurex works on float32Array)
+
+    layer_data.forEach((layer, index) => {
+        let cube = null;
+        let windowWidth = 1;
+        let windowHeight = 1;
+        let strideX = 1;
+        let strideY = 1;
+        
+        if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling") {
+            const [iH, iW, iD] = layer.inputShape;
+
+            const visualWidth = Math.min(iW, 224);
+            const visualHeight = Math.min(iH, 224);
+            const visualDepth = Math.max(Math.min(iD, 512), 4);
+            pointer += layer.isParametric ? 1 : 0;
+
+            const isConv = layer.layer_name === "convolutionalLayer";
+
+            cube = createCube({
+                height: visualHeight, 
+                width: visualWidth, 
+                depth: visualDepth, 
+                color: isConv ? 0x4f8cff : 0xFFAE00,
+                outlineColor: isConv ? 0x00ffff : 0xFFAE00, 
+                opacity: 0.3
+            });
+
+            // Determine kernel / pool dimensions & strides
+            if (isConv) {
+                const k = layer.kernel_size || layer.kernelSize || [3, 3];
+                windowWidth = Array.isArray(k) ? k[1] : k;
+                windowHeight = Array.isArray(k) ? k[0] : k;
+            } else {
+                const p = layer.poolSize || layer.pool_size || [2, 2];
+                windowWidth = Array.isArray(p) ? p[1] : p;
+                windowHeight = Array.isArray(p) ? p[0] : p;
+            }
+
+            const s = layer.strides || layer.stride || [1, 1];
+            strideY = Array.isArray(s) ? s[0] : s;
+            strideX = Array.isArray(s) ? s[1] : s;
+
+            // Positioning Z axis
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ);
+            currentZ += visualDepth / 2 + baseGap;
+
+            // Add sliding window indicator
+            const windowMesh = createSlidingWindow(windowWidth, windowHeight, visualDepth, 0xffffff);
+            cube.add(windowMesh);
+
+            animatedLayers.push({
+                parentCube: cube,
+                windowMesh: windowMesh,
+                boundsW: visualWidth,
+                boundsH: visualHeight,
+                winW: windowWidth,
+                winH: windowHeight,
+                strideX: strideX,
+                strideY: strideY
+            });
+
+            modelGroup.add(cube);
+
+            // 1. Store metadata inside the cube mesh when creating it inside renderModel()
+            cube.userData = {
+                name:  isConv ? "Convolutional Layer" : "Max Pooling Layer",
+                inputShape: layer.inputShape || `Size: ${layer.layer_size}`,
+                desc: isConv ? "Allows you to add convolutional layers <br/> in your model architecture in sequential building." : "is use for downsampling operation that reduces the spatial <br/> dimensions of an input tensor by taking the maximum <br/> value over a defined sliding window",
+                outputShape: layer.outputShape,
+            };
+
+            // 3. Update mouse coordinates AND move the tooltip directly in screen space
+            viewer.addEventListener("pointermove", (event) => {
+                const rect = viewer.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
+
+                // Position tooltip 12px away from cursor
+                tooltip.style.left = `${event.clientX + 12}px`;
+                tooltip.style.top = `${event.clientY + 12}px`;
+            });
+        }
+        else if (layer.layer_name === "connected_layer") {
+            const rawSize = layer.layer_size;
+            const visualWidth = Math.min(Math.max(rawSize / 4, 2), 30); 
+            const visualHeight = 1;
+            const visualDepth = 1;
+            pointer += layer.isParametric ? 1 : 0;
+
+            cube = createCube({
+                height: visualHeight, 
+                width: visualWidth, 
+                depth: visualDepth, 
+                color: 0xFF3300,
+                outlineColor: 0xFF3300, 
+                opacity: 0.5
+            });
+
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ); 
+            currentZ += visualDepth / 2 + baseGap;
+
+            // 1x1 sliding window with stride = 1 for dense layers
+            const windowMesh = createSlidingWindow(1, 1, visualDepth + 0.1, 0xffffff);
+            cube.add(windowMesh);
+
+            animatedLayers.push({
+                parentCube: cube,
+                windowMesh: windowMesh,
+                boundsW: visualWidth,
+                boundsH: visualHeight,
+                winW: 1,
+                winH: 1,
+                strideX: 1,
+                strideY: 1
+            });
+
+            modelGroup.add(cube);
+
+            cube.userData = {
+                name: "Connected Layer",
+                inputShape: layer.inputShape,
+                outputShape: layer.outputShape,
+                desc: "Allows you to build a layer with number of neurons and the <br>activation function to use in a layer. Stacking more layers <br> will build connected layers or multilayer perceptron",
+            };
+            
+            viewer.addEventListener("pointermove", (event) => {
+                const rect = viewer.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
+
+                // Position tooltip 12px away from cursor
+                tooltip.style.left = `${event.clientX + 12}px`;
+                tooltip.style.top = `${event.clientY + 12}px`;
+            });
+        }
+    });
+
+    if (dataFlowGroup) {
+        modelGroup.remove(dataFlowGroup);
+    }
+
+    // Generate new connection particles
+    dataFlowGroup = createDataFlowParticles(animatedLayers);
+    modelGroup.add(dataFlowGroup);
+
+    const box = new THREE.Box3().setFromObject(modelGroup);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    controls.target.copy(center);
+    controls.update();
+}
+
+
+function createSlidingWindow(width, height, depth, color) {
+    const geom = new THREE.BoxGeometry(width, height, depth);
+    const edges = new THREE.EdgesGeometry(geom);
+    const lineMat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+    const wireframe = new THREE.LineSegments(edges, lineMat);
+
+    const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.25 });
+    const fill = new THREE.Mesh(geom, mat);
+    wireframe.add(fill);
+
+    return wireframe;
+}
+
+function createScene() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, width / height, 0.5, 1000);
+
+    modelGroup = new THREE.Group();
+    scene.add(modelGroup);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    viewer.appendChild(renderer.domElement);
+
+    camera.position.set(-50, 20, -50);
+    camera.lookAt(0, 0, 0);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 2);
+    sun.position.set(5, 5, 5);
+    scene.add(sun);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 2, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+}
+
+window.addEventListener("resize", () => {
+    const width = viewer.clientWidth;
+    const height = viewer.clientHeight;
+
+    renderer.setSize(width, height);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+});
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const elapsedTime = clock.getElapsedTime();
+    const speed = 15; // Speed of tensor data flow
+
+    // Update sliding windows
+    animatedLayers.forEach(item => {
+        const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
+
+        // Calculate maximum visual steps based on strides
+        const maxStepsX = Math.max(1, Math.floor((boundsW - winW) / strideX) + 1);
+        const maxStepsY = Math.max(1, Math.floor((boundsH - winH) / strideY) + 1);
+        const totalSteps = maxStepsX * maxStepsY;
+
+        // Calculate active step sequence over time
+        const step = Math.floor(elapsedTime * 4) % totalSteps;
+        const stepX = step % maxStepsX;
+        const stepY = Math.floor(step / maxStepsX);
+
+        // Convert grid step to local coordinates centered inside the parent box
+        const startX = -boundsW / 2 + winW / 2;
+        const startY = boundsH / 2 - winH / 2;
+
+        const posX = startX + stepX * strideX;
+        const posY = startY - stepY * strideY;
+
+        windowMesh.position.set(posX, posY, 0);
+    });
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(modelGroup.children, false);
+
+    if (intersects.length > 0) {
+        const object = intersects[0].object;
+
+        if (hoveredObject !== object) {
+            if (hoveredObject && originalEmissive) {
+                hoveredObject.material.emissive.setHex(originalEmissive);
+            }
+            hoveredObject = object;
+            originalEmissive = hoveredObject.material.emissive.getHex();
+            hoveredObject.material.emissive.setHex(0x555555); 
+            document.body.style.cursor = 'pointer'; 
+
+            // Show and set tooltip text
+            if (object.userData && object.userData.name) {
+                tooltip.innerHTML = `
+                    <strong>${object.userData.name}</strong><br/>
+                    <p>Description: ${object.userData.desc}</p>
+                    <p>Input Shape: ${JSON.stringify(object.userData.inputShape)}</p>
+                    <p>Output Shape: ${JSON.stringify(object.userData.outputShape)}</p>
+                `;
+                tooltip.style.display = 'block';
+            }
+        }
+    } else {
+        if (hoveredObject) {
+            if (originalEmissive) hoveredObject.material.emissive.setHex(originalEmissive);
+            hoveredObject = null;
+            document.body.style.cursor = 'default';
+
+            // Hide tooltip
+            tooltip.style.display = 'none';
+        }
+    }
+
+    if (dataFlowGroup) {
+        dataFlowGroup.children.forEach(points => {
+            const positions = points.geometry.attributes.position.array;
+            const { sourceZ, gapDistance, particleCount, offsets } = points.userData;
+
+            for (let i = 0; i < particleCount; i++) {
+                // Compute continuous movement along the gap using modulo
+                const progress = ((elapsedTime * speed + offsets[i] * gapDistance) % gapDistance) / gapDistance;
+                
+                // Set current particle Z location along gap
+                positions[i * 3 + 2] = sourceZ + (progress * gapDistance);
+            }
+
+            // Flag WebGL to update vertex buffer
+            points.geometry.attributes.position.needsUpdate = true;
+        });
+    }
+
+    renderer.render(scene, camera);
+    controls.update();
+}
+
+const createCube = ({width = 1, height = 1, depth = 1, color = 0x4f8cff, opacity = 0.8, outlineColor = null} = {}) => {
+    const maxHeight = height > 224 ? 224 : height;
+    const maxWidth = width > 224 ? 224 : width;
+    const maxDepth = depth > 512 ? 512 : depth;
+
+    const geometry = new THREE.BoxGeometry(maxWidth, maxHeight, maxDepth);
+    const material = new THREE.MeshStandardMaterial({
+        color,
+        transparent: opacity < 1,
+        opacity
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+
+    if (outlineColor !== null) {
+        const edges = new THREE.EdgesGeometry(geometry);
+        const lineMaterial = new THREE.LineBasicMaterial({ color: outlineColor });
+        const wireframe = new THREE.LineSegments(edges, lineMaterial);
+        mesh.add(wireframe);
+    }
+
+    return mesh;
+};
+
+function createDataFlowParticles(animatedLayers) {
+    const particleGroup = new THREE.Group();
+    const particleCountPerGap = 30; // Adjust density per gap
+
+    for (let i = 0; i < animatedLayers.length - 1; i++) {
+        const sourceCube = animatedLayers[i].parentCube;
+        const targetCube = animatedLayers[i + 1].parentCube;
+
+        const sourceZ = sourceCube.position.z;
+        const targetZ = targetCube.position.z;
+        const gapDistance = targetZ - sourceZ;
+
+        // Shared geometry and material for high performance
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCountPerGap * 3);
+        const offsets = new Float32Array(particleCountPerGap); // Stores unique speed/time offsets
+
+        const sourceBounds = animatedLayers[i];
+        
+        for (let p = 0; p < particleCountPerGap; p++) {
+            // Randomize X and Y within the bounds of the source layer
+            const x = (Math.random() - 0.5) * sourceBounds.boundsW;
+            const y = (Math.random() - 0.5) * sourceBounds.boundsH;
+            
+            positions[p * 3] = x;
+            positions[p * 3 + 1] = y;
+            positions[p * 3 + 2] = sourceZ; // Start at source layer Z
+
+            offsets[p] = Math.random(); // Stagger start positions along the gap
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        const material = new THREE.PointsMaterial({
+            color: 0x00ffff, // Glowing cyan stream
+            size: 1.5,
+            transparent: true,
+            opacity: 0.7,
+            blending: THREE.AdditiveBlending
+        });
+
+        const points = new THREE.Points(geometry, material);
+        
+        // Attach metadata to animate in the loop
+        points.userData = {
+            sourceZ,
+            gapDistance,
+            particleCount: particleCountPerGap,
+            offsets
+        };
+
+        particleGroup.add(points);
+    }
+
+    return particleGroup;
+}
+
+viewer.addEventListener("pointermove", (event) => {
+    const rect = viewer.getBoundingClientRect();
+    mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
+});
+
+
+const size = 500;
+const divisions = 100;
+
+const gridHelper = new THREE.GridHelper(size, divisions);
+gridHelper.position.y = -20;
+scene.add(gridHelper);

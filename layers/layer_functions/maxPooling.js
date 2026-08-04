@@ -6,7 +6,7 @@ const { calculateTensorShape } = require("../../utils/utils");
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>, isParametric: Boolean}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
@@ -33,7 +33,6 @@ const initParams = (size, shape, layer_data) => {
         inputShape: inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
-        isParametric: false,
     }
 }
 
