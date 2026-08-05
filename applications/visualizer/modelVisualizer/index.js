@@ -33,11 +33,11 @@ const modelVisualizer = () => {
 
             const data = {
                 layers: JSON.parse(JSON.stringify(modelData.layers)),
-                weights: modelData.weights,
-                biases: modelData.biases,
+                weights: modelData.weights.map((w) => Array.from(w)),
+                biases: modelData.biases.map((b) => Array.from(b)),
                 version: visualizerData.version,
                 inputShape: modelData.input_shape,
-            }
+            };
 
             if (worker) {
                 worker.postMessage({type: "VISUALIZE", payload: data});

@@ -49,16 +49,10 @@ ws.onmessage = async (event) => {
     weights = data.weights;
     biases = data.biases;
 
-    let w = weights.map(w => Array.isArray(w) ? w : Object.values(w));
-    let b = biases.map(b => Array.isArray(b) ? b : Object.values(b));
-    
-    let formattedW = w.map(weightArray => weightArray.map(weight => weight.toFixed(4)));
-    let formattedB = b.map(biasArray => biasArray.map(bias => bias.toFixed(4)));
-
     document.getElementById('inputShape').innerText = `[${data.inputShape}]`;
     document.getElementById('numLayers').innerText = layers.length;
 
-    renderModel(layers, formattedW, formattedB);
+    renderModel(layers, weights, biases);
 
     listLayers(layers);
 
@@ -66,15 +60,13 @@ ws.onmessage = async (event) => {
 }
 
 function renderModel(layer_data, weights, biases) {
-    
-    console.log(layer_data);
+
     modelGroup.clear();
     animatedLayers = []; // Reset tracked layers
     
     let pointer = 0; // if isParametric ? pointer++ : pointer;
     let currentZ = 0; 
-    const baseGap = 15; 
-    const maxParamsToDisplay = 10; // use to get the first N items from the current weights[i] and biases[i]. Each layer has flat 1D array  of params (since Neurex works on float32Array)
+    const baseGap = 15;
 
     layer_data.forEach((layer, index) => {
         let cube = null;
@@ -89,7 +81,7 @@ function renderModel(layer_data, weights, biases) {
             const visualWidth = Math.min(iW, 224);
             const visualHeight = Math.min(iH, 224);
             const visualDepth = Math.max(Math.min(iD, 512), 4);
-            pointer += layer.isParametric ? 1 : 0;
+            
 
             const isConv = layer.layer_name === "convolutionalLayer";
 
@@ -142,12 +134,20 @@ function renderModel(layer_data, weights, biases) {
             modelGroup.add(cube);
 
             // 1. Store metadata inside the cube mesh when creating it inside renderModel()
-            cube.userData = {
+            const layerData = {
                 name:  isConv ? "Convolutional Layer" : "Max Pooling Layer",
                 inputShape: layer.inputShape || `Size: ${layer.layer_size}`,
                 desc: isConv ? "Allows you to add convolutional layers <br/> in your model architecture in sequential building." : "is use for downsampling operation that reduces the spatial <br/> dimensions of an input tensor by taking the maximum <br/> value over a defined sliding window",
                 outputShape: layer.outputShape,
             };
+
+            if (isConv) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
+
+            cube.userData = layerData;
 
             // 3. Update mouse coordinates AND move the tooltip directly in screen space
             viewer.addEventListener("pointermove", (event) => {
@@ -165,7 +165,6 @@ function renderModel(layer_data, weights, biases) {
             const visualWidth = Math.min(Math.max(rawSize / 4, 2), 30); 
             const visualHeight = 1;
             const visualDepth = 1;
-            pointer += layer.isParametric ? 1 : 0;
 
             cube = createCube({
                 height: visualHeight, 
@@ -199,12 +198,21 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
 
-            cube.userData = {
+            const layerData = {
                 name: "Connected Layer",
                 inputShape: layer.inputShape,
                 outputShape: layer.outputShape,
                 desc: "Allows you to build a layer with number of neurons and the <br>activation function to use in a layer. Stacking more layers <br> will build connected layers or multilayer perceptron",
             };
+
+            if (layer.isParametric) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
+
+
+            cube.userData = layerData;
             
             viewer.addEventListener("pointermove", (event) => {
                 const rect = viewer.getBoundingClientRect();
@@ -221,7 +229,6 @@ function renderModel(layer_data, weights, biases) {
             const visualWidth = Math.min(Math.max(layer.embeddingDim / 2, 2), 30);
             const visualHeight = Math.min(Math.max(layer.maxSequenceLength / 2, 2), 30);
             const visualDepth = 2;
-            pointer += layer.isParametric ? 1 : 0;
 
             cube = createCube({
                 height: visualHeight,
@@ -238,12 +245,20 @@ function renderModel(layer_data, weights, biases) {
             cube.position.set(0, 0, currentZ);
             currentZ += visualDepth / 2 + baseGap;
 
-            cube.userData = {
+            const layerData = {
                 name: "Embedding Layer",
                 inputShape: [1, 1, layer.maxSequenceLength],
                 outputShape: [1, 1, layer.embeddingDim, layer.maxSequenceLength],
-                desc: "Maps discrete token IDs into dense continuous vector representations using a trainable lookup table."
+                desc: "Maps discrete token IDs into dense continuous vector representations using a trainable lookup table.",
             };
+
+            if (layer.isParametric) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
+
+            cube.userData = layerData;
 
             // Row-scan highlight: a full-width bar that sweeps top -> bottom,
             // one sequence-position "row" at a time. Reuses the same
@@ -272,7 +287,6 @@ function renderModel(layer_data, weights, biases) {
             const visualWidth = Math.min(Math.max(layer.units / 2, 2), 30);
             const visualHeight = 4;
             const visualDepth = 4;
-            pointer += layer.isParametric ? 1 : 0;
 
             cube = createCube({
                 height: visualHeight,
@@ -302,12 +316,21 @@ function renderModel(layer_data, weights, biases) {
                 boundsD: visualDepth
             });
 
-            cube.userData = {
+            const layerData = {
                 name: "Recurrent Cell (RNN)",
                 inputShape: layer.inputShape,
                 outputShape: layer.outputShape,
-                desc: "is the fundamental building block of a Recurrent Neural Network (RNN) <br/> designed to process sequential data. It maintains an internal `memory` by <br/> taking its output from the previous time step and feeding <br/> it back into itself alongside the new input."
+                desc: "is the fundamental building block of a Recurrent Neural Network (RNN) <br/> designed to process sequential data. It maintains an internal `memory` by <br/> taking its output from the previous time step and feeding <br/> it back into itself alongside the new input.",
             };
+
+            if (layer.isParametric) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
+
+
+            cube.userData = layerData;
 
             modelGroup.add(cube);
         }
@@ -449,6 +472,8 @@ function animate() {
                     <p>Description: ${object.userData.desc}</p>
                     <p>Input Shape: ${JSON.stringify(object.userData.inputShape)}</p>
                     <p>Output Shape: ${JSON.stringify(object.userData.outputShape)}</p>
+                    <p>Weight L1: ${object.userData?.weight_L1 || "Non-parametric"}</p>
+                    <p>Bias L1: ${object.userData?.bias_L1 || "Non-parametric"}</p>
                 `;
                 tooltip.style.display = 'block';
             }
@@ -488,9 +513,9 @@ function animate() {
 
 // helper function to create cubes, because why not?
 const createCube = ({width = 1, height = 1, depth = 1, color = 0x4f8cff, opacity = 0.8, outlineColor = null} = {}) => {
-    const maxHeight = height > 224 ? 224 : height;
-    const maxWidth = width > 224 ? 224 : width;
-    const maxDepth = depth > 512 ? 512 : depth;
+    const maxHeight = height > 2000 ? 2000 : height;
+    const maxWidth = width > 2000 ? 2000 : width;
+    const maxDepth = depth > 2000 ? 2000 : depth;
 
     const geometry = new THREE.BoxGeometry(maxWidth, maxHeight, maxDepth);
     const material = new THREE.MeshStandardMaterial({
@@ -628,6 +653,25 @@ function createDataFlowParticles(animatedLayers) {
     }
 
     return particleGroup;
+}
+
+function weightsToTexture(flatWeights, cols) {
+    const rows = Math.ceil(flatWeights.length / cols);
+    const canvas = document.createElement('canvas');
+    canvas.width = cols; canvas.height = rows;
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(cols, rows);
+    const max = Math.max(...flatWeights.map(Math.abs)) || 1;
+    flatWeights.forEach((w, i) => {
+        const t = w / max; // -1..1
+        img.data[i*4]   = t > 0 ? t * 255 : 0;      // red = positive
+        img.data[i*4+2] = t < 0 ? -t * 255 : 0;     // blue = negative
+        img.data[i*4+3] = 255;
+    });
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter; // keep it crisp, not blurred
+    return tex;
 }
 
 viewer.addEventListener("pointermove", (event) => {
