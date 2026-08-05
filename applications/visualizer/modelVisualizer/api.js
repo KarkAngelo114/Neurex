@@ -608,7 +608,7 @@ function createDataFlowParticles(animatedLayers) {
 
         const material = new THREE.PointsMaterial({
             color: 0x00ffff,
-            size: 0.5,
+            size: 0.9,
             transparent: true,
             opacity: 0.7,
             blending: THREE.AdditiveBlending
