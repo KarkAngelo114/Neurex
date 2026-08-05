@@ -56,6 +56,7 @@ ws.onmessage = async (event) => {
     let formattedB = b.map(biasArray => biasArray.map(bias => bias.toFixed(4)));
 
     document.getElementById('inputShape').innerText = `[${data.inputShape}]`;
+    document.getElementById('numLayers').innerText = layers.length;
 
     renderModel(layers, formattedW, formattedB);
 
@@ -316,6 +317,12 @@ function renderModel(layer_data, weights, biases) {
         modelGroup.remove(dataFlowGroup);
     }
 
+    let maxHeight = 0;
+    layer_data.forEach(l => {
+        if (l.inputShape) maxHeight = Math.max(maxHeight, l.inputShape[0] || 0);
+    });
+    gridHelper.position.y = -Math.max(20, (maxHeight / 2) + 10);
+
     // Generate new connection particles
     dataFlowGroup = createDataFlowParticles(animatedLayers);
     modelGroup.add(dataFlowGroup);
@@ -406,7 +413,7 @@ function animate() {
             const maxStepsY = Math.max(1, Math.floor((boundsH - winH) / strideY) + 1);
             const totalSteps = maxStepsX * maxStepsY;
 
-            const step = Math.floor(elapsedTime * 4) % totalSteps;
+            const step = Math.floor(elapsedTime * 10) % totalSteps;
             const stepX = step % maxStepsX;
             const stepY = Math.floor(step / maxStepsX);
 

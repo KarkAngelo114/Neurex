@@ -131,22 +131,7 @@ class Neurex {
             this.plugins = configs.plugins;
         }
 
-        if (this.plugins?.trainingVisualizer) {
-            // const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-            for (const visualizer of this.plugins.trainingVisualizer) {
-                if (typeof visualizer?.initialize !== 'function') {
-                    this.isfailed = true;
-                    throw new Error("A plugin function doesn't have a callable initialize() function.");
-                }
-
-                
-                
-                setTimeout(() => {
-                    visualizer?.initialize();
-                },1000);
-                // await delay(5000);
-            }
-        }
+        
 
         init();
         this.isInit = true;
@@ -701,6 +686,10 @@ class Neurex {
         this.epoch_count = epoch;
         this.batch_size = batch_size;
         const batchSize = batch_size;
+        const totalBatches = Math.ceil(trainX.length / batchSize);
+        let logMessage;
+        let previousEpochLoss = 0;
+        let startTime;
             
         const lossLower = loss.toLowerCase();
 
@@ -716,6 +705,8 @@ class Neurex {
                 throw new Error(`[FAILED]------- There is/are missing parameter/s. Failed to start training...`);
             }
 
+
+
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
@@ -727,12 +718,71 @@ class Neurex {
             const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
             this.task = taskType;
 
+            if (this.plugins?.trainingVisualizer) {
+                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                for (const visualizer of this.plugins.trainingVisualizer) {
+                    if (typeof visualizer?.initialize !== 'function') {
+                        this.isfailed = true;
+                        throw new Error("A plugin function doesn't have a callable initialize() function.");
+                    }
+                    
+                    await visualizer?.initialize();
+                    await delay(5000);
+                }
+            }
+
+            // initial dispatch so that visualizers will already have data to show but dummy
+            if (this.plugins?.trainingVisualizer) {
+
+                // pass data to the visualizer plugin and call the visualize() factory function. 
+                // Note: any visualizer plugins must expose a visualize() function and accepts an Object argument.
+                // The object contains data to be visualize in a moving graph for loss and accuracy (if needed).
+
+                const visualizerData = {
+                    epoch: 0,
+                    loss: 0,
+                    task: this.task,
+                    totalEpoch: epoch,
+                    totalBatchSize: batchSize,
+                    optimizer: this.optimizer.name || "Custom Optimizer",
+                    learningRate: this.learning_rate,
+                    duration: ' | [took: 0.000ms to finish]',
+                    version: version,
+                    lossFunction: lossLower
+                }
+
+                if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
+                    visualizerData.accuracy = 0;
+                }
+
+                const modelData = {
+                    loss_function: lossLower,
+                    input_size: this.input_size,
+                    input_shape: this.input_shape,
+                    num_layers: this.num_layers,
+                    layers: this.layers,
+                    weights: this.weights,
+                    biases: this.biases
+                }
+
+                // dispatch the data to the plugin visualizers
+                for (const visualizer of this.plugins.trainingVisualizer) {
+                    if (typeof visualizer?.visualize !== 'function') {
+                        this.isfailed = true;
+                        throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                    }
+                    
+                    await visualizer.visualize(visualizerData, modelData, trainX, trainY);
+
+                    await new Promise(resolve => setImmediate(resolve));
+                }
+                    
+            }
+            
+
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
 
-            const totalBatches = Math.ceil(trainX.length / batchSize);
-            let logMessage;
-            let previousEpochLoss = 0;
-            let startTime;
+            
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
                 
