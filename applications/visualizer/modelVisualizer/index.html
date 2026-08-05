@@ -16,26 +16,22 @@
         <title>Model Visualizer</title>
     </head>
     <body>
-        <header class="solar-flare-gradient-bg"></header>
         
-        <section class="dashboard">
-            <aside>
-                <div class="right-div">
-                    <img src="logo.png" class="logo"/>
-                    <div style="text-align: left; height:50vh;">
-                        <p>Input shape: <span id = "inputShape">Fetching data...</span></p>
-                        <p>Layers:</p>
-                        <div style="overflow-y: auto;">
-                            <div id = "list" style=" width: 100%"></div>
-                        </div>
+        <section class="left-div">
+            <div id="renderer"></div>
+            <div id="tooltip"></div>
+            <div class="right-div">
+                <img src="logo.png" class="logo"/>
+                <div style="text-align: left">
+                    <p>Input shape: <span id="inputShape">Fetching data...</span></p>
+                    <p>Layers:</p>
+                    <div style="overflow-y: auto; ">
+                        <div id="list" style="width: 100%; height: 100vh;">Fetching data...</div>
                     </div>
                 </div>
-            </aside>
-            <section class="left-div">
-                <!-- model renderer -->
-                <div id = "renderer"></div>
-                <div id = "tooltip"></div>
-            </section>
+            </div>
+
+            
         </section>
     </body>
     <script type="module" src="api.js"></script>

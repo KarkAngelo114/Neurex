@@ -1,66 +1,33 @@
 html, body {
-    font-family: monospace;
+    font-family: 'Courier New', monospace; 
     margin: 0;
     padding: 0;
     height: 100vh;
     overflow: hidden;
-    background-color: #fcf7ff;
-    display: flex;
-    flex-direction: column;
+    background-color: #000;
     box-sizing: border-box;
-}
-
-header {
-    padding: 10px;
-    color: black;
-    flex-shrink: 0; 
-}
-
-.dashboard {
-    display: grid;
-    grid-template-columns: 250px 1fr;
-    gap: 20px;
-    padding: 10px;
-    flex: 1;
-    min-height: 0;
-}
-
-.left-div, .right-div {
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px -1px #00000037, 0 2px 4px -1px #00000046;
-    height: 100%;
-    box-sizing: border-box; 
-}
-
-.right-div {
-    padding: 10px;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-
-.logo {
-    width: 100px;
-}
-
-.version_tag {
-    position: relative;
-    bottom: 0;
-    text-align: left !important;
 }
 
 .left-div {
-    box-sizing: border-box;
-    display: flex;  
+    width: 100%;
+    height: 100%;
+    position: relative;
     overflow: hidden;
 }
 
+* {
+    transition: all 0.3s ease-in-out;
+    box-sizing: border-box;
+}
+
+/* Fullscreen Renderer Background */
 #renderer {
     width: 100%;
     height: 100%;
-    position: relative;        /* Added: Ensures proper bounds */
-    overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
 }
 
 #renderer canvas {
@@ -68,6 +35,45 @@ header {
     width: 100% !important;
     height: 100% !important;
 }
+
+
+.right-div {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    width: 300px;
+    height: 90%;
+    padding: 20px;
+    background: #0a0f1ea6;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #00e5ff4d;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px 0 #00000099, inset 0 0 15px #00e5ff0d;
+    color: #00e5ff;
+    text-shadow: 0 0 5px #00e5ff80;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.logo {
+    width: 100px;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 8px #ff8c0099);
+}
+
+.right-div::-webkit-scrollbar {
+    width: 2px;
+}
+
+.right-div::-webkit-scrollbar-thumb {
+    background: #00e5ff66;
+    border-radius: 4px;
+}
+
 
 #tooltip {
     position: fixed;

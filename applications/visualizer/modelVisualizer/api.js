@@ -17,8 +17,8 @@ let mouse = new THREE.Vector2();
 let hoveredObject = null;
 let originalEmissive = null;
 let dataFlowGroup = null;
-const size = 500;
-const divisions = 100;
+const size = 5000;
+const divisions = 500;
 
 let clock = new THREE.Clock();
 let animatedLayers = []; // Track objects that have a sliding window
@@ -66,6 +66,7 @@ ws.onmessage = async (event) => {
 
 function renderModel(layer_data, weights, biases) {
     
+    console.log(layer_data);
     modelGroup.clear();
     animatedLayers = []; // Reset tracked layers
     
@@ -111,9 +112,9 @@ function renderModel(layer_data, weights, biases) {
                 windowHeight = Array.isArray(p) ? p[0] : p;
             }
 
-            const s = layer.strides || layer.stride || [1, 1];
-            strideY = Array.isArray(s) ? s[0] : s;
-            strideX = Array.isArray(s) ? s[1] : s;
+            const s = layer.strides; // an integer (eg. 1, 2, 4, and so on)
+            strideY = s;
+            strideX = s;
 
             // Positioning Z axis
             if (index > 0) currentZ += visualDepth / 2;
@@ -392,7 +393,6 @@ function animate() {
             // Rotate loops around the X axis (spinning vertically around the layer geometry)
             if (recurrenceLoop) {
                 recurrenceLoop.children.forEach((loop, i) => {
-
                     // slow spin
                     loop.rotation.z = elapsedTime * 1.5;
 
@@ -400,7 +400,6 @@ function animate() {
             }
         } 
         else {
-            // --- Standard Conv / Dense / Embedding Sliding Window Logic ---
             const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
 
             const maxStepsX = Math.max(1, Math.floor((boundsW - winW) / strideX) + 1);
@@ -601,8 +600,8 @@ function createDataFlowParticles(animatedLayers) {
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
         const material = new THREE.PointsMaterial({
-            color: 0x00ffff, // Glowing cyan stream
-            size: 1.5,
+            color: 0x00ffff,
+            size: 0.5,
             transparent: true,
             opacity: 0.7,
             blending: THREE.AdditiveBlending
@@ -640,10 +639,16 @@ function listLayers(layers) {
 
     layers.forEach(layer => {
         const p = document.createElement('p');
-        p.innerHTML = `
 
-            <div style = "display: flex; justify-content: flex-start; gap: 10px; align-items: center; widthL 100%">
-                <div style = "height: 5px; width: 5px; background: red"/>
+        const color = layer.layer_name === "convolutionalLayer" ? "#4f8cff": 
+                    layer.layer_name === "maxPooling" ? "#FFAE00" : 
+                    layer.layer_name === "recurrent_cell" ? "#FF69B4" :
+                    layer.layer_name === "EmbeddingLayer" ? "#BB6BD9" :
+                    "red"; // default color: red for connected layer
+
+        p.innerHTML = `
+            <div style = "display: flex; justify-content: flex-start; gap: 10px; align-items: center; width: 100%;">
+                <p style = "height: 10px; width: 10px; background-color: ${color}"></p>
                 <p>${layer.layer_name}</p>
             </div>
         `;
