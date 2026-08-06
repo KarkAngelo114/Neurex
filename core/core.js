@@ -53,7 +53,7 @@ class Neurex {
         this.lr_scheduler = null;
         this.clip_norm_value = 1.0;
         this.onChange_optimizer = null;
-        this.plugins = null;
+        this.visualizers = [];
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -74,27 +74,9 @@ class Neurex {
     }
 
     /**
-    * @typedef {Object} NeurexConfig
-    * @property {number} [learning_rate] - Learning rate for training.
-    * @property {string} [optimizer] - Optimizer to use [available: sgd, adam, adagrad, rmsprop, adadelta ].
-    * @property {number} [randMin] - Minimum value for random initialization of weights/biases.
-    * @property {number} [randMax] - Maximum value for random initialization of weights/biases.
-    * @property {number} [checkpoint_per_epoch] - set a checkpoint per N epochs. Once set, every N epochs will save the model, even not yet fully trained.
-    */
-
-    /**
-    * Allows configuration of your neural network's parameters.
-    * @method configure
-    * @param {NeurexConfig} configs - Configuration options for the neural network.
-    *
-    * You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
-    *
-    * Default configurations:
-    * learning_rate: 0.001
-    * optimizer: 'adam'
-    * randMin: -1
-    * randMax: 1
-    */
+     * 
+     * @param {Object} configs object configurations. See index.d.ts for exported interfaces. 
+     */
     configure(configs) {
         
         if (configs.learning_rate !== undefined) {
@@ -128,9 +110,15 @@ class Neurex {
         }
 
         if (configs.plugins !== undefined) {
-            this.plugins = configs.plugins;
+            configs.plugins.forEach((plugins, index) => {
+                if (plugins.type.toLowerCase() === "visualizers") {
+                    this.visualizers.push(configs.plugins[index]); // push visualizers to the visualizer array. They'll be use during training. Examples are the built visualizers surch as lossVisualizer(), lossLandscapeVisualizer(), modelVisualizer()
+                }
+                else {
+                    // ... other plugins soon
+                }
+            })
         }
-
         
 
         init();
@@ -718,9 +706,9 @@ class Neurex {
             const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
             this.task = taskType;
 
-            if (this.plugins?.trainingVisualizer) {
+            if (this.visualizers.length > 0) {
                 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-                for (const visualizer of this.plugins.trainingVisualizer) {
+                for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.initialize !== 'function') {
                         this.isfailed = true;
                         throw new Error("A plugin function doesn't have a callable initialize() function.");
@@ -732,7 +720,7 @@ class Neurex {
             }
 
             // initial dispatch so that visualizers will already have data to show but dummy
-            if (this.plugins?.trainingVisualizer) {
+            if (this.visualizers.length > 0) {
 
                 // pass data to the visualizer plugin and call the visualize() factory function. 
                 // Note: any visualizer plugins must expose a visualize() function and accepts an Object argument.
@@ -766,7 +754,7 @@ class Neurex {
                 }
 
                 // dispatch the data to the plugin visualizers
-                for (const visualizer of this.plugins.trainingVisualizer) {
+                for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.visualize !== 'function') {
                         this.isfailed = true;
                         throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
@@ -971,7 +959,7 @@ class Neurex {
                     logMessage += duration;
                 }
 
-                if (this.plugins?.trainingVisualizer) {
+                if (this.visualizers.length > 0) {
 
                     // pass data to the visualizer plugin and call the visualize() factory function. 
                     // Note: any visualizer plugins must expose a visualize() function and accepts an Object argument.
@@ -1005,7 +993,7 @@ class Neurex {
                     }
 
                     // dispatch the data to the plugin visualizers
-                    for (const visualizer of this.plugins.trainingVisualizer) {
+                    for (const visualizer of this.visualizers) {
                         if (typeof visualizer?.visualize !== 'function') {
                             this.isfailed = true;
                             throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
@@ -1028,8 +1016,8 @@ class Neurex {
                 console.log();
             }
 
-            if (this.plugins?.trainingVisualizer) {
-                for (const visualizer of this.plugins.trainingVisualizer) {
+            if (this.visualizers.length > 0) {
+                for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.abort !== 'function') {
                         this.isfailed = true;
                         throw new Error("Failed to use a visualizer plugin. No callable 'abort()' function.");

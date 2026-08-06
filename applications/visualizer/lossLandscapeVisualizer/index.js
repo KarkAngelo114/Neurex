@@ -25,6 +25,7 @@ function lossLandscapeVisualizer({ renderEveryTargetEpoch = 100 } = {}) {
     let worker = null;
 
     return {
+        type: "visualizers",
         initialize: () => {
             return new Promise((resolve, reject) => {
             

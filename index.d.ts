@@ -202,18 +202,19 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function;
     }
 
-    export interface VisualizerPlugin {
+    export interface pluginFactoryObject {
+        /** type of plugin. All plugins must have a type */
+        type?: string;
+
+        /** for visualizer plugins, the items below are required */
         /** initialize the plugin visualizer. This can be a localhost web server, websocket server, etc. */
         initilaize?: () => void;
         /** broadcast data */
-        visualize?: (data: object) => void;
+        visualize?: (...params: any) => void;
         /** Every visualizer plugins must have an functional `abort` function. The core engine might use this to stop any running services (like ocalhost web server, websocket server, etc) when an error occurred in the core itself.*/
         abort?: () => void;
-    }
 
-    export interface pluginConfig {
-        /** an array of plugin visualizers. These plugins runs during training*/
-        trainingVisualizer?: VisualizerPlugin[];
+        /** for upcoming plugins, it is encourage to understand how the core framework works under the hood and how built-in ones exposed their factory functions*/
     }
 
     export interface NeurexConfig {
@@ -233,8 +234,8 @@ declare module 'neurex' {
         clip_norm_value?: Number;
         /** on change config to automate changing of optimizer mid-training.*/
         onChange_optimizer?: onChangeConfig;
-        /** plug-in configs.  */
-        plugins?:pluginConfig;
+        /** plugin array. Accepts plugin factory functions */
+        plugins?: pluginFactoryObject[];
     }
 
     /**

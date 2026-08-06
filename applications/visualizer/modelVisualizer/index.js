@@ -7,6 +7,8 @@ const modelVisualizer = () => {
     let worker = null;
 
     return {
+        special_type: 'model_visualizer', // this will be use for model visualization even not during training (e.g: you want to inspect a model visually after loading a model)
+        type: "visualizers",
         initialize: () => {
             return new Promise((resolve, reject) => {
 

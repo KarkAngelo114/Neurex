@@ -222,36 +222,35 @@ function CustomScheduler() {
 Use monitoring tool plugins to monitor training in real-time!
 
 ```JavaScript
-const { Neurex, Layers, lossVisualizer } = require('neurex');
+const { Neurex, Layers, lossVisualizer, modelVisualizer, lossLandscapeVisualizer } = require('neurex');
 
 (async () => {
     const nrx = new Neurex();
     const layer = new Layers();
     
     nrx.sequentialBuild([
-        layer.embeddingLayer(VOCAB_SIZE, EMBEDDING_DIM, MAX_SEQUENCE),
-        layer.recurrentCell(30, 'tanh', true),
-        layer.recurrentCell(30, 'tanh', true),
-        layer.recurrentCell(30, 'tanh'),
-        layer.connectedLayer(1, 'sigmoid'),
+        layer.inputShape({height: 28, width: 28, depth: 1}),
+        ...templates.simpleCNN(), // conv [3, 3] stride = 1 "same" -> maxPool [2, 2] stride = 2 "valid" -> conv [3, 3] stride = 1 "same" -> maxPool [2, 2] stride = 2 "valid" -> dense: 128 -> 64 -> 32
+        layer.connectedLayer(10, 'softmax')
     ]);
 
     nrx.configure({
         /* ... other configs */
-        plugins: {
-            trainingVisualizer: [
-                lossVisualizer() // built-in monitoring tool
-            ]
-        }
+        plugins: [
+            modelVisualizer(),
+            lossVisualizer(),
+            lossLandscapeVisualizer()
+        ]
     })
 
-    await nrx.train(X, Y, 'binary_cross_entropy', 1000, 12);
+    await nrx.train(X, Y, 'categorical_cross_entropy', 1000, 12);
 
 })()
 ```
 
-![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785594743/Screenshot_737_qkup71.png)
-![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785594743/Screenshot_738_ccuvcy.png)
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115813_ksqvw9.png)
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115739_fcrzv4.png)
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115828_tjt5zi.png)
 
 # Test the Experimental Upcoming Updates 🔥
 If you'd like to try the upcoming major updates before it is officially released on NPM, you can install the latest development version directly from GitHub.

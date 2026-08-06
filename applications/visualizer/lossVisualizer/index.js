@@ -7,6 +7,7 @@ function lossVisualizer() {
     const port = 7001;
 
     return {
+        type: "visualizers",
         initialize: () => {
             return new Promise((resolve, reject) => {
 
