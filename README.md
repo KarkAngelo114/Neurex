@@ -60,31 +60,31 @@ const { Neurex, Layers } = require('neurex');
 
 Built-in layers:
 
-### `connectedLayer(layer_size: number, activation: string)`
+`connectedLayer(layer_size: number, activation: string)`
 
 ```JavaScript
 layer.connectedLayer(5, 'tanh');
 ```
 
-### `convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string)`
+`convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string)`
 
 ```JavaScript
 layer.convolutionalLayer(12, 1, [3, 3], 'relu', 'same'); // or use 'valid'
 ```
 
-### `embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number)`
+`embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number)`
 
 ```JavaScript
 layer.embeddingLayer(5000, 50, 10)
 ```
 
-### `maxPooling(poolSize: Number[], strides: Number, padding: String)`
+`maxPooling(poolSize: Number[], strides: Number, padding: String)`
 
 ```JavaScript
 layer.maxPooling([2, 2], 2, 'same'); // or use 'valid'
 ```
 
-### `recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean)`
+`recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean)`
 
 ```JavaScript
 layer.recurrentCell(18, 'tanh', true); // or false if the next layer in the stack is not recurrent
