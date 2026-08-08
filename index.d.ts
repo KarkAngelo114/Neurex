@@ -585,7 +585,7 @@ declare module 'neurex' {
          * @returns {Object} The Recurrent Cell configuration
          * @throws {Error} if internal initialization and computational process has an error.
          */
-        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean,  maxSequenceLength: Number, return_state: Boolean): Object;
+        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean): Object;
 
         /**
         * 

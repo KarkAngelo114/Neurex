@@ -24,7 +24,7 @@ Checkout the documentation for full API reference, live demos, and some starter 
 # Neurex
 Neurex is a Javascript-based, GPU-Accelerated, deep learning library for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
 
-1. 🧠 Mix and Match; train CNN + ANN or just ANN ✅
+1. 🧠 Easy model building through sequential stacking ✅
 2. 🛠️ Both CommonJS and ES module importing ✅
 3. 🔃 Retraining and transfer learning ✅
 4. ⚡ GPU acceleration for faster training ✅
@@ -34,6 +34,64 @@ Neurex is a Javascript-based, GPU-Accelerated, deep learning library for Node.js
 2. Abstracted complexities - Intuitive API that handles the heavy lifting of backpropagation and weight initialization, allowing you to focus on architecture.
 3. Educational - Good for experimenting or learning how to build Neural networks
 4. Use vs See - Others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
+
+
+## Build your model sequentially
+Use built-in layers from the `Layers` class to build your model.
+
+```Javascript
+const { Neurex, Layers } = require('neurex');
+
+(async () => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    // stack layers in sequential order
+    nrx.sequentialBuild([
+        layer.inputShape({ features: 3 }),
+        layer.connectedLayer(5), // layer size: 5, activation: relu (by default)
+        layer.connectedLayer(5), // layer size: 5, activation: relu (by default)
+        layer.connectedLayer(5), // layer size: 5, activation: relu (by default)
+        layer.connectedLayer(10, 'softmax')
+    ]);
+})();
+```
+
+
+Built-in layers:
+
+### `connectedLayer(layer_size: number, activation: string)`
+
+```JavaScript
+layer.connectedLayer(5, 'tanh');
+```
+
+### `convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string)`
+
+```JavaScript
+layer.convolutionalLayer(12, 1, [3, 3], 'relu', 'same'); // or use 'valid'
+```
+
+### `embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number)`
+
+```JavaScript
+layer.embeddingLayer(5000, 50, 10)
+```
+
+### `maxPooling(poolSize: Number[], strides: Number, padding: String)`
+
+```JavaScript
+layer.maxPooling([2, 2], 2, 'same'); // or use 'valid'
+```
+
+### `recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean)`
+
+```JavaScript
+layer.recurrentCell(18, 'tanh', true); // or false if the next layer in the stack is not recurrent
+```
+
+For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
+
 
 ## Sample usage - training a XOR 
 Here's an example on how you can use `Neurex` to train on XOR problem.
@@ -106,9 +164,29 @@ const layer = new Layers();
 })();
 ```
 
-_Note: `nrx` (or neurex) models are proprietary model file format in `Neurex` only._
 
-## Loading, popping and adding new layers for transfer learning
+
+
+## Saving, loading, popping and adding new layers for transfer learning
+
+Saving models is very straightforward. 
+
+```JavaScript
+    (async () => {
+        
+        const {Neurex, Layers} = require('neurex');
+
+        const nrx = new Neurex();
+
+        // ... data preprocessing, layer stacking, configurations, train()
+
+        await nrx.saveModel()
+    })()
+```
+
+Your model will be saved in a binary file which can be use later on.
+
+_Note: `nrx` (or neurex) models are exclusive model file format in `Neurex` only._
 
 To load `.nrx` models, you can use `loadSavedModel()`. This will load and recontruct your trained model
 
@@ -148,7 +226,9 @@ const { Neurex, Layers } = require('neurex');
 })();
 ```
 
-You can also used predefined neural network templates which you can drop in to the `sequentialBuild()`
+## Use built-in templates
+
+Want to train a model immediately? The `templates` module offers curated templates you can use which you can drop in to the `sequentialBuild()` method.
 
 ```Javascript
 
@@ -166,6 +246,41 @@ const { Neurex, Layers, templates } = require('neurex');
     ])
 })();
 ``` 
+
+```Javascript
+const { Neurex, Layers, templates } = require('neurex');
+
+(() => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    nrx.sequentialBuild([
+        layer.inputShape({features: 2}),
+        // drop in a convolutional network. If "isHeadless" parameter is set to true, the funnel-shape connected layer will be removed. Default is `false`
+        ...templates.simpleCNN(isHeadless = true),
+        layer.recurrentCell(18, 'tanh', true),
+        layer.recurrentCell(18, 'tanh', true),
+        layer.recurrentCell(18, 'tanh'),
+        layer.connectedLayer(1, 'sigmoid')
+    ])
+})();
+``` 
+
+
+```Javascript
+const { Neurex, Layers, templates } = require('neurex');
+
+(() => {
+    const nrx = new Neurex();
+    const layer = new Layers();
+
+    nrx.sequentialBuild([
+        layer.embeddingLayer(5000, 50, 10),
+        ...templates.vanillaRNN(18, 'reu'), // uses 3 recurrent cells, each has 3 units be default and tanh activation. All uses `return_sequences = true`
+        layer.connectedLayer(1, 'sigmoid')
+    ])
+})();
+```
 
 Learn more about neural network templates [here](https://neurex-documentation.vercel.app/javascript-nodejs#templates).
 
