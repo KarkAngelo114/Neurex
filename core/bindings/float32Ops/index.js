@@ -125,28 +125,28 @@ const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     return weightGrads;
 }
 
-const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
-    const {globalOutputTensorTemplate} = getGlobalParams();
-    
-    const z_values = globalOutputTensorTemplate[outputTemplatePointer]; // use the output template pointer to get the corresponding pre-allocated output tensor
 
-    z_values.set(biases);
+const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
+    const { globalOutputTensorTemplate } = getGlobalParams();
+
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    output.set(biases);
 
     for (let i = 0; i < inputSize; i++) {
         const inputVal = input[i];
-        
-        // Calculate the starting offset for this specific input neuron's weights
-        const offset = i * outputSize;
 
-        // Multiply the input by every weight connecting to output neurons
+        const rowStart = i * outputSize;
+        const rowEnd = rowStart + outputSize;
+        const weightRow = weights.subarray(rowStart, rowEnd);
+
         for (let j = 0; j < outputSize; j++) {
-            z_values[j] += inputVal * weights[offset + j];
+            output[j] += inputVal * weightRow[j];
         }
     }
 
-
-    return z_values;
-}
+    return output;
+};
 
 const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     const prevDelta = new Float32Array(inputSize);
@@ -169,21 +169,19 @@ const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
 }
 
 const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => {
-    const output = weightGrads;
-    // We iterate through every connection
     for (let i = 0; i < inputSize; i++) {
         const inputVal = activations[i];
-        
-        // Calculate the row offset in the flat 1D array
-        const offset = i * outputSize;
+
+        const rowStart = i * outputSize;
+        const rowEnd = rowStart + outputSize;
+        const gradRow = weightGrads.subarray(rowStart, rowEnd);
 
         for (let j = 0; j < outputSize; j++) {
-            // weightGrads[index] += activation_i * delta_j
-            output[offset + j] += inputVal * delta[j];
+            gradRow[j] += inputVal * delta[j];
         }
     }
 
-    return output;
+    return weightGrads;
 }
 
 const computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
