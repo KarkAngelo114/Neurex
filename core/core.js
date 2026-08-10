@@ -109,16 +109,7 @@ class Neurex {
             }
         }
 
-        if (configs.plugins !== undefined) {
-            configs.plugins.forEach((plugins, index) => {
-                if (plugins.type.toLowerCase() === "visualizers") {
-                    this.visualizers.push(configs.plugins[index]); // push visualizers to the visualizer array. They'll be use during training. Examples are the built visualizers surch as lossVisualizer(), lossLandscapeVisualizer(), modelVisualizer()
-                }
-                else {
-                    // ... other plugins soon
-                }
-            })
-        }
+        this.visualizers = configs.visualizerPlugins || [];
         
 
         init();

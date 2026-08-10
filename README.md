@@ -351,7 +351,7 @@ const { Neurex, Layers, lossVisualizer, modelVisualizer, lossLandscapeVisualizer
 
     nrx.configure({
         /* ... other configs */
-        plugins: [
+        visualizerPlugins: [
             modelVisualizer(),
             lossVisualizer(),
             lossLandscapeVisualizer()

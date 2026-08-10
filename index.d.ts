@@ -205,8 +205,6 @@ declare module 'neurex' {
     export interface pluginFactoryObject {
         /** type of plugin. All plugins must have a type */
         type?: string;
-
-        /** for visualizer plugins, the items below are required */
         /** initialize the plugin visualizer. This can be a localhost web server, websocket server, etc. */
         initilaize?: () => void;
         /** broadcast data */
@@ -234,8 +232,8 @@ declare module 'neurex' {
         clip_norm_value?: Number;
         /** on change config to automate changing of optimizer mid-training.*/
         onChange_optimizer?: onChangeConfig;
-        /** plugin array. Accepts plugin factory functions */
-        plugins?: pluginFactoryObject[];
+        /** visualizer plugin array. Accepts plugin factory functions */
+        visualizerPlugins?: pluginFactoryObject[];
     }
 
     /**
