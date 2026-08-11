@@ -205,22 +205,21 @@ const scaleGrad = (grads, batchSize) => {
 }
 
 const gradientClipping = (grads, threshold) => {
-    const output = new Float32Array(grads);
     let norm = 0;
     
-    for (let i = 0; i < output.length; i++) {
-        norm += output[i] * output[i];
+    for (let i = 0; i < grads.length; i++) {
+        norm += grads[i] * grads[i];
     }
     norm = Math.sqrt(norm);
 
     if (norm > threshold) {
         let scalingValue = threshold / norm;
-        for (let i = 0; i < output.length; i++) {
-            output[i] *= scalingValue;
+        for (let i = 0; i < grads.length; i++) {
+            grads[i] *= scalingValue;
         }
     }
 
-    return output;
+    return grads;
 }
 
 const SGD = (params, grads, velocity, lr, momentum = 0.9) => {

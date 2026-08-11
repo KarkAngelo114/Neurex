@@ -546,7 +546,7 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
  * @param {Number} threshold 
  * @returns {Float32Array}
  */
-const gradientClipping = (grads, threshold) => float32_Modules.gradientClipping(grads, threshold);
+const gradientClipping = (grads, threshold) => functions.gradientClipping(grads, threshold);
 
 
 module.exports = {
