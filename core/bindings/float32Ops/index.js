@@ -634,9 +634,10 @@ const element_wise_mul = (arr1, arr2) => {
 
 const scaleDiff = (arr1, arr2, arr3) => {
     let output = new Float32Array(arr1.length);
+    const scale = 2.0 / output.length;
 
     for (let i = 0; i < output.length; i++) {
-        output[i] = (arr1[i] - arr2[i]) * arr3[i];
+        output[i] = (arr1[i] - arr2[i]) * arr3[i] * scale;
     }
 
     return output;
@@ -803,6 +804,167 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     return output;
 }
 
+const transConv = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, weights, biases, outputTemplatePointer) => {
+    const { globalOutputTensorTemplate } = getGlobalParams();
+
+    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [kernelH, kernelW] = kernelSize;
+    const [f, kh, kw, d] = weightShape;
+
+    // Sanity checks
+    if (d !== iD) {
+        throw new Error(`TransConv: weight input depth (${d}) != input depth (${iD})`);
+    }
+
+    if (f !== oD) {
+        throw new Error(`TransConv: number of filters (${f}) != output depth (${oD})`);
+    }
+
+    if (filters !== f) {
+        throw new Error(`TransConv: filters (${filters}) != weightShape[0] (${f})`);
+    }
+
+    // Clear output first (just in case)
+    output.fill(0);
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+    const padW = Math.max(0,(iW - 1) * strides + kw - oW);
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    // Flat index helpers.
+    const inputIndex = (y, x, c) => (y * iW + x) * iD + c;
+    const outputIndex = (y, x, c) => (y * oW + x) * f + c;
+    const weightIndex = (filter, ky, kx, c) =>(((filter * kh) + ky) * kw + kx) * d + c;
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+
+            const inputBase = (iy * iW + ix) * iD;
+
+            for (let ky = 0; ky < kh; ky++) {
+
+                const oy = iy * strides + ky - padTop;
+
+                // Kernel row falls outside output.
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+
+                    const ox = ix * strides + kx - padLeft;
+
+                    // Kernel column falls outside output.
+                    if (ox < 0 || ox >= oW) continue;
+
+                    const outputBase = (oy * oW + ox) * f;
+
+                    /*
+                     * For every output filter, accumulate the
+                     * input channels multiplied by the kernel.
+                     */
+                    for (let filter = 0; filter < f; filter++) {
+
+                        let sum = 0;
+
+                        const weightBase = ((filter * kh + ky) * kw + kx) * d;
+
+                        for (let c = 0; c < d; c++) {
+                            sum += input[inputBase + c] * weights[weightBase + c];
+                        }
+
+                        output[outputBase + filter] += sum;
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+     * Bias is added ONCE per output element, after all
+     * input/kernel contributions have been accumulated.
+     */
+    for (let y = 0; y < oH; y++) {
+        for (let x = 0; x < oW; x++) {
+
+            const outputBase = (y * oW + x) * f;
+
+            for (let filter = 0; filter < f; filter++) {
+                output[outputBase + filter] += biases[filter];
+            }
+        }
+    }
+
+    return output;
+};
+
+const transConvBackward = (delta, inputShape, outputShape, strides, filters, kernelSize, weightShape, weights) => {
+
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [kernelH, kernelW] = kernelSize;
+    const [f, kh, kw, d] = weightShape;
+
+    // Sanity checks
+    if (d !== iD) {
+        throw new Error(`TransConvDelta: weight input depth (${d}) != input depth (${iD})`);
+    }
+
+    if (f !== oD) {
+        throw new Error(`TransConvDelta: number of filters (${f}) != output depth (${oD})`);
+    }
+
+    if (filters !== f) {
+        throw new Error(`TransConvDelta: filters (${filters}) != weightShape[0] (${f})`);
+    }
+
+    const deltaInput = new Float32Array(iH * iW * iD);
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+
+    const padW = Math.max(0, (iW - 1) * strides + kw - oW);
+
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    const deltaInputIndex = (y, x, c) => (y * iW + x) * iD + c;
+    const deltaOutputIndex = (y, x, f) => (y * oW + x) * oD + f;
+
+    const weightIndex = (f, ky, kx, c) => (((f * kh) + ky) * kw + kx) * d + c;
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+            for (let ky = 0; ky < kh; ky++) {
+                const oy = iy * strides + ky - padTop;
+
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+
+                    const ox = ix * strides + kx - padLeft;
+
+                    if (ox < 0 || ox >= oW) continue;
+
+                    for (let filter = 0; filter < f; filter++) {
+
+                        const deltaY = delta[deltaOutputIndex(oy, ox, filter)];
+                        const weightBase = ((filter * kh + ky) * kw + kx) * d;
+                        const inputBase = (iy * iW + ix) * iD;
+
+                        for (let c = 0; c < d; c++) {
+
+                            deltaInput[inputBase + c] += deltaY * weights[weightBase + c];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return deltaInput;
+}
+
 
 
 module.exports = {
@@ -830,6 +992,8 @@ module.exports = {
     ConvolveDelta,
     DilateInput,
     Convolve,
+    transConv,
+    transConvBackward,
     computeBiasGradsForConv,
     computeKernelGradients,
     MaxPooling,
@@ -846,5 +1010,5 @@ module.exports = {
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
-    gradientClipping
+    gradientClipping,
 }

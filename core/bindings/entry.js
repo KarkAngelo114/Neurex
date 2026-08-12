@@ -541,12 +541,61 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} grads 
  * @param {Number} threshold 
  * @returns {Float32Array}
  */
 const gradientClipping = (grads, threshold) => functions.gradientClipping(grads, threshold);
+
+/**
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} strides 
+ * @param {Number} filters 
+ * @param {Array<Number>} kernelSize 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} pointer 
+ * @param {Number} outputTemplatePointer 
+ * @returns {Float32Array} trans conv output.
+ */
+const transConv = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer, outputTemplatePointer) => float32_Modules.transConv(
+    input, 
+    inputShape, 
+    outputShape, 
+    strides, 
+    filters, 
+    kernelSize, 
+    weightShape, 
+    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalBiases[pointer], 
+    outputTemplatePointer
+);
+
+/**
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} strides 
+ * @param {Number} filters 
+ * @param {Array<Number>} kernelSize 
+ * @param {Array<Number>} weightShape 
+ * @param {pointer} pointer 
+ * @returns {Float32Array} delta tensor to be projected
+ */
+const transConvBackward = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer) => float32_Modules.transConvBackward(
+    input,
+    inputShape,
+    outputShape,
+    strides,
+    filters,
+    kernelSize,
+    weightShape,
+    getGlobalParams().globalWeights[pointer], 
+);
 
 
 module.exports = {
@@ -561,6 +610,8 @@ module.exports = {
     linear,
     applyPadding,
     Convolve,
+    transConv,
+    transConvBackward,
     Dilate_Input,
     ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
