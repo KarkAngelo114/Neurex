@@ -8,7 +8,7 @@ const { red, reset } = require("../../color-code");
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     const inputSize = size;
@@ -19,7 +19,6 @@ const initParams = (size, shape, layer_data) => {
     const weightGrads = new Float32Array(TotalWeightSize);
     const biases = new Float32Array(outputSize);
     const biasGrads = new Float32Array(outputSize);
-    const output_template = new Float32Array(outputSize);
                     
     const limit = XavierInitialization(inputSize, outputSize);
 
@@ -41,7 +40,6 @@ const initParams = (size, shape, layer_data) => {
         biases: biases,
         weightGrads: weightGrads,
         biasGrads: biasGrads,
-        outputTensors: output_template,
         inputShape: [1, 1, size],
         outputShape: updatedShape,
         paramShape: weightShape,
@@ -106,9 +104,9 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
+const feedforward = (input, current_layer, pointer) => {
     const [inputSize, outputSize] = current_layer.weightShape; // weight shape [input, output]
-    const z_values = MatMul(input, inputSize, outputSize, pointer, outputTemplatePointer); // perform the MatMul() operation
+    const z_values = MatMul(input, inputSize, outputSize, pointer); // perform the MatMul() operation
 
     const activation_function = activation[current_layer.activation_function.name]; // activation function
     let outputs = activation_function(z_values); // use the activation function       

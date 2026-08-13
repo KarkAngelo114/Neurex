@@ -1,5 +1,3 @@
-const { getGlobalParams, replaceWeightParamByIndex } = require("../../../gpu/globals");
-
 const Relu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
@@ -82,10 +80,9 @@ const DLinear = (arr) => {
     return output;
 };
 
-const getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointer) => {
-    const {globalOutputTensorTemplate} = getGlobalParams();
+const getEmbeddings = (tokenVector, embeddingDim, lookup) => {
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = new Float32Array(tokenVector.length * embeddingDim);
 
     // helper function
     const getRow = (tokenID) => {
@@ -125,11 +122,9 @@ const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     return weightGrads;
 }
 
+const MatMul = (input, inputSize, outputSize, weights, biases) => {
 
-const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
-    const { globalOutputTensorTemplate } = getGlobalParams();
-
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = new Float32Array(outputSize);
 
     output.set(biases);
 
@@ -562,13 +557,12 @@ const computeKernelGradients = (input, delta, weightGrads, inputShape, outputSha
     return weightGrads;
 }
 
-const MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
-    const {globalOutputTensorTemplate} = getGlobalParams();
+const MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
     const [poolH, poolW] = pool_size;
     const [inputH, inputW, inputD] = inputShape;
     const [outputH, outputW, outputD] = outputShape;
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output =  new Float32Array(outputH * outputW * outputD);
     const maxIdexes = new Int32Array(outputH * outputW * outputD);
 
     for (let d = 0; d < inputD; d++) {
@@ -634,9 +628,10 @@ const element_wise_mul = (arr1, arr2) => {
 
 const scaleDiff = (arr1, arr2, arr3) => {
     let output = new Float32Array(arr1.length);
+    const scale = 2.0 / output.length;
 
     for (let i = 0; i < output.length; i++) {
-        output[i] = (arr1[i] - arr2[i]) * arr3[i];
+        output[i] = (arr1[i] - arr2[i]) * arr3[i] * scale;
     }
 
     return output;
@@ -696,14 +691,14 @@ const binary_cross_entropy = (predictions, actuals, epsilon) => {
     return sum / predictions.length;
 }
 
-const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
-    const { globalOutputTensorTemplate } = getGlobalParams();
+const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases) => {
     // The weights were concatenated during initialization as:
     // [input_weights..., recurrent_weights...]
     const inputSize = inputWeightShape[0];
     const units = inputWeightShape[1];
     const range_input_weights = inputSize * units;
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    const output = new Float32Array(units);
 
     const input_weights = weights.subarray(0, range_input_weights);
     const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
@@ -803,6 +798,204 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     return output;
 }
 
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases) => {
+    
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [f, kh, kw, d] = weightShape;
+
+    const output = new Float32Array(oH * oW * oD);
+
+    // Sanity checks
+    if (d !== iD) {
+        throw new Error(`TransConv: weight input depth (${d}) != input depth (${iD})`);
+    }
+
+    if (f !== oD) {
+        throw new Error(`TransConv: number of filters (${f}) != output depth (${oD})`);
+    }
+
+    if (filters !== f) {
+        throw new Error(`TransConv: filters (${filters}) != weightShape[0] (${f})`);
+    }
+
+    // Clear output first (just in case)
+    output.fill(0);
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+    const padW = Math.max(0,(iW - 1) * strides + kw - oW);
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    // Flat index helpers.
+    const inputIndex = (y, x, c) => (y * iW + x) * iD + c;
+    const outputIndex = (y, x, c) => (y * oW + x) * f + c;
+    const weightIndex = (filter, ky, kx, c) =>(((filter * kh) + ky) * kw + kx) * d + c;
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+
+            const inputBase = (iy * iW + ix) * iD;
+
+            for (let ky = 0; ky < kh; ky++) {
+
+                const oy = iy * strides + ky - padTop;
+
+                // Kernel row falls outside output.
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+
+                    const ox = ix * strides + kx - padLeft;
+
+                    // Kernel column falls outside output.
+                    if (ox < 0 || ox >= oW) continue;
+
+                    const outputBase = (oy * oW + ox) * f;
+
+                    /*
+                     * For every output filter, accumulate the
+                     * input channels multiplied by the kernel.
+                     */
+                    for (let filter = 0; filter < f; filter++) {
+
+                        let sum = 0;
+
+                        const weightBase = ((filter * kh + ky) * kw + kx) * d;
+
+                        for (let c = 0; c < d; c++) {
+                            sum += input[inputBase + c] * weights[weightBase + c];
+                        }
+
+                        output[outputBase + filter] += sum;
+                    }
+                }
+            }
+        }
+    }
+
+    /*
+     * Bias is added ONCE per output element, after all
+     * input/kernel contributions have been accumulated.
+     */
+    for (let y = 0; y < oH; y++) {
+        for (let x = 0; x < oW; x++) {
+
+            const outputBase = (y * oW + x) * f;
+
+            for (let filter = 0; filter < f; filter++) {
+                output[outputBase + filter] += biases[filter];
+            }
+        }
+    }
+
+    return output;
+};
+
+const transConvBackward = (delta, inputShape, outputShape, strides, filters, weightShape, weights) => {
+
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [f, kh, kw, d] = weightShape;
+
+    // Sanity checks
+    if (d !== iD) {
+        throw new Error(`TransConvDelta: weight input depth (${d}) != input depth (${iD})`);
+    }
+
+    if (f !== oD) {
+        throw new Error(`TransConvDelta: number of filters (${f}) != output depth (${oD})`);
+    }
+
+    if (filters !== f) {
+        throw new Error(`TransConvDelta: filters (${filters}) != weightShape[0] (${f})`);
+    }
+
+    const deltaInput = new Float32Array(iH * iW * iD);
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+
+    const padW = Math.max(0, (iW - 1) * strides + kw - oW);
+
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    const deltaInputIndex = (y, x, c) => (y * iW + x) * iD + c;
+    const deltaOutputIndex = (y, x, f) => (y * oW + x) * oD + f;
+
+    const weightIndex = (f, ky, kx, c) => (((f * kh) + ky) * kw + kx) * d + c;
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+            for (let ky = 0; ky < kh; ky++) {
+                const oy = iy * strides + ky - padTop;
+
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+
+                    const ox = ix * strides + kx - padLeft;
+
+                    if (ox < 0 || ox >= oW) continue;
+
+                    for (let filter = 0; filter < f; filter++) {
+
+                        const deltaY = delta[deltaOutputIndex(oy, ox, filter)];
+                        const weightBase = ((filter * kh + ky) * kw + kx) * d;
+                        const inputBase = (iy * iW + ix) * iD;
+
+                        for (let c = 0; c < d; c++) {
+
+                            deltaInput[inputBase + c] += deltaY * weights[weightBase + c];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return deltaInput;
+}
+
+const accumulateKernelGradsForTransConv = (activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape) => {
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [f, kh, kw, d] = weightShape;
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+    const padW = Math.max(0, (iW - 1) * strides + kw - oW);
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+            const inputBase = (iy * iW + ix) * iD;
+
+            for (let ky = 0; ky < kh; ky++) {
+                const oy = iy * strides + ky - padTop;
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+                    const ox = ix * strides + kx - padLeft;
+                    if (ox < 0 || ox >= oW) continue;
+
+                    const deltaBase = (oy * oW + ox) * filters;
+
+                    for (let filter = 0; filter < filters; filter++) {
+                        const deltaVal = deltas[deltaBase + filter];
+                        const gradBase = ((filter * kh + ky) * kw + kx) * iD;
+
+                        for (let c = 0; c < iD; c++) {
+                            weightGrads[gradBase + c] += activation_outputs[inputBase + c] * deltaVal;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return weightGrads;
+}
 
 
 module.exports = {
@@ -830,8 +1023,11 @@ module.exports = {
     ConvolveDelta,
     DilateInput,
     Convolve,
+    transConv,
+    transConvBackward,
     computeBiasGradsForConv,
     computeKernelGradients,
+    accumulateKernelGradsForTransConv,
     MaxPooling,
     MaxPoolDelta,
     element_wise_mul,
@@ -846,5 +1042,5 @@ module.exports = {
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
-    gradientClipping
+    gradientClipping,
 }

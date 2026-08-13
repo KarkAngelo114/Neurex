@@ -1,6 +1,6 @@
 const { red, reset } = require('../../color-code');
 const activation = require('../../core/bindings');
-const { applyPadding, element_wise_sub, scaleDiff, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
+const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, accumulateKernelGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddingSizes } = require('../../utils/utils');
 
 
@@ -9,7 +9,7 @@ const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddi
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
 
@@ -50,9 +50,6 @@ const initParams = (size, shape, layer_data) => {
     // calculate output shape
     const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
 
-    // create allocated buffer (for GPU)
-    const outputTensorTemplate = new Float32Array(CalculatedTensorShape);
-
     // output shape and weight shape
     const outputShape = [OutputHeight, OutputWidth, filters];
     const weightShape = [filters, kh, kw, iD];
@@ -64,7 +61,6 @@ const initParams = (size, shape, layer_data) => {
         biases: biases,
         weightGrads: weightGrads,
         biasGrads: biasGrads,
-        outputTensors: outputTensorTemplate,
         inputShape: layer_data.inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
@@ -105,29 +101,24 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
-    let [f, kh, kw, kd] = current_layer.weightShape;
-    let [input_H, input_W, input_D] = current_layer.inputShape; 
-    let [oH, oW, oD] = current_layer.outputShape; 
-    let padding = current_layer.padding;
-    let strides = current_layer.strides;
-    let activationFunction = activation[current_layer.activation_function.name];
+const feedforward = (input, current_layer, pointer) => {
+    
+    const inputShape = current_layer.inputShape; // [iH, iW, iD]
+    const outputShape = current_layer.outputShape; // [oH, oW, oD]
+    const weightShape = current_layer.weightShape; // [f, kh, kw, d]
+    const strides = current_layer.strides;
+    const filters = current_layer.filters;
+    const activation_function = activation[current_layer.activation_function.name];
 
-    // trans conv is just a inverse version of normal convolution where instead of shrinking the output by stride, the trans conv increase the output
+    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer);
+    if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
 
-    const { data: DilatedInput, dilatedHeight, dilatedWidth } = Dilate_Input(input, [input_H, input_W, input_D], strides);
-    const { top, bottom, left, right } = getTransposedPaddingSizes(input_H, input_W, kh, kw, strides, padding);
-    const { data: paddedInput, shape } = applyPadding(DilatedInput, dilatedHeight, dilatedWidth, kd, top, bottom, left, right);
-    const convoleRes = Convolve(paddedInput, 1, [oH, oW, oD], [f, kh, kw, kd], [shape[0], shape[1]], pointer, outputTemplatePointer);
-    if (convoleRes.some(v => Number.isNaN(v))) throw new Error("[TRANSCONV ERROR] Convolution output has Nans");
-
-    // apply activation
-    const output = activationFunction(convoleRes);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[TRANSCONV ERROR] output activation has Nans");
+    const output = activation_function(transConvOutput);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after applying activation");
 
     return {
         outputs: output,
-        z_values: convoleRes,
+        z_values: transConvOutput,
         incrementor_value: 1
     }
 }
@@ -170,13 +161,6 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * Projects the incoming delta backward through THIS conv layer's own kernels.
- * Called on the *next* layer (in feedforward direction) from the core backprop loop.
- * No branching on layer type — each layer implements this for itself.
- *
- * Math: we dilate the incoming delta (to undo strides), pad it (to undo the
- * original padding mode), then cross-correlate with the flipped kernels to
- * recover the gradient w.r.t. the previous layer's output.
  *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
  * @param {Number} pointer - weight pointer for THIS conv layer
@@ -185,29 +169,14 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
-    const [Fn, KHn, KWn, KCn] = layer_data.weightShape;
-    const [oHn, oWn, oDn] = layer_data.outputShape;
-    
-    const [oHprev, oWprev] = layer_data.inputShape; 
-    
-    const stridesN = layer_data.strides;
-    const paddingN = layer_data.padding;
+    const inputShape = layer_data.inputShape;
+    const outputShape = layer_data.outputShape;
+    const weightShape = layer_data.weightShape;
+    const strides = layer_data.strides;
+    const filters = layer_data.filters;
 
-    let pT, pB, pL, pR;
-    if (paddingN === "valid") {
-        pT = pB = 0;   // was KHn - 1
-        pL = pR = 0;   // was KWn - 1
-    } else {
-        // "same" — existing logic is correct for stride=1
-        pT = Math.floor((KHn - 1) / 2);  pB = (KHn - 1) - pT;
-        pL = Math.floor((KWn - 1) / 2);  pR = (KWn - 1) - pL;
-        // keep the needH/needW clamp as-is
-    }
-
-    const { data: paddedInput, shape } = applyPadding(delta, oHn, oWn, oDn, pT, pB, pL, pR);
-
-    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1);
-    if (result.some(v => Number.isNaN(v))) throw new Error("ConvolveDelta result has NaNs in projectDeltaBackward (trans conv)");
+    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer);
+    if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
     
     return result;
 }
@@ -230,24 +199,14 @@ const applyOwnDerivative = (delta, z, layer_data) => {
 }
 
 const accumulateKernelGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
-    const [filters, kH, kW, inDepth] = layer_data.weightShape
-    const [inH, inW, inD] = layer_data.inputShape;
-    const [outH, outW] = layer_data.outputShape;
     const strides = layer_data.strides;
+    const filters = layer_data.filters;
+    const inputShape = layer_data.inputShape; // [iH, iW, iD]
+    const outputShape = layer_data.outputShape; // [oH, oW, oD]
+    const weightShape = layer_data.weightShape; // [f, kh, kw, d]
 
-    const {data: dilated, dilatedHeight, dilatedWidth} = Dilate_Input(activation_outputs, [inH, inW, inD], strides);
-
-    const output = ComputeGradientForKernels(
-        dilated,
-        deltas,
-        weightGrads,
-        [dilatedHeight, dilatedWidth, inD],
-        [outH, outW, filters],
-        [kH, kW]
-    );
-
-    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads (trans conv)`);
-
+    const output = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV GRADIENT ACCUMULATION ERROR] result has NaNs in accumulateKernelGrads (trans conv)");
     return output;
 }
 

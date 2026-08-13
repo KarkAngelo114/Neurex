@@ -83,10 +83,9 @@ const init = () => {
  * @param {Array<Number>} tokenVector an array of token vector 
  * @param {Number} embeddingDim embedding dim value
  * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
- * @param {Number} outputTemplatePointer pointer value correspondind to the output template tensor 
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer, outputTemplatePointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, getGlobalParams().globalWeights[pointer], outputTemplatePointer);
+const getEmbeddings = (tokenVector, embeddingDim, pointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, getGlobalParams().globalWeights[pointer]);
 
 /**
  * "✅☑️"
@@ -109,13 +108,12 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functio
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @returns 1D array of output
  */
-const MatMul = (inputs, inputSize, outputSize, pointer, outputTemplatePointer) => functions.MatMul(
+const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(
     inputs, 
     inputSize, 
     outputSize, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer], 
-    outputTemplatePointer
 );
 
 /**
@@ -280,18 +278,16 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {Array<Number>} kernelShape [num_filters, Kh, Kw, channels]
  * @param {Array<Number>} inputShape [iH, iW] 
  * @param {Number} pointer pointer value to fetch corresponding parameters of the layer from the global store
- * @param {Number} outputTemplatePointer pointer value to fetch allocated tensor of the layer from the global store
  * @returns {Float32Array} convolution result
  */
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, outputTemplatePointer) => functions.Convolve(
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer) => functions.Convolve(
     input, 
     strides, 
     outputShape, 
     kernelShape, 
     inputShape, 
     getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer], 
-    outputTemplatePointer
+    getGlobalParams().globalBiases[pointer],
 );
 
 /**
@@ -455,7 +451,7 @@ const scaleDiff = (arr1, arr2, arr3) => {
  * @param {Array<Number>} outputShape - output shape of the tensor
  * @param {Number} strides - determines how many pixels it will skipped
  */
-const MaxPool = (input, poolSize, inputShape, outputShape, strides, outputTemplatePointer) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides, outputTemplatePointer);
+const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides);
 
 /**
  * "✅☑️"
@@ -475,17 +471,15 @@ const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, 
  * @param {Array<Number>} inputWeightShape input weight shape
  * @param {Array<Number>} recurrentWeightShape recurrent weight shape
  * @param {Number} pointer value to reference the weights and biases 
- * @param {Number} outputTemplatePointer value to reference the output template pointer 
  * @returns 
  */
-const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer, outputTemplatePointer) => functions.recurrentMatMul(
+const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer) => functions.recurrentMatMul(
     input, 
     prevHiddenState,
     inputWeightShape, 
     recurrentWeightShape, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer],
-    outputTemplatePointer
 );
 
 
@@ -541,12 +535,66 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} grads 
  * @param {Number} threshold 
  * @returns {Float32Array}
  */
 const gradientClipping = (grads, threshold) => functions.gradientClipping(grads, threshold);
+
+/**
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} strides 
+ * @param {Number} filters 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} pointer 
+ * @returns {Float32Array} trans conv output.
+ */
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConv(
+    input, 
+    inputShape, 
+    outputShape, 
+    strides, 
+    filters, 
+    weightShape, 
+    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalBiases[pointer],
+);
+
+/**
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} strides 
+ * @param {Number} filters 
+ * @param {Array<Number>} weightShape 
+ * @param {pointer} pointer 
+ * @returns {Float32Array} delta tensor to be projected
+ */
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConvBackward(
+    input,
+    inputShape,
+    outputShape,
+    strides,
+    filters,
+    weightShape,
+    getGlobalParams().globalWeights[pointer], 
+);
+
+const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape) => functions.accumulateKernelGradsForTransConv(
+    activation_outputs,
+    delta, 
+    zeroGradAccumulator,
+    strides,
+    filters, 
+    inputShape, 
+    outputShape, 
+    weightShape
+);
 
 
 module.exports = {
@@ -561,10 +609,13 @@ module.exports = {
     linear,
     applyPadding,
     Convolve,
+    transConv,
+    transConvBackward,
     Dilate_Input,
     ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,
+    accumulateKernelGradsForTransConv,
     computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
     scaleGrads,

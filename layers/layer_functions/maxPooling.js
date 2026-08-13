@@ -6,7 +6,7 @@ const { calculateTensorShape } = require("../../utils/utils");
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     // max pooling layer doesn't have parameters, so we just calculate what will be the output shape to be use for the next layer
@@ -20,7 +20,6 @@ const initParams = (size, shape, layer_data) => {
     const weightShape = null;
     const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTensorShape(inputH, inputW, poolHeight, poolWidth, inputD, strides, padding); // we get the output shape to be use as input shape for the succeeding layers
     const outputShape = [OutputHeight, OutputWidth, inputD]; // set the output shape
-    const output_template = new Float32Array(CalculatedTensorShape)
 
     return {
         updatedSize: CalculatedTensorShape,
@@ -29,7 +28,6 @@ const initParams = (size, shape, layer_data) => {
         biases: [],
         weightGrads: [],
         biasGrads: [],
-        outputTensors: output_template,
         inputShape: inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
@@ -56,13 +54,13 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
+const feedforward = (input, current_layer, pointer) => {
     const [inputh, inputw, inputd] = current_layer.inputShape;
     const [outputh, outputw, outputd] = current_layer.outputShape;
     const [poolHeight, poolWidth] = current_layer.poolSize;
     const strides = current_layer.strides;
                 
-    let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides, outputTemplatePointer);
+    let {output, maxIndices} = MaxPool(input, [poolHeight, poolWidth], [inputh, inputw, inputd], [outputh, outputw, outputd], strides);
 
     current_layer.maxIndices = maxIndices;
 

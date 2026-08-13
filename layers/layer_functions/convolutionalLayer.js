@@ -9,7 +9,7 @@ const { XavierInitialization, calculateTensorShape, getPaddingSizes } = require(
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     const filters = layer_data.filters;
@@ -43,7 +43,6 @@ const initParams = (size, shape, layer_data) => {
 
     // Calculate output shape
     const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(inputH, inputW, kH, kW, filters, stride, padding);
-    const output_template = new Float32Array(CalculatedTensorShape)
     // store output shape too
     const outputShape = [OutputHeight, OutputWidth, filters];
 
@@ -56,7 +55,6 @@ const initParams = (size, shape, layer_data) => {
         biases: biases,
         weightGrads: kernelGrads,
         biasGrads: biasGrads,
-        outputTensors: output_template,
         inputShape: inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
@@ -83,7 +81,7 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
+const feedforward = (input, current_layer, pointer) => {
     let [f, kh, kw, kd] = current_layer.weightShape;
     let [input_H, input_W, input_D] = current_layer.inputShape; 
     let padding = current_layer.padding;
@@ -99,7 +97,7 @@ const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
     const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
     // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, outputTemplatePointer);
+    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer);
 
     if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
