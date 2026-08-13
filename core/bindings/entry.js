@@ -555,19 +555,17 @@ const gradientClipping = (grads, threshold) => functions.gradientClipping(grads,
  * @param {Array<Number>} outputShape 
  * @param {Number} strides 
  * @param {Number} filters 
- * @param {Array<Number>} kernelSize 
  * @param {Array<Number>} weightShape 
  * @param {Number} pointer 
  * @param {Number} outputTemplatePointer 
  * @returns {Float32Array} trans conv output.
  */
-const transConv = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer, outputTemplatePointer) => float32_Modules.transConv(
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer, outputTemplatePointer) => functions.transConv(
     input, 
     inputShape, 
     outputShape, 
     strides, 
     filters, 
-    kernelSize, 
     weightShape, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer], 
@@ -581,20 +579,29 @@ const transConv = (input, inputShape, outputShape, strides, filters, kernelSize,
  * @param {Array<Number>} outputShape 
  * @param {Number} strides 
  * @param {Number} filters 
- * @param {Array<Number>} kernelSize 
  * @param {Array<Number>} weightShape 
  * @param {pointer} pointer 
  * @returns {Float32Array} delta tensor to be projected
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer) => float32_Modules.transConvBackward(
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConvBackward(
     input,
     inputShape,
     outputShape,
     strides,
     filters,
-    kernelSize,
     weightShape,
     getGlobalParams().globalWeights[pointer], 
+);
+
+const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape) => functions.accumulateKernelGradsForTransConv(
+    activation_outputs,
+    delta, 
+    zeroGradAccumulator,
+    strides,
+    filters, 
+    inputShape, 
+    outputShape, 
+    weightShape
 );
 
 
@@ -616,6 +623,7 @@ module.exports = {
     ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,
+    accumulateKernelGradsForTransConv,
     computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
     scaleGrads,

@@ -792,6 +792,7 @@ class Neurex {
 
                 // batch size
                 for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
+                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
                     numBatches++; // Increment batch count
                     const currentBatch = Math.floor(batchStart / batchSize) + 1;
 
@@ -901,8 +902,6 @@ class Neurex {
 
                         pointer++;
                     }
-
-                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
                     setGlobalParams(
                         this.weights, 

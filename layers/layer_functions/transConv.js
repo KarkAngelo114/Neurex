@@ -1,6 +1,6 @@
 const { red, reset } = require('../../color-code');
 const activation = require('../../core/bindings');
-const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul} = require("../../core/bindings");
+const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, accumulateKernelGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddingSizes } = require('../../utils/utils');
 
 
@@ -110,12 +110,11 @@ const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
     const inputShape = current_layer.inputShape; // [iH, iW, iD]
     const outputShape = current_layer.outputShape; // [oH, oW, oD]
     const weightShape = current_layer.weightShape; // [f, kh, kw, d]
-    const kernelSize = current_layer.kernel_size; // [kh, kw]
     const strides = current_layer.strides;
     const filters = current_layer.filters;
     const activation_function = activation[current_layer.activation_function.name];
 
-    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer, outputTemplatePointer);
+    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, outputTemplatePointer);
     if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
 
     const output = activation_function(transConvOutput);
@@ -177,11 +176,10 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
     const inputShape = layer_data.inputShape;
     const outputShape = layer_data.outputShape;
     const weightShape = layer_data.weightShape;
-    const kernelSize = layer_data.kernel_size;
     const strides = layer_data.strides;
     const filters = layer_data.filters;
 
-    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, kernelSize, weightShape, pointer);
+    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer);
     if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
     
     return result;
@@ -205,7 +203,14 @@ const applyOwnDerivative = (delta, z, layer_data) => {
 }
 
 const accumulateKernelGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
-    // TODO
+    const strides = layer_data.strides;
+    const filters = layer_data.filters;
+    const inputShape = layer_data.inputShape; // [iH, iW, iD]
+    const outputShape = layer_data.outputShape; // [oH, oW, oD]
+    const weightShape = layer_data.weightShape; // [f, kh, kw, d]
+
+    const output = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV GRADIENT ACCUMULATION ERROR] result has NaNs in accumulateKernelGrads (trans conv)");
     return output;
 }
 

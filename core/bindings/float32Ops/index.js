@@ -804,13 +804,12 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     return output;
 }
 
-const transConv = (input, inputShape, outputShape, strides, filters, kernelSize, weightShape, weights, biases, outputTemplatePointer) => {
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases, outputTemplatePointer) => {
     const { globalOutputTensorTemplate } = getGlobalParams();
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = globalOutputTensorTemplate[outputTemplatePointer] || new Float32Array();
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
-    const [kernelH, kernelW] = kernelSize;
     const [f, kh, kw, d] = weightShape;
 
     // Sanity checks
@@ -899,11 +898,10 @@ const transConv = (input, inputShape, outputShape, strides, filters, kernelSize,
     return output;
 };
 
-const transConvBackward = (delta, inputShape, outputShape, strides, filters, kernelSize, weightShape, weights) => {
+const transConvBackward = (delta, inputShape, outputShape, strides, filters, weightShape, weights) => {
 
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
-    const [kernelH, kernelW] = kernelSize;
     const [f, kh, kw, d] = weightShape;
 
     // Sanity checks
@@ -965,6 +963,45 @@ const transConvBackward = (delta, inputShape, outputShape, strides, filters, ker
     return deltaInput;
 }
 
+const accumulateKernelGradsForTransConv = (activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape) => {
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+    const [f, kh, kw, d] = weightShape;
+
+    const padH = Math.max(0, (iH - 1) * strides + kh - oH);
+    const padW = Math.max(0, (iW - 1) * strides + kw - oW);
+    const padTop = Math.floor(padH / 2);
+    const padLeft = Math.floor(padW / 2);
+
+    for (let iy = 0; iy < iH; iy++) {
+        for (let ix = 0; ix < iW; ix++) {
+            const inputBase = (iy * iW + ix) * iD;
+
+            for (let ky = 0; ky < kh; ky++) {
+                const oy = iy * strides + ky - padTop;
+                if (oy < 0 || oy >= oH) continue;
+
+                for (let kx = 0; kx < kw; kx++) {
+                    const ox = ix * strides + kx - padLeft;
+                    if (ox < 0 || ox >= oW) continue;
+
+                    const deltaBase = (oy * oW + ox) * filters;
+
+                    for (let filter = 0; filter < filters; filter++) {
+                        const deltaVal = deltas[deltaBase + filter];
+                        const gradBase = ((filter * kh + ky) * kw + kx) * iD;
+
+                        for (let c = 0; c < iD; c++) {
+                            weightGrads[gradBase + c] += activation_outputs[inputBase + c] * deltaVal;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return weightGrads;
+}
 
 
 module.exports = {
@@ -996,6 +1033,7 @@ module.exports = {
     transConvBackward,
     computeBiasGradsForConv,
     computeKernelGradients,
+    accumulateKernelGradsForTransConv,
     MaxPooling,
     MaxPoolDelta,
     element_wise_mul,
