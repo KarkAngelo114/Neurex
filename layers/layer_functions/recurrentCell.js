@@ -6,7 +6,7 @@ const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMat
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     const units = layer_data.units;
@@ -31,7 +31,6 @@ const initParams = (size, shape, layer_data) => {
     const biasGrads = new Float32Array(totalBiases);
 
     const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
-    const output_template = new Float32Array(units); // output template per timesteps
 
     const limit1 = XavierInitialization(feature_size, units); // Use feature_size
     const limit2 = XavierInitialization(units, units);
@@ -63,7 +62,6 @@ const initParams = (size, shape, layer_data) => {
         biases: biases,
         weightGrads: weightGrads,
         biasGrads: biasGrads,
-        outputTensors: output_template,
         inputShape: [1, 1, size],
         outputShape: updatedShape,
         paramShape: weightShape,
@@ -128,7 +126,7 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointer) => {
+const feedforward = (inputSequence, current_layer, pointer) => {
 
     const units = current_layer.units;
     // Assume inputSequence is flat: [units * sequence_length]
@@ -156,8 +154,7 @@ const feedforward = (inputSequence, current_layer, pointer, outputTemplatePointe
             current_hidden, 
             [current_layer.weightShape[0], current_layer.weightShape[1]], 
             [current_layer.weightShape[2], current_layer.weightShape[3]], 
-            pointer, 
-            outputTemplatePointer
+            pointer
         );
 
         if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");

@@ -27,7 +27,6 @@ class Neurex {
     constructor () {
         this.weights = [];
         this.biases = [];
-        this.output_layers_templates = [];
         this.num_layers = 0;
         this.input_size = 1;
         this.input_shape = [1, 1, 1];
@@ -425,7 +424,6 @@ class Neurex {
                     // Recreate the connected layer with the correct activation and size
                     newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
-                    this.output_layers_templates.push(new Float32Array(layerData.layer_size));
                     this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "input_layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
@@ -439,7 +437,6 @@ class Neurex {
                     newLayer.outputShape = layerData.outputShape;
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
-                    this.output_layers_templates.push(new Float32Array(totalSize));
                     this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "maxPooling") {
                     newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
@@ -447,7 +444,6 @@ class Neurex {
                     newLayer.outputShape = layerData.outputShape;
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
-                    this.output_layers_templates.push(new Float32Array(totalSize));
                 }
                 else if (layerData.layer_name === "EmbeddingLayer") {
                     const vocabSize = layerData.vocabSize;
@@ -459,7 +455,6 @@ class Neurex {
                     newLayer.outputShape = [1, 1, outputSize];
                     newLayer.weightShape = [vocabSize, embeddingDim];
                     newLayer.outputSize = outputSize;
-                    this.output_layers_templates.push(new Float32Array(outputSize));
                     this.parametric_layers.push(layerData.layer_name);
                 }
                 else if (layerData.layer_name === "recurrent_cell") {
@@ -471,7 +466,6 @@ class Neurex {
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
-                    this.output_layers_templates.push(new Float32Array(units));
                     this.parametric_layers.push(layerData.layer_name);
                 }
                 else {
@@ -638,7 +632,6 @@ class Neurex {
         setGlobalParams(
             this.weights, 
             this.biases, 
-            this.output_layers_templates,
         );
 
         if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
@@ -906,7 +899,6 @@ class Neurex {
                     setGlobalParams(
                         this.weights, 
                         this.biases, 
-                        this.output_layers_templates,
                     );
 
                 }
@@ -1090,7 +1082,6 @@ class Neurex {
                     biases, 
                     weightGrads, 
                     biasGrads, 
-                    outputTensors, 
                     inputShape, 
                     outputShape, 
                     paramShape, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
@@ -1104,7 +1095,6 @@ class Neurex {
                 if (biases.length > 0) this.biases.push(biases);
                 if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
                 if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
-                if (outputTensors.length > 0) this.output_layers_templates.push(outputTensors);
                 if (isParametric) this.parametric_layers.push(layer_data.layer_name);
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
@@ -1134,7 +1124,6 @@ class Neurex {
             biases, 
             weightGrads, 
             biasGrads, 
-            outputTensors, 
             inputShape, 
             outputShape, 
             isParametric,
@@ -1147,7 +1136,6 @@ class Neurex {
         if (biases.length > 0) this.biases.push(biases);
         if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
         if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
-        if (outputTensors.length > 0) this.output_layers_templates.push(outputTensors);
         if (isParametric) this.parametric_layers.push(layer_data.layer_name); 
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
@@ -1199,17 +1187,15 @@ class Neurex {
         let current_input = input
         let all_layer_outputs = [input];
         let zs = [];
-        
-        let outputTemplatePointer = 0
+
         let pointer = 0;
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
             // const layer_weights = this.weights[pointer];
             // const layer_biases = this.biases[pointer];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer, outputTemplatePointer);
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
             pointer+=incrementor_value;
-            outputTemplatePointer++;
 
             zs.push(z_values);
             current_input = outputs;
@@ -1369,10 +1355,6 @@ class Neurex {
         for (let i = 0; i < this.weights.length; i ++) {
             this.weightGrads[i].fill(0);
             this.biasGrads[i].fill(0);
-        }
-
-        for (const template of this.output_layers_templates) {
-            template.fill(0);
         }
     }
 }

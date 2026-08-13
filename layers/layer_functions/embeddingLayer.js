@@ -8,7 +8,7 @@ const { getEmbeddings, DeltaMatMul, returnEmbeddings, recurrentTimeDelta } = req
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, outputTensors: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     // Embedding layer can be added without input shape. So, we don't need to rely on the initial `size` and `shape` as it is just the default values from the constructor
@@ -44,8 +44,6 @@ const initParams = (size, shape, layer_data) => {
 
     const biasGrads = new Float32Array(embeddingDim).fill(0);
 
-    const output_template = new Float32Array(maxSequenceLength * embeddingDim);
-
     return {
         updatedSize: updatedSize,
         updatedShape: updatedShape,
@@ -53,8 +51,7 @@ const initParams = (size, shape, layer_data) => {
         biases: biases,
         weightGrads: weightGrads,
         biasGrads: biasGrads,
-        outputTensors: output_template,
-        inputShape: [],
+        inputShape: shape,
         outputShape: updatedShape,
         paramShape: weightShape,
         overrides: {
@@ -85,10 +82,10 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer, outputTemplatePointer) => {
+const feedforward = (input, current_layer, pointer) => {
     const embeddingDim = current_layer.embeddingDim;
 
-    const output = getEmbeddings(input, embeddingDim, pointer, outputTemplatePointer);
+    const output = getEmbeddings(input, embeddingDim, pointer);
 
     if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (feedforward)");
     

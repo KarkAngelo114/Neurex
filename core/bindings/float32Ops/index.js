@@ -1,5 +1,3 @@
-const { getGlobalParams, replaceWeightParamByIndex } = require("../../../gpu/globals");
-
 const Relu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
@@ -82,10 +80,9 @@ const DLinear = (arr) => {
     return output;
 };
 
-const getEmbeddings = (tokenVector, embeddingDim, lookup, outputTemplatePointer) => {
-    const {globalOutputTensorTemplate} = getGlobalParams();
+const getEmbeddings = (tokenVector, embeddingDim, lookup) => {
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = new Float32Array(tokenVector.length * embeddingDim);
 
     // helper function
     const getRow = (tokenID) => {
@@ -125,11 +122,9 @@ const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     return weightGrads;
 }
 
+const MatMul = (input, inputSize, outputSize, weights, biases) => {
 
-const MatMul = (input, inputSize, outputSize, weights, biases, outputTemplatePointer) => {
-    const { globalOutputTensorTemplate } = getGlobalParams();
-
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output = new Float32Array(outputSize);
 
     output.set(biases);
 
@@ -562,13 +557,12 @@ const computeKernelGradients = (input, delta, weightGrads, inputShape, outputSha
     return weightGrads;
 }
 
-const MaxPooling = (arr, pool_size, inputShape, outputShape, strides, outputTemplatePointer) => {
-    const {globalOutputTensorTemplate} = getGlobalParams();
+const MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
     const [poolH, poolW] = pool_size;
     const [inputH, inputW, inputD] = inputShape;
     const [outputH, outputW, outputD] = outputShape;
 
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+    const output =  new Float32Array(outputH * outputW * outputD);
     const maxIdexes = new Int32Array(outputH * outputW * outputD);
 
     for (let d = 0; d < inputD; d++) {
@@ -697,14 +691,14 @@ const binary_cross_entropy = (predictions, actuals, epsilon) => {
     return sum / predictions.length;
 }
 
-const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases, outputTemplatePointer) => {
-    const { globalOutputTensorTemplate } = getGlobalParams();
+const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases) => {
     // The weights were concatenated during initialization as:
     // [input_weights..., recurrent_weights...]
     const inputSize = inputWeightShape[0];
     const units = inputWeightShape[1];
     const range_input_weights = inputSize * units;
-    const output = globalOutputTensorTemplate[outputTemplatePointer];
+
+    const output = new Float32Array(units);
 
     const input_weights = weights.subarray(0, range_input_weights);
     const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
@@ -804,13 +798,13 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     return output;
 }
 
-const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases, outputTemplatePointer) => {
-    const { globalOutputTensorTemplate } = getGlobalParams();
-
-    const output = globalOutputTensorTemplate[outputTemplatePointer] || new Float32Array();
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases) => {
+    
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
     const [f, kh, kw, d] = weightShape;
+
+    const output = new Float32Array(oH * oW * oD);
 
     // Sanity checks
     if (d !== iD) {
