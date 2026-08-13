@@ -468,6 +468,17 @@ class Neurex {
                     newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
                     this.parametric_layers.push(layerData.layer_name);
                 }
+                else if (layerData.layer_name === "transConvLayer") {
+                    const filters = layerData.filters;
+                    const strides = layerData.strides;
+                    const kernelSize = layerData.kernel_size
+                    newLayer = layerBuilder.transConvLayer(filters, strides, kernelSize, layerData.activation_function_name, layerData.padding, layerData.inputShape);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+
+                    this.parametric_layers.push(layerData.layer_name);
+                }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
                 }
@@ -1032,7 +1043,7 @@ class Neurex {
 
         setGlobalParams(this.weights, this.biases, this.output_layers_templates);
 
-        if (!this.weights || !this.biases || !this.output_layers_templates) {
+        if (!this.weights || !this.biases) {
             throw new Error("Parameters are missing");
         }
 
