@@ -277,11 +277,12 @@ class Layers {
      * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
      * @param {String} activation_function the activation function to be use for this layer
      * @param {String} padding adds N amount of padding on all sides. Default is 0
-     * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize]) 
+     * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize])
+     * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
      * @return {Object} transConv layer configs
      * @throws {Error} if any of the parameters are invalid.
      */
-    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = "Same", inputShape = [28, 28, 1]) {
+    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = "Same", inputShape = [28, 28, 1], useBias = true) {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -313,6 +314,7 @@ class Layers {
                 strides: strides,
                 inputShape: inputShape,
                 isParametric: true,
+                useBias: useBias,
                 initParams: (size, shape, layer_data) => trans.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => trans.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer) => trans.feedforward(input, current_layer, pointer),

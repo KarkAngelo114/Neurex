@@ -15,6 +15,7 @@ const initParams = (size, shape, layer_data) => {
 
     const currentInputShape = layer_data.inputShape.reduce((acc, current) => acc * current, 1);
     const incomingInputShape = shape.reduce((acc, current) => acc * current, 1);
+    const useBias = layer_data.useBias;
 
     if (currentInputShape != incomingInputShape) {
         throw new Error(`[ERROR]------- Failed to initialized transpose convolution layer. Incoming shape must match current inputShape. Expected shape: ${layer_data.inputShape} or ${currentInputShape} | Incoming shape: ${shape} or ${incomingInputShape}`);
@@ -43,9 +44,12 @@ const initParams = (size, shape, layer_data) => {
     }
 
     // biases
-    for (let i = 0; i < filters; i++) {
-        biases[i] =  (Math.random() * 2 - 1) * limit;
+    if (useBias) {
+        for (let i = 0; i < filters; i++) {
+            biases[i] =  (Math.random() * 2 - 1) * limit;
+        }
     }
+    
 
     // calculate output shape
     const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
