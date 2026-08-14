@@ -1,6 +1,6 @@
 const { red, reset } = require('../../color-code');
 const activation = require('../../core/bindings');
-const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, accumulateKernelGradsForTransConv} = require("../../core/bindings");
+const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddingSizes } = require('../../utils/utils');
 
 
@@ -137,6 +137,11 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
 
+    // dOutputLayer = element_wise_sub(preds, actuals);
+
+    // return dOutputLayer;
+
+    
     if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
         dOutputLayer = element_wise_sub(preds, actuals);
     }
@@ -158,6 +163,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
 
     return dOutputLayer;
+   
 }
 
 /**
