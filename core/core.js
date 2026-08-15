@@ -46,7 +46,7 @@ class Neurex {
         this.hasBuilt = false;
 
         // default configs
-        this.optimizer = null;
+        this.optimizer =  optimizers.SGD();;
         this.learning_rate = 0.001;
         this.initial_learning_rate = 0.001;
         this.lr_scheduler = null;
@@ -222,8 +222,8 @@ class Neurex {
                     break;
                 default:
                     displayName = layerType;
-                    outputShape = '-';
-                    activation  = activationName;
+                    outputShape = `(${layer.outputShape.join(' x ')})`;
+                    activation  = activationName || 'None';
                     params = paramCount.toLocaleString();
                     padding = layer.padding || 'None';
             }
@@ -309,6 +309,7 @@ class Neurex {
                 kernel_size: layer.kernel_size || [0, 0],
                 weightShape: layer.weightShape || [],
                 inputShape: layer.inputShape || [],
+                targetShape: layer.targetShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
                 embeddingDim: layer.embeddingDim || 1,
@@ -476,8 +477,13 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-
                     this.parametric_layers.push(layerData.layer_name);
+                }
+                else if (layerData.layer_name === "Reshape") {
+                    newLayer = layerBuilder.reshape(layerData.targetShape);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
                 }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);

@@ -390,7 +390,12 @@ declare module 'neurex' {
     * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
     * @returns {object} {X_train, Y_train, X_test, Y_test}
     */
-    export function split_dataset(X: number[][], Y: number[], split_ratio: number): object;
+    export function split_dataset(X: number[][], Y: number[], split_ratio: number): {
+        X_train: any[][], 
+        Y_train: any[][], 
+        X_test: any[][], 
+        Y_test: any[][]
+    };
 
     /**
     * Computes evaluation metrics for regression tasks given test features and labels.
@@ -533,6 +538,13 @@ declare module 'neurex' {
         ]);
         */
         inputShape(shapeConfig: Object): Object;
+
+        /**
+         * @method reshape changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `input layer` to bridge data from layers that outputs 1D vector to be feed to convolutional layers which works on spatial grid-like data. 
+         * @param targetShape specify the target shape for the data to be reshape. Default is `[28, 28, 3]`
+         * @returns {Object} The reshape layer object configuration
+         */
+        reshape(targetShape: number[]): object;
 
         /**
         * @method embeddingLayer Creates an embedding layer for token encoding.

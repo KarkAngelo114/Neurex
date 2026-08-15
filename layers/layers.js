@@ -28,7 +28,8 @@ const cnn = require('./layer_functions/convolutionalLayer');
 const maxpool = require('./layer_functions/maxPooling');
 const embedding = require('./layer_functions/embeddingLayer');
 const rnn = require('./layer_functions/recurrentCell');
-const trans = require('./layer_functions/transConv')
+const trans = require('./layer_functions/transConv');
+const reshaper = require('./layer_functions/reshape');
 
 
 class Layers {
@@ -53,6 +54,29 @@ class Layers {
      the inputShape() method allows you to get the shape of your input.
      */
     inputShape = (shapeConfig) => inputConfig(shapeConfig);
+    
+    /**
+     * @method reshape changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `input layer` to bridge data from layers that outputs 1D vector to be feed to convolutional layers which works on spatial grid-like data. 
+     * @param targetShape specify the target shape for the data to be reshape. Default is `[28, 28, 3]`
+     * @returns {Object} The reshape layer object configuration
+    */
+    reshape(targetShape = [28, 28, 3]) {
+        if (targetShape.some(n => !n || n <= 0)) throw new Error(`[ERROR]------- Values should never be 0, null or a negative value.`);
+
+        return {
+            layer_name: 'Reshape',
+            targetShape: targetShape,
+            isParametric: false,
+            initParams: (size, shape, layer_data) => reshaper.initParams(size, shape, layer_data),
+            determineInferenceType: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
+            feedforward: (input) => reshaper.feedforward(input),
+            getOutputLayerDelta: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => delta,
+            applyOwnDerivative: (delta) => delta,
+            accumulateWeightGradients: () => {},
+            accumulateBiasGradients: () => {},
+        }
+    }
 
     /**
     * Creates an embedding layer for token encoding.

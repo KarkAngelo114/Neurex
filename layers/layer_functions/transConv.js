@@ -12,62 +12,67 @@ const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddi
  * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
+    try {
+        const currentInputShape = layer_data.inputShape.reduce((acc, current) => acc * current, 1);
+        const incomingInputShape = shape.reduce((acc, current) => acc * current, 1);
+        const useBias = layer_data.useBias;
 
-    const currentInputShape = layer_data.inputShape.reduce((acc, current) => acc * current, 1);
-    const incomingInputShape = shape.reduce((acc, current) => acc * current, 1);
-    const useBias = layer_data.useBias;
+        if (currentInputShape != incomingInputShape) {
+            console.error(`[ERROR]------- Failed to initialized transpose convolution layer. Incoming shape must match current inputShape. Expected shape: ${layer_data.inputShape} or ${currentInputShape} | Incoming shape: ${shape} or ${incomingInputShape}`);
+            throw new Error('SHAPE ERROR')
+        }
+        
+        const filters = layer_data.filters;
+        const padding = layer_data.padding || "same";
+        const [kh, kw] = layer_data.kernel_size || [3, 3];
+        const [iH, iW, iD] = layer_data.inputShape || [28, 28, 1];
+        const strides = layer_data.strides || 1;
+        const TotalSize = filters * kh * kw * iD;
 
-    if (currentInputShape != incomingInputShape) {
-        throw new Error(`[ERROR]------- Failed to initialized transpose convolution layer. Incoming shape must match current inputShape. Expected shape: ${layer_data.inputShape} or ${currentInputShape} | Incoming shape: ${shape} or ${incomingInputShape}`);
-        process.exit(1);
-    }
-    
-    const filters = layer_data.filters;
-    const padding = layer_data.padding || "same";
-    const [kh, kw] = layer_data.kernel_size || [3, 3];
-    const [iH, iW, iD] = layer_data.inputShape || [28, 28, 1];
-    const strides = layer_data.strides || 1;
-    const TotalSize = filters * kh * kw * iD;
+        const weights = new Float32Array(TotalSize);
+        const biases = new Float32Array(filters);
+        const weightGrads = new Float32Array(weights.length);
+        const biasGrads =  new Float32Array(biases.length);
 
-    const weights = new Float32Array(TotalSize);
-    const biases = new Float32Array(filters);
-    const weightGrads = new Float32Array(weights.length);
-    const biasGrads =  new Float32Array(biases.length);
+        const fanIn = kh * kw * iD;
+        const fanOut = kh * kw * filters;
+        const limit = XavierInitialization(fanIn, fanOut);
 
-    const fanIn = kh * kw * iD;
-    const fanOut = kh * kw * filters;
-    const limit = XavierInitialization(fanIn, fanOut);
+        // weights
+        for (let i = 0; i < TotalSize; i++) {
+            weights[i] =  (Math.random() * 2 - 1) * limit;
+        }
 
-    // weights
-    for (let i = 0; i < TotalSize; i++) {
-        weights[i] =  (Math.random() * 2 - 1) * limit;
-    }
+        // biases
+        if (useBias) {
+            for (let i = 0; i < filters; i++) {
+                biases[i] =  (Math.random() * 2 - 1) * limit;
+            }
+        }
+        
 
-    // biases
-    if (useBias) {
-        for (let i = 0; i < filters; i++) {
-            biases[i] =  (Math.random() * 2 - 1) * limit;
+        // calculate output shape
+        const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
+
+        // output shape and weight shape
+        const outputShape = [OutputHeight, OutputWidth, filters];
+        const weightShape = [filters, kh, kw, iD];
+                        
+        return {
+            updatedSize: CalculatedTensorShape,
+            updatedShape: outputShape,
+            weights: weights,
+            biases: biases,
+            weightGrads: weightGrads,
+            biasGrads: biasGrads,
+            inputShape: layer_data.inputShape,
+            outputShape: outputShape,
+            paramShape: weightShape,
         }
     }
-    
-
-    // calculate output shape
-    const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
-
-    // output shape and weight shape
-    const outputShape = [OutputHeight, OutputWidth, filters];
-    const weightShape = [filters, kh, kw, iD];
-                    
-    return {
-        updatedSize: CalculatedTensorShape,
-        updatedShape: outputShape,
-        weights: weights,
-        biases: biases,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads,
-        inputShape: layer_data.inputShape,
-        outputShape: outputShape,
-        paramShape: weightShape,
+    catch (error) {
+        console.log(error);
+        process.exit(1)
     }
     
 }

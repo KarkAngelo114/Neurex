@@ -87,6 +87,9 @@ const feedforward = (input, current_layer, pointer) => {
     let padding = current_layer.padding;
     let strides = current_layer.strides;
 
+    const totalSize = current_layer.inputShape.reduce((acc, val) => acc * val, 1);
+    if (input.length != totalSize) throw new Error(`[CONV ERROR]------- Input tensor doesn't match with the expected input tensor shape: Expected shape/size: ${[input_H, input_W, input_D]} or ${totalSize}. The size of the input entered is ${input.length}`); 
+
     // 1. compute expected output tensor shape
     const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, current_layer.strides, current_layer.padding);
 
