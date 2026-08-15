@@ -6,8 +6,8 @@
  * - getOutputLayerDelta()
  * - projectDeltaBackward() 
  * - applyOwnDerivative()
- * - computeWeightGrads()
- * - computeBiasGrads()
+ * - accumulateWeightGrads()
+ * - accumulateBiasGrads()
  *
  */
 
@@ -77,8 +77,8 @@ class Layers {
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
             projectDeltaBackward: (delta, pointer, targetShape, layer_data) => delta,
             applyOwnDerivative: (delta, z, layer_data) => delta,
-            computeWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
-            computeBiasGradients: (biasGrads, delta, layer_data) => biasGrads,
+            accumulateWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
+            accumulateBiasGradients: (biasGrads, delta, layer_data) => biasGrads,
         }
     }
 
@@ -117,8 +117,8 @@ class Layers {
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => ann.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => ann.applyOwnDerivative(delta, z, layer_data),
-                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
-                computeBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
+                accumulateBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
             };
         }
         catch (error) {
@@ -175,8 +175,8 @@ class Layers {
                 getOutputLayerDelta: () => cnn.getOutputLayerDelta(),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => cnn.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => cnn.applyOwnDerivative(delta, z, layer_data),
-                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => cnn.computeWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
-                computeBiasGradients: (biasgrads, deltas, layer_data) => cnn.computeBiasGradients(biasgrads, deltas, layer_data),
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => cnn.computeWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
+                accumulateBiasGradients: (biasgrads, deltas, layer_data) => cnn.computeBiasGradients(biasgrads, deltas, layer_data),
             }
         }
         catch (error) {
@@ -220,8 +220,8 @@ class Layers {
                 getOutputLayerDelta: () => maxpool.getOutputLayerDelta(),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => maxpool.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => maxpool.applyOwnDerivative(delta, z, layer_data),
-                computeWeightGradients: () => {},
-                computeBiasGradients: () => {},
+                accumulateWeightGradients: () => {},
+                accumulateBiasGradients: () => {},
             }
         }
         catch (error) {
@@ -258,8 +258,8 @@ class Layers {
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => rnn.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => rnn.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => rnn.applyOwnDerivative(delta, z, layer_data),
-                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => rnn.accumulateRecurrentWeightGrads(activation_outputs, deltas, weightGrads, layer_data),
-                computeBiasGradients: (biasgrads, deltas, layer_data) => rnn.accumulateRecurrentBiasGrads(biasgrads, deltas, layer_data),
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => rnn.accumulateRecurrentWeightGrads(activation_outputs, deltas, weightGrads, layer_data),
+                accumulateBiasGradients: (biasgrads, deltas, layer_data) => rnn.accumulateRecurrentBiasGrads(biasgrads, deltas, layer_data),
             }
         }
         catch (error) {
@@ -321,8 +321,8 @@ class Layers {
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => trans.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => trans.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => trans.applyOwnDerivative(delta, z, layer_data),
-                computeWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => trans.accumulateKernelGrads(activation_outputs, deltas, weightGrads, layer_data),
-                computeBiasGradients: (biasgrads, deltas, layer_data) => trans.accumulateBiasGradients(biasgrads, deltas, layer_data),
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => trans.accumulateKernelGrads(activation_outputs, deltas, weightGrads, layer_data),
+                accumulateBiasGradients: (biasgrads, deltas, layer_data) => trans.accumulateBiasGradients(biasgrads, deltas, layer_data),
             }
         }
         catch (error) {

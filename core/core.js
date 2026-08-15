@@ -848,10 +848,10 @@ class Neurex {
 
 
                             // Accumulate weight gradients
-                            weightGrads[pointer] = layer_data_obj.computeWeightGradients(a_prev, delta, weightGrads[pointer], layer_data_obj);
+                            weightGrads[pointer] = layer_data_obj.accumulateWeightGradients(a_prev, delta, weightGrads[pointer], layer_data_obj);
 
                             // Accumulate bias gradients
-                            biasGrads[pointer] = layer_data_obj.computeBiasGradients(biasGrads[pointer], delta, layer_data_obj);
+                            biasGrads[pointer] = layer_data_obj.accumulateBiasGradients(biasGrads[pointer], delta, layer_data_obj);
                             pointer++;
                         }
                     }
