@@ -75,7 +75,7 @@ function renderModel(layer_data, weights, biases) {
         let strideX = 1;
         let strideY = 1;
         
-        if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling") {
+        if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling" || layer.layer_name === "transConvLayer" ) {
             const [iH, iW, iD] = layer.inputShape;
 
             const visualWidth = Math.min(iW, 224);
@@ -83,19 +83,19 @@ function renderModel(layer_data, weights, biases) {
             const visualDepth = Math.max(Math.min(iD, 512), 4);
             
 
-            const isConv = layer.layer_name === "convolutionalLayer";
+            const spatialLayerName = layer.layer_name;
 
             cube = createCube({
                 height: visualHeight, 
                 width: visualWidth, 
                 depth: visualDepth, 
-                color: isConv ? 0x4f8cff : 0xFFAE00,
-                outlineColor: isConv ? 0x00ffff : 0xFFAE00, 
+                color: spatialLayerName === "convolutionalLayer" ? 0x4f8cff : spatialLayerName === "transConvLayer" ? 0x00d52e : 0xFFAE00,
+                outlineColor: spatialLayerName === "convolutionalLayer" ? 0x00ffff : spatialLayerName === "transConvLayer" ? 0x6af488 : 0xFFAE00, 
                 opacity: 0.3
             });
 
             // Determine kernel / pool dimensions & strides
-            if (isConv) {
+            if (spatialLayerName === "convolutionalLayer" || spatialLayerName === "transConvLayer") {
                 const k = layer.kernel_size || layer.kernelSize || [3, 3];
                 windowWidth = Array.isArray(k) ? k[1] : k;
                 windowHeight = Array.isArray(k) ? k[0] : k;
@@ -133,15 +133,19 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
 
+            const conv = 'Allows you to add convolutional layers <br/> in your model architecture in sequential building.';
+            const transconv = "transConv (or transpose convolution) is a <br/> specialized convolutional layer that upsamples incoming tensor <br/>map, which does the opposite of the normal convolution"
+            const maxpool = "is use for downsampling operation that reduces the spatial <br/> dimensions of an input tensor by taking the maximum <br/> value over a defined sliding window"; 
+
             // 1. Store metadata inside the cube mesh when creating it inside renderModel()
             const layerData = {
-                name:  isConv ? "Convolutional Layer" : "Max Pooling Layer",
+                name:  spatialLayerName === "convolutionalLayer" ? "Convolutional Layer" : spatialLayerName === "transConvLayer" ? "Trans Convolution" : "Max Pooling Layer",
                 inputShape: layer.inputShape || `Size: ${layer.layer_size}`,
-                desc: isConv ? "Allows you to add convolutional layers <br/> in your model architecture in sequential building." : "is use for downsampling operation that reduces the spatial <br/> dimensions of an input tensor by taking the maximum <br/> value over a defined sliding window",
+                desc: spatialLayerName === "convolutionalLayer" ? conv : spatialLayerName === "transConvLayer" ? transconv : maxpool,
                 outputShape: layer.outputShape,
             };
 
-            if (isConv) {
+            if (spatialLayerName === "transConvLayer" || spatialLayerName === "convolutionalLayer") {
                 layerData.weight_L1 = L1_Mean(weights[pointer]);
                 layerData.bias_L1 = L1_Mean(biases[pointer]);
                 pointer++;
@@ -150,6 +154,51 @@ function renderModel(layer_data, weights, biases) {
             cube.userData = layerData;
 
             // 3. Update mouse coordinates AND move the tooltip directly in screen space
+            viewer.addEventListener("pointermove", (event) => {
+                const rect = viewer.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
+
+                // Position tooltip 12px away from cursor
+                tooltip.style.left = `${event.clientX + 12}px`;
+                tooltip.style.top = `${event.clientY + 12}px`;
+            });
+        }
+        else if (layer.layer_name === "Reshape") {
+            const [iH, iW, iD] = layer.inputShape;
+            const [oH, oW, oD] = layer.outputShape;
+            const rawSize = layer.outputShape.reduce((acc, val) => acc * val , 1);
+            const visualWidth = Math.min(Math.max(rawSize / 4, 2), 30); 
+            const visualHeight = 1;
+            const visualDepth = 1;
+
+
+            cube = createCube({
+                width: oW,
+                height: oH, 
+                depth: oD,
+                color: 0xFFFFFF,
+                outlineColor: 0xFFFFFF,
+                opacity: 0.5
+            })
+
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ); 
+            currentZ += visualDepth / 2 + baseGap;
+
+            modelGroup.add(cube);
+
+            const layerData = {
+                name: "Reshape",
+                inputShape: layer.inputShape,
+                outputShape: layer.outputShape,
+                desc: "The <b>Reshape</b> layer changes the dimensions (shape) of the data passing through <br/> it without changing the data values. This acts as the `connector` to bridge data from different <br/> layers (e.g: from connected layer to convolutional layer)",
+            };
+
+            cube.userData = layerData;
+            
             viewer.addEventListener("pointermove", (event) => {
                 const rect = viewer.getBoundingClientRect();
                 mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
@@ -695,6 +744,8 @@ function listLayers(layers) {
                     layer.layer_name === "maxPooling" ? "#FFAE00" : 
                     layer.layer_name === "recurrent_cell" ? "#FF69B4" :
                     layer.layer_name === "EmbeddingLayer" ? "#BB6BD9" :
+                    layer.layer_name === "transConvLayer" ? "#00d52e" :
+                    layer.layer_name === "Reshape" ? "#fbfffc" :
                     "red"; // default color: red for connected layer
 
         p.innerHTML = `

@@ -540,7 +540,7 @@ declare module 'neurex' {
         inputShape(shapeConfig: Object): Object;
 
         /**
-         * @method reshape changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `input layer` to bridge data from layers that outputs 1D vector to be feed to convolutional layers which works on spatial grid-like data. 
+         * @method reshape changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `connector` to bridge data from different layers (e.g: from connected layer to convolutional layer). 
          * @param targetShape specify the target shape for the data to be reshape. Default is `[28, 28, 3]`
          * @returns {Object} The reshape layer object configuration
          */

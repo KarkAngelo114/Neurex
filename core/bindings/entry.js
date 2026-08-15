@@ -543,7 +543,7 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
 const gradientClipping = (grads, threshold) => functions.gradientClipping(grads, threshold);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
@@ -565,7 +565,7 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
@@ -585,6 +585,18 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
     getGlobalParams().globalWeights[pointer], 
 );
 
+/**
+ * "✅☑️"
+ * @param {*} activation_outputs 
+ * @param {*} delta 
+ * @param {*} zeroGradAccumulator 
+ * @param {*} strides 
+ * @param {*} filters 
+ * @param {*} inputShape 
+ * @param {*} outputShape 
+ * @param {*} weightShape 
+ * @returns 
+ */
 const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape) => functions.accumulateKernelGradsForTransConv(
     activation_outputs,
     delta, 
