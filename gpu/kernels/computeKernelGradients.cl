@@ -80,3 +80,80 @@ __kernel void computeKernelGradients(
         wg[kernelRowOffset * Cin + c_start + 3] += sum3;
     }
 }
+
+__kernel void accumulateTransConvKernelGrads(
+    __global const float* activation_outputs,
+    __global const float* deltas,
+    __global float* weightGrads,
+    const int iH,
+    const int iW,
+    const int iD,
+    const int oH,
+    const int oW,
+    const int filters,
+    const int kh_size,
+    const int kw_size,
+    const int strides,
+    const int padTop,
+    const int padLeft
+) {
+    /*
+     * One work item computes one (filter, ky, kx, input-channel)
+     * weight gradient.
+     *
+     * Weight layout:
+     *   [filter][ky][kx][input_channel]
+     *
+     * Activation layout:
+     *   [y][x][input_channel]
+     *
+     * Delta layout:
+     *   [y][x][filter]
+     */
+
+    int filter = get_global_id(0);
+    int ky = get_global_id(1);
+
+    int z = get_global_id(2);
+
+    /*
+     * The host launches kw_size * iD work items on dimension 2.
+     * Decode that into kernel-x and input-channel.
+     */
+    int kx = z / iD;
+    int channel = z % iD;
+
+    if (filter >= filters ||
+        ky >= kh_size ||
+        kx >= kw_size ||
+        channel >= iD) {
+        return;
+    }
+
+    float sum = 0.0f;
+    for (int iy = 0; iy < iH; iy++) {
+        int oy = iy * strides + ky - padTop;
+
+        if (oy < 0 || oy >= oH) {
+            continue;
+        }
+
+        for (int ix = 0; ix < iW; ix++) {
+            int ox = ix * strides + kx - padLeft;
+
+            if (ox < 0 || ox >= oW) {
+                continue;
+            }
+
+            int activationIndex = (iy * iW + ix) * iD + channel;
+
+            int deltaIndex = (oy * oW + ox) * filters + filter;
+
+            sum += activation_outputs[activationIndex] * deltas[deltaIndex];
+        }
+    }
+
+    int gradIndex = ((filter * kh_size + ky) * kw_size + kx) * iD + channel;
+
+    weightGrads[gradIndex] += sum;
+}

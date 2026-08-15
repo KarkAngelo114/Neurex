@@ -1,10 +1,15 @@
 # v0.1.0 (In Development)
 ### What's New
-- Introduced recurrent cell to support RNN modeling
+- Added `recurrentCell` to support RNN modeling
+- Added `transConv` layer
+- Addde `reshape` layer
 - added learning rate schedulers
 - added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
 - You can now add you own optimizers and learning rate scheduler. See the latest documentation about [optimizers](https://neurex-documentation.vercel.app/javascript-nodejs#optimizers), and [lr_schedulers](https://neurex-documentation.vercel.app/javascript-nodejs#schedulers), and how to plug in your own.
 - added plugins for visualizer tools. Built-in visualizers are `lossVisualizer()`, `lossLandscapeVisualizer()`, and `modelVisualizer()`
+
+### Fixes
+- fixed all derivative activation functions.
 
 ### What's Updated
 - arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it's now `connectedLayer(layer_size, activation_func)`. See the updated the documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#layers).

@@ -25,6 +25,7 @@ __kernel void element_wise_sub(
     output[i] = arr1[i] - arr2[i];
 
 }
+
 __kernel void scale_diff(
     __global const float* arr1,
     __global const float* arr2,
