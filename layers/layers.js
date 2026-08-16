@@ -90,7 +90,7 @@ class Layers {
         if (vocabSize <= 0 || embeddingDim <= 0 || maxSequenceLength <= 0) throw new Error(`VocabSize or embeddingDim should not be a negative number or 0. vocabSize: ${vocabSize} | embeddingDim: ${embeddingDim} | maxSequenceLength: ${maxSequenceLength}`);
 
         return {
-            layer_name:"EmbeddingLayer",
+            layer_name:"Embedding Layer",
             vocabSize: vocabSize,
             embeddingDim: embeddingDim,
             maxSequenceLength: maxSequenceLength,
@@ -130,7 +130,7 @@ class Layers {
             }
 
             return {
-                layer_name: "connected_layer", 
+                layer_name: "Connected Layer", 
                 activation_function: activation[function_name], 
                 derivative_activation_function: activation.derivatives[function_name],
                 layer_size: layer_size,
@@ -185,7 +185,7 @@ class Layers {
             }
 
             return {
-                layer_name: "convolutionalLayer",
+                layer_name: "Convolutional Layer",
                 activation_function: activation[function_name],
                 derivative_activation_function: activation.derivatives[function_name],
                 kernel_size: kernel_size,
@@ -233,7 +233,7 @@ class Layers {
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
 
             return {
-                layer_name: "maxPooling",
+                layer_name: "Max Pooling",
                 poolSize: poolSize,
                 padding: padding,
                 strides: strides,
@@ -269,7 +269,7 @@ class Layers {
             if (!units || units <= 0) throw new Error(`[ERROR]------- Units cannot be null, negative integer or a 0. | Units: ${units}`);
 
             return {
-                layer_name: "recurrent_cell", 
+                layer_name: "Recurrent Cell", 
                 activation_function: activation[function_name], 
                 derivative_activation_function: activation.derivatives[function_name],
                 units: units,
@@ -329,7 +329,7 @@ class Layers {
             }
 
             return {
-                layer_name: "transConvLayer",
+                layer_name: "Trans Convolution",
                 activation_function: activation[function_name],
                 derivative_activation_function: activation.derivatives[function_name],
                 kernel_size: kernel_size,

@@ -9,7 +9,7 @@ const inputConfig = (shapeConfig) => {
         if (shapeConfig.featureSize && shapeConfig.sequenceLength) {
             const { featureSize, sequenceLength } = shapeConfig;
             return {
-                layer_name: "input_layer",
+                layer_name: "Input Layer",
                 layer_size: featureSize * sequenceLength,
                 input_shape: [1, 1, featureSize, sequenceLength]
             };
@@ -17,7 +17,7 @@ const inputConfig = (shapeConfig) => {
         else if (shapeConfig.features) {
             const features = shapeConfig.features;
             return {
-                layer_name: "input_layer",
+                layer_name: "Input Layer",
                 layer_size: features,
                 input_shape: [1, 1, features, 1]
             };
@@ -26,7 +26,7 @@ const inputConfig = (shapeConfig) => {
             const { height, width, depth } = shapeConfig;
 
             return {
-                layer_name: "input_layer",
+                layer_name: "Input Layer",
                 layer_size: height * width * depth,
                 input_shape: [height, width, depth]
             };

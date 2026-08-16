@@ -16,7 +16,7 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
-const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration, calculateTransConvOutputShape } = require('../utils');
+const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, gradientClipping, scaleGrads } = require('./bindings');
@@ -125,6 +125,7 @@ class Neurex {
      * Shows the model architecture
      */
     modelSummary() {
+
         if (!this.layers || this.layers.length === 0) {
             console.error(`${color.red}[ERROR]------- An error occurred${color.reset}`);
             throw new Error('No layers to show details');
@@ -174,59 +175,11 @@ class Neurex {
 
             let displayName, outputShape, activation, params, padding;
 
-            switch (layerType) {
-                case 'convolutionalLayer':
-                    displayName = 'Convolutional Layer';
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation = activationName;
-                    params = paramCount.toLocaleString();
-                    padding = layer.padding || 'None';
-                    break;
-
-                case 'transConvLayer':
-                    displayName = 'Trans Convolution';
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation = activationName;
-                    params = paramCount.toLocaleString();
-                    padding = layer.padding || 'None';
-                    break;
-
-                case 'connected_layer':
-                    displayName = 'Connected Layer';
-                    outputShape = `(1 x 1 x ${layer.layer_size})`;
-                    activation  = activationName;
-                    params  = paramCount.toLocaleString();
-                    padding = layer.padding || 'None';
-                    break;
-
-                case 'maxPooling':
-                    displayName = 'Max Pooling';
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation  = 'None';
-                    params = '0 (non-param)';
-                    padding = layer.padding || 'None';
-                    break;
-                case "EmbeddingLayer":
-                    displayName = "Embedding Layer";
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation = 'None';
-                    params = paramCount.toLocaleString();
-                    padding = "None"
-                    break;
-                case "recurrent_cell":
-                    displayName = "Recurrent Cell";
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation = activationName|| 'None';
-                    params = paramCount.toLocaleString();
-                    padding = "None"
-                    break;
-                default:
-                    displayName = layerType;
-                    outputShape = `(${layer.outputShape.join(' x ')})`;
-                    activation  = activationName || 'None';
-                    params = paramCount.toLocaleString();
-                    padding = layer.padding || 'None';
-            }
+            displayName = layerType;
+            outputShape = `(${layer.outputShape.join(' x ')})`;
+            activation  = activationName || 'None';
+            params = `${paramCount.toLocaleString()} ${paramCount == 0 ? "(non-param)":""}`;
+            padding = layer.padding || 'None';
 
             console.log(row([displayName, outputShape, activation, params, padding]));
         });
@@ -420,17 +373,20 @@ class Neurex {
             this.clip_norm_value = modelData.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
+
                 let newLayer;
-                if (layerData.layer_name === "connected_layer") {
+                if (layerData.layer_name === "Connected Layer") {
                     // Recreate the connected layer with the correct activation and size
                     newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
                     this.parametric_layers.push(layerData.layer_name);
-                } else if (layerData.layer_name === "input_layer") {
+                } else if (layerData.layer_name === "Input Layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
                 } 
-                else if (layerData.layer_name === "convolutionalLayer") {
+                else if (layerData.layer_name === "Convolutional Layer") {
                     // recreate Convolutional layer
                     newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
                     newLayer.weightShape = layerData.weightShape;
@@ -439,14 +395,14 @@ class Neurex {
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
                     this.parametric_layers.push(layerData.layer_name);
-                } else if (layerData.layer_name === "maxPooling") {
+                } else if (layerData.layer_name === "Max Pooling") {
                     newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     const [H, W, D] = layerData.outputShape;
                     const totalSize = H * W * D;
                 }
-                else if (layerData.layer_name === "EmbeddingLayer") {
+                else if (layerData.layer_name === "Embedding Layer") {
                     const vocabSize = layerData.vocabSize;
                     const embeddingDim = layerData.embeddingDim;
                     const sequence_length = layerData.maxSequenceLength;
@@ -458,7 +414,7 @@ class Neurex {
                     newLayer.outputSize = outputSize;
                     this.parametric_layers.push(layerData.layer_name);
                 }
-                else if (layerData.layer_name === "recurrent_cell") {
+                else if (layerData.layer_name === "Recurrent Cell") {
                     const units = layerData.units;
                     const return_sequence = layerData.return_sequence || false;
                     const return_state = layerData.return_state || false;
@@ -469,7 +425,7 @@ class Neurex {
                     newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
                     this.parametric_layers.push(layerData.layer_name);
                 }
-                else if (layerData.layer_name === "transConvLayer") {
+                else if (layerData.layer_name === "Trans Convolution") {
                     const filters = layerData.filters;
                     const strides = layerData.strides;
                     const kernelSize = layerData.kernel_size
@@ -534,7 +490,7 @@ class Neurex {
 
             layer_data.forEach(layer => {
                 // extract input size
-                if (layer.layer_name === "input_layer") {
+                if (layer.layer_name === "Input Layer") {
                     this.input_size = layer.layer_size;
                     this.input_shape = layer.input_shape || [1, 1, this.input_size || 0];
                     this.depth = this.input_shape[2] || 0;
@@ -1324,7 +1280,7 @@ class Neurex {
         for (let i = 0; i < this.layers.length; i++) {
             const layer = this.layers[i];
 
-            if (layer.layer_name === "convolutionalLayer") {
+            if (layer.layer_name === "Convolutional Layer") {
                 const filters = layer.filters;
                 const [kernelHeight, kernelWidth] = layer.kernel_size;
                 const stride = layer.strides || 1;
@@ -1335,7 +1291,7 @@ class Neurex {
                 W = OutputWidth;
                 D = filters;
             }
-            else if (layer.layer_name === "maxPooling") {
+            else if (layer.layer_name === "Max Pooling") {
                 const [poolHeight, poolWidth] = layer.poolSize;
                 const stride = layer.strides;
                 const padding = layer.padding;
@@ -1345,21 +1301,39 @@ class Neurex {
                 W = OutputWidth;
             } 
 
-            else if (layer.layer_name === "connected_layer") {
+            else if (layer.layer_name === "Connected Layer") {
                 H = 1;
                 W = 1;
                 D = layer.layer_size;
             }
-            else if (layer.layer_name === "EmbeddingLayer") {
+            else if (layer.layer_name === "Embedding Layer") {
                 H = 1;
                 W = 1;
                 D = layer.maxSequenceLength * layer.embeddingDim;
                 sequenceLength = layer.maxSequenceLength;
             }
-            else if (layer.layer_name === "recurrent_cell") {
+            else if (layer.layer_name === "Recurrent Cell") {
                 H = 1;
                 W = 1;
                 D = layer.return_sequence ? (layer.units * layer.maxSequenceLength) : layer.units;
+            }
+            else if (layer.layer_name === "Trans Convolution") {
+                const filters = layer.filters;
+                const [kernelHeight, kernelWidth] = layer.kernel_size;
+                const stride = layer.strides || 1;
+                const padding = layer.padding || "same";
+
+                const {OutputHeight, OutputWidth} = calculateTransposedTensorShape(H, W, kernelHeight, kernelWidth, D, stride, padding);
+                H = OutputHeight;
+                W = OutputWidth;
+                D = filters;
+            }
+            else if (layer.layer_name === "Reshape") {
+                const [h, w, d] = layer.targetShape;
+
+                H = h;
+                W = W;
+                D = d;
             }
         }
 

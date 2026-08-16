@@ -75,7 +75,7 @@ function renderModel(layer_data, weights, biases) {
         let strideX = 1;
         let strideY = 1;
         
-        if (layer.layer_name === "convolutionalLayer" || layer.layer_name === "maxPooling" || layer.layer_name === "transConvLayer" ) {
+        if (layer.layer_name === "Convolutional Layer" || layer.layer_name === "Max Pooling" || layer.layer_name === "Trans Convolution" ) {
             const [iH, iW, iD] = layer.inputShape;
 
             const visualWidth = Math.min(iW, 224);
@@ -89,13 +89,13 @@ function renderModel(layer_data, weights, biases) {
                 height: visualHeight, 
                 width: visualWidth, 
                 depth: visualDepth, 
-                color: spatialLayerName === "convolutionalLayer" ? 0x4f8cff : spatialLayerName === "transConvLayer" ? 0x00d52e : 0xFFAE00,
-                outlineColor: spatialLayerName === "convolutionalLayer" ? 0x00ffff : spatialLayerName === "transConvLayer" ? 0x6af488 : 0xFFAE00, 
+                color: spatialLayerName === "Convolutional Layer" ? 0x4f8cff : spatialLayerName === "Trans Convolution" ? 0x00d52e : 0xFFAE00,
+                outlineColor: spatialLayerName === "Convolutional Layer" ? 0x00ffff : spatialLayerName === "Trans Convolution" ? 0x6af488 : 0xFFAE00, 
                 opacity: 0.3
             });
 
             // Determine kernel / pool dimensions & strides
-            if (spatialLayerName === "convolutionalLayer" || spatialLayerName === "transConvLayer") {
+            if (spatialLayerName === "Convolutional Layer" || spatialLayerName === "Trans Convolution") {
                 const k = layer.kernel_size || layer.kernelSize || [3, 3];
                 windowWidth = Array.isArray(k) ? k[1] : k;
                 windowHeight = Array.isArray(k) ? k[0] : k;
@@ -139,13 +139,13 @@ function renderModel(layer_data, weights, biases) {
 
             // 1. Store metadata inside the cube mesh when creating it inside renderModel()
             const layerData = {
-                name:  spatialLayerName === "convolutionalLayer" ? "Convolutional Layer" : spatialLayerName === "transConvLayer" ? "Trans Convolution" : "Max Pooling Layer",
+                name: spatialLayerName,
                 inputShape: layer.inputShape || `Size: ${layer.layer_size}`,
-                desc: spatialLayerName === "convolutionalLayer" ? conv : spatialLayerName === "transConvLayer" ? transconv : maxpool,
+                desc: spatialLayerName === "Convolutional Layer" ? conv : spatialLayerName === "Trans Convolution" ? transconv : maxpool,
                 outputShape: layer.outputShape,
             };
 
-            if (spatialLayerName === "transConvLayer" || spatialLayerName === "convolutionalLayer") {
+            if (layer.isParametric) {
                 layerData.weight_L1 = L1_Mean(weights[pointer]);
                 layerData.bias_L1 = L1_Mean(biases[pointer]);
                 pointer++;
@@ -209,7 +209,7 @@ function renderModel(layer_data, weights, biases) {
                 tooltip.style.top = `${event.clientY + 12}px`;
             });
         }
-        else if (layer.layer_name === "connected_layer") {
+        else if (layer.layer_name === "Connected Layer") {
             const rawSize = layer.layer_size;
             const visualWidth = Math.min(Math.max(rawSize / 4, 2), 30); 
             const visualHeight = 1;
@@ -248,7 +248,7 @@ function renderModel(layer_data, weights, biases) {
             modelGroup.add(cube);
 
             const layerData = {
-                name: "Connected Layer",
+                name: layer.layer_name,
                 inputShape: layer.inputShape,
                 outputShape: layer.outputShape,
                 desc: "Allows you to build a layer with number of neurons and the <br>activation function to use in a layer. Stacking more layers <br> will build connected layers or multilayer perceptron",
@@ -259,7 +259,6 @@ function renderModel(layer_data, weights, biases) {
                 layerData.bias_L1 = L1_Mean(biases[pointer]);
                 pointer++;
             }
-
 
             cube.userData = layerData;
             
@@ -273,7 +272,7 @@ function renderModel(layer_data, weights, biases) {
                 tooltip.style.top = `${event.clientY + 12}px`;
             });
         }
-        else if (layer.layer_name === "EmbeddingLayer") {
+        else if (layer.layer_name === "Embedding Layer") {
             // Determine 3D cube dimensions (Width: EmbeddingDim, Height: Sequence Length)
             const visualWidth = Math.min(Math.max(layer.embeddingDim / 2, 2), 30);
             const visualHeight = Math.min(Math.max(layer.maxSequenceLength / 2, 2), 30);
@@ -295,7 +294,7 @@ function renderModel(layer_data, weights, biases) {
             currentZ += visualDepth / 2 + baseGap;
 
             const layerData = {
-                name: "Embedding Layer",
+                name: layer.layer_name,
                 inputShape: [1, 1, layer.maxSequenceLength],
                 outputShape: [1, 1, layer.embeddingDim, layer.maxSequenceLength],
                 desc: "Maps discrete token IDs into dense continuous vector representations using a trainable lookup table.",
@@ -332,7 +331,7 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
         } 
-        else if (layer.layer_name === "recurrent_cell") {
+        else if (layer.layer_name === "Recurrent Cell") {
             const visualWidth = Math.min(Math.max(layer.units / 2, 2), 30);
             const visualHeight = 4;
             const visualDepth = 4;
@@ -366,7 +365,7 @@ function renderModel(layer_data, weights, biases) {
             });
 
             const layerData = {
-                name: "Recurrent Cell (RNN)",
+                name: layer.layer_name,
                 inputShape: layer.inputShape,
                 outputShape: layer.outputShape,
                 desc: "is the fundamental building block of a Recurrent Neural Network (RNN) <br/> designed to process sequential data. It maintains an internal `memory` by <br/> taking its output from the previous time step and feeding <br/> it back into itself alongside the new input.",
@@ -740,11 +739,11 @@ function listLayers(layers) {
     layers.forEach(layer => {
         const p = document.createElement('p');
 
-        const color = layer.layer_name === "convolutionalLayer" ? "#4f8cff": 
-                    layer.layer_name === "maxPooling" ? "#FFAE00" : 
-                    layer.layer_name === "recurrent_cell" ? "#FF69B4" :
-                    layer.layer_name === "EmbeddingLayer" ? "#BB6BD9" :
-                    layer.layer_name === "transConvLayer" ? "#00d52e" :
+        const color = layer.layer_name === "Convolutional Layer" ? "#4f8cff": 
+                    layer.layer_name === "Max Pooling" ? "#FFAE00" : 
+                    layer.layer_name === "Recurrent Cell" ? "#FF69B4" :
+                    layer.layer_name === "Embedding Layer" ? "#BB6BD9" :
+                    layer.layer_name === "Trans Convolution" ? "#00d52e" :
                     layer.layer_name === "Reshape" ? "#fbfffc" :
                     "red"; // default color: red for connected layer
 
