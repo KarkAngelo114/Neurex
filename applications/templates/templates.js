@@ -82,7 +82,7 @@ exports.vanillaRNN = (units_per_cell = 3, activation_function = "tanh") => {
     return [
         layer.recurrentCell(units_per_cell, activation_function, true),
         layer.recurrentCell(units_per_cell, activation_function, true),
-        layer.recurrentCell(units_per_cell, activation_function, true),
+        layer.recurrentCell(units_per_cell, activation_function),
     ];
 }
 
