@@ -15,4 +15,6 @@ const runCommand = (command) => {
     runCommand('git pull origin experimental');
     runCommand('git push origin main');
     runCommand('git checkout experimental');
+
+    console.log('\nDone...');
 })();
