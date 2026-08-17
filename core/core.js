@@ -516,6 +516,7 @@ class Neurex {
         
         catch(err) {
             console.error(err);
+            process.exit(1);
         }
     }
 
@@ -759,7 +760,6 @@ class Neurex {
 
                 // batch size
                 for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
-                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
                     numBatches++; // Increment batch count
                     const currentBatch = Math.floor(batchStart / batchSize) + 1;
 
@@ -867,8 +867,10 @@ class Neurex {
                         // assigned updated bias states to it's current index position relative to the layer's index
                         this.optimizerStates.biases[pointer] = res2.state;
 
-                        pointer++;
+                        pointer++;                        
                     }
+
+                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
                     setGlobalParams(
                         this.weights, 
@@ -1082,7 +1084,7 @@ class Neurex {
             this.hasBuilt = true;
         } catch (error) {
             console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
-            throw error;
+            process.exit(1);
         }
     }
 
