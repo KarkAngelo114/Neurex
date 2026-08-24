@@ -848,23 +848,52 @@ class Neurex {
                         // clip accumulated bias gradients using a threshold
                         biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
-                        // update Weights using the optimizer
-                        const res1 = this.optimizer({params: this.weights[pointer], grads: weightGrads[pointer], state: this.optimizerStates.weights[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
+                        // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
+                        const res1 = this.optimizer({
+                            params: this.weights[pointer],
+                            grads: weightGrads[pointer],
+                            state: this.optimizerStates.weights[pointer],
+                            lr: this.learning_rate,
+                            previousEpochLoss,
+                            current_epoch,
+                            batchSize,
+                            totalEpoch: epoch,
+                            trainingFeatureSize: trainX[0].length
+                        });
 
-                        // Update biases using the optimizer
-                        const res2 = this.optimizer({params: this.biases[pointer], grads: biasGrads[pointer], state: this.optimizerStates.biases[pointer], lr: this.learning_rate, previousEpochLoss: previousEpochLoss, current_epoch: current_epoch, batchSize: batchSize, totalEpoch: epoch, trainingFeatureSize: trainX[0].length});
-
-                        // assigned updated weights to it's current index position relative to the layer's index
+                        // update weights corresponding a parametric layer using a pointer
                         this.weights[pointer] = res1.params;
 
-                        // assigned updated biases to it's current index position relative to the layer's index
-                        this.biases[pointer] = res2.params;
-
-                        // assigned updated weight states to it's current index position relative to the layer's index
+                        // store states
                         this.optimizerStates.weights[pointer] = res1.state;
 
-                        // assigned updated bias states to it's current index position relative to the layer's index
-                        this.optimizerStates.biases[pointer] = res2.state;
+
+                        // Update bias only if the layer actually has a bias and has the property `useBias`
+                        if (layer_data_obj?.useBias) {
+
+                            const res2 = this.optimizer({
+                                params: this.biases[pointer],
+                                grads: biasGrads[pointer],
+                                state: this.optimizerStates.biases[pointer],
+                                lr: this.learning_rate,
+                                previousEpochLoss,
+                                current_epoch,
+                                batchSize,
+                                totalEpoch: epoch,
+                                trainingFeatureSize: trainX[0].length
+                            });
+
+                            this.biases[pointer] = res2.params;
+                            this.optimizerStates.biases[pointer] = res2.state;
+
+                        } else {
+
+                            // This layer has no bias parameter.
+                            this.biases[pointer].fill(0);
+                            this.biasGrads[pointer].fill(0);
+                            this.optimizerStates.biases[pointer] = this.biases[pointer];
+
+                        }
 
                         pointer++;                        
                     }
