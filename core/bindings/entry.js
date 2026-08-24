@@ -11,6 +11,7 @@ const {BooleanAvailability} = require('../../gpu/modeSelector');
 const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
 const { getGlobalParams } = require('../../gpu/globals');
+const { unpackQKV, transpose2D } = require('../../utils/utils');
 let addon;
 
 let functions;
@@ -387,12 +388,12 @@ const computeBiasGradsForConnected_Layer = (biasGrads, delta) => functions.compu
 const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => functions.computeBiasGradsForConv(grads, deltas, oh, ow, num_filters);
 
 /**
- * "✅☑️"
+ * "✅☑️" performs X[i] /= scaling_value
  * @param {Float32Array} grad - accumulated gradients
  * @param {Number} batchSize - batch size
  * @returns A float32 array of scaled gradients
  */
-const scaleGrads = (grad, batchSize) => functions.scaleGrad(grad, batchSize)
+const scale = (input, scalingValue) => functions.scaleGrad(input, scalingValue);
 
 /**
  * 
@@ -608,6 +609,64 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
     weightShape
 );
 
+/**
+ * "☑️"
+ * @param {Float32Array} arr1 
+ * @param {Float32Array} arr2 
+ * @param {Number} inputSize 
+ * @param {Number} outputSize 
+ * @returns {Float32Array}
+ */
+const dotProduct = (arr1, arr2, inputSize, outputSize) => float32_Modules.dotProduct(arr1, arr2, inputSize, outputSize);
+
+
+const CoreAttention = (input, layerData, pointer) => {
+    const embedDim = layerData.embedDim;
+    const dkRoot = layerData.dkRoot;
+    const seqLen = layerData.seqLen;
+    const weights = getGlobalParams().globalWeights[pointer];
+    const biases = getGlobalParams().globalBiases[pointer];
+
+    const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKV(weights, biases, embedDim);
+
+    const Q = new Float32Array(seqLen * embedDim);
+    const K = new Float32Array(seqLen * embedDim);
+    const V = new Float32Array(seqLen * embedDim);
+
+    for (let t = 0; t < seqLen; t++) {
+        const tokenVec = input.subarray(t * embedDim, (t + 1) * embedDim);
+        Q.set(functions.MatMul(tokenVec, embedDim, embedDim, Q_weights, Q_bias), t * embedDim);
+        K.set(functions.MatMul(tokenVec, embedDim, embedDim, K_weights, K_bias), t * embedDim);
+        V.set(functions.MatMul(tokenVec, embedDim, embedDim, V_weights, V_bias), t * embedDim);
+    }
+
+    const transpose_K = transpose2D(K, seqLen, embedDim);
+
+    const scores = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const Qrow = Q.subarray(t * embedDim, (t + 1) * embedDim);
+        const rowScores = dotProduct(Qrow, transpose_K, embedDim, seqLen); // inputSize=embedDim, outputSize=seqLen
+        scores.set(rowScores, t * seqLen);
+    }
+
+    const scaledvals = scale(scores, dkRoot);
+
+    const softmaxOutput = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const row = scaledvals.subarray(t * seqLen, (t + 1) * seqLen);
+        softmaxOutput.set(softmax(row), t * seqLen);
+    }
+
+    const output = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const srow = softmaxOutput.subarray(t * seqLen, (t + 1) * seqLen);
+        const orow = dotProduct(srow, V, seqLen, embedDim); // inputSize=seqLen, outputSize=embedDim
+        output.set(orow, t * embedDim);
+    }
+    
+    return output;
+}
+
 
 module.exports = {
     getEmbeddings,
@@ -630,7 +689,7 @@ module.exports = {
     accumulateKernelGradsForTransConv,
     computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
-    scaleGrads,
+    scaleGrads: scale,
     ApplySGD,
     ApplyAdam,
     element_wise_mul,
@@ -649,6 +708,8 @@ module.exports = {
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
     gradientClipping,
+    CoreAttention,
+    dotProduct,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

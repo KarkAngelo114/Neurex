@@ -27,7 +27,7 @@ const embedding = require('./layer_functions/embeddingLayer');
 const rnn = require('./layer_functions/recurrentCell');
 const trans = require('./layer_functions/transConv');
 const reshaper = require('./layer_functions/reshape');
-
+const simple_attention = require("./layer_functions/simpleAttention")
 
 class Layers {
     constructor () {
@@ -355,6 +355,34 @@ class Layers {
             process.exit(1);
         }
     }
+
+    /**
+     * @method `simpleAttention` layer is the implementation of an attention mechanism in its basic form.
+     * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
+     * @return {Object} simple attention layer configs
+     */
+    simpleAttention(useBias = true) {
+
+        let function_name = "softmax";// default is softmax
+
+        return {
+            layer_name: "Simple Attention",
+            useBias: useBias,
+            activation_function: activation[function_name], 
+            derivative_activation_function: activation.derivatives[function_name],
+            isParametric: true,
+            useBias: useBias,
+            initParams: (size, shape, layer_data) => simple_attention.initParams(size, shape, layer_data),
+            determineInferenceType: (layerObject, lossFunc, trainY) => simple_attention.determineInferenceType(layerObject, lossFunc, trainY),
+            feedforward: (input, current_layer, pointer) => simple_attention.feedforward(input, current_layer, pointer),
+            getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => simple_attention.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => simple_attention.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+            applyOwnDerivative: (delta, z, layer_data) => simple_attention.applyOwnDerivative(delta, z, layer_data),
+            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => simple_attention.accumulateKernelGrads(activation_outputs, deltas, weightGrads, layer_data),
+            accumulateBiasGradients: (biasgrads, deltas, layer_data) => simple_attention.accumulateBiasGradients(biasgrads, deltas, layer_data),
+        };
+    }
+
 }
 
 module.exports = Layers;

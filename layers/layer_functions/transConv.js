@@ -146,10 +146,6 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
 
-    // dOutputLayer = element_wise_sub(preds, actuals);
-
-    // return dOutputLayer;
-
     
     if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
         dOutputLayer = element_wise_sub(preds, actuals);

@@ -180,6 +180,44 @@ const concatenateFloat32Array = (chunks) => {
     return result;
 }
 
+/**
+ * @function unpackQKV allows you to unpack parameters of weights and biases of Q, K and V
+ * @param {float32Array} weights QKV weights concatenated to one contagious array
+ * @param {float32Array} biases QKV biases concatenated to one contagious array
+ * @param {Number} embeddingDim embedding dimension value
+ * @returns {{ Q_weights: Float32Array, K_weights: Float32Array, V_weights: Float32Array, Q_bias: Floa32Array, K_bias: Float32Array, V_bias: float32Array }}
+ */
+const unpackQKV = (weights, biases, embeddingDim) => {
+    const matrixSize = embeddingDim * embeddingDim;
+
+    const Q_weights = weights.subarray(0, matrixSize);
+    const K_weights = weights.subarray(matrixSize, matrixSize * 2);
+    const V_weights = weights.subarray(matrixSize * 2, matrixSize * 3);
+
+    const Q_bias = biases.subarray(0, embeddingDim);
+    const K_bias = biases.subarray(embeddingDim, embeddingDim * 2);
+    const V_bias = biases.subarray(embeddingDim * 2, embeddingDim * 3);
+
+    return { Q_weights, K_weights, V_weights, Q_bias, K_bias, V_bias };
+};
+
+/**
+ * Transposes a flattened 1D Float32Array representing a 2D matrix [rows x cols]
+ * @param {Float32Array} matrix - Flattened matrix
+ * @param {Number} rows - Number of rows
+ * @param {Number} cols - Number of columns
+ * @returns {Float32Array} Transposed flattened matrix [cols x rows]
+ */
+function transpose2D(matrix, rows, cols) {
+    const output = new Float32Array(rows * cols);
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            output[c * rows + r] = matrix[r * cols + c];
+        }
+    }
+    return output;
+}
+
 module.exports = {
     calculateTensorShape,
     calculateTransposedTensorShape,
@@ -189,5 +227,7 @@ module.exports = {
     getTotalMB,
     formatDuration,
     concatenateFloat32Array,
-    getTransposedPaddingSizes
+    getTransposedPaddingSizes,
+    unpackQKV,
+    transpose2D
 }

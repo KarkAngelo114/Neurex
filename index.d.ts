@@ -615,6 +615,13 @@ declare module 'neurex' {
         * @throws {Error} if any of the parameters are invalid.
         */
         transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: String, inputShape: Number[], useBias: boolean): Object;
+        
+        /**
+        * @method `simpleAttention` layer is the implementation of an attention mechanism in its simpliest and basic form.
+        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
+        * @return {Object} simple attention layer configs
+        */
+        simpleAttention(useBias: boolean): object;
     }
 
     /**

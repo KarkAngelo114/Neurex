@@ -69,9 +69,19 @@ const DTanh = (arr) => {
     return output;
 };
 
-const DSoftmax = (arr) => {
+const DSoftmax = (arr1, arr2) => {
+    let output = new Float32Array(arr1.length);
 
-    return new Float32Array(arr.length).fill(1);
+    let dot_product = 0;
+    for (let i = 0; i < arr1.length; i++) {
+        dot_product += arr2[i] * arr1[i];
+    }
+
+    for (let i = 0; i < arr1.length; i++) {
+        output[i] = arr1[i] * (arr2[i] - dot_product);
+    }
+
+    return output;
 };
 
 const DLinear = (arr) => {
@@ -997,6 +1007,24 @@ const accumulateKernelGradsForTransConv = (activation_outputs, deltas, weightGra
     return weightGrads;
 }
 
+const dotProduct = (arr1, arr2, inputSize, outputSize) => {
+    const output = new Float32Array(outputSize);
+
+    for (let i = 0; i < inputSize; i++) {
+        const inputVal = arr1[i];
+
+        const rowStart = i * outputSize;
+        const rowEnd = rowStart + outputSize;
+        const inputVal2 = arr2.subarray(rowStart, rowEnd);
+
+        for (let j = 0; j < outputSize; j++) {
+            output[j] += inputVal * inputVal2[j];
+        }
+    }
+
+    return output;
+}
+
 
 module.exports = {
     Relu,
@@ -1043,4 +1071,5 @@ module.exports = {
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
     gradientClipping,
+    dotProduct
 }
