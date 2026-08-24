@@ -10,6 +10,7 @@ const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMat
  */
 const initParams = (size, shape, layer_data) => {
     const units = layer_data.units;
+    const useBias = layer_data.useBias;
     
     // 1. Correctly extract the sequence length and feature size from the embedding layer's output shape
     // shape format from embedding is: [1, 1, embeddingDim, maxSequenceLength]
@@ -43,9 +44,12 @@ const initParams = (size, shape, layer_data) => {
         recurrent_weights[i] = (Math.random() * 2 - 1) * limit2;
     }
 
-    for (let i = 0; i < totalBiases; i++) {
-        biases[i] = (Math.random() * 2 - 1) * limit1;
+    if (useBias) {
+        for (let i = 0; i < totalBiases; i++) {
+            biases[i] = (Math.random() * 2 - 1) * limit1;
+        }
     }
+    
 
     const concatenated_weights = concatenateFloat32Array([input_weights, recurrent_weights]);
     

@@ -12,14 +12,11 @@
  */
 
 const {
-    returnEmbeddings,
     computeWeightGradientsForWeightsInConnectedLayer, 
     computeBiasGradsForConnected_Layer,
-    scaleGrads,
 } = require('../core/bindings/entry');
 
 const activation = require('../core/bindings/entry');
-const { red, reset } = require('../color-code');
 
 // import modular functions of different layers. 
 const inputConfig = require('./layer_functions/inputLayer');
@@ -71,7 +68,7 @@ class Layers {
             determineInferenceType: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
             feedforward: (input) => reshaper.feedforward(input),
             getOutputLayerDelta: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => delta,
+            projectDeltaBackward: (delta) => delta,
             applyOwnDerivative: (delta) => delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {},
@@ -99,10 +96,10 @@ class Layers {
             determineInferenceType: () => embedding.determineInferenceType(),
             feedforward: (input, current_layer, pointer) => embedding.feedforward(input, current_layer, pointer),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => delta,
-            applyOwnDerivative: (delta, z, layer_data) => delta,
+            projectDeltaBackward: (delta) => delta,
+            applyOwnDerivative: (delta,) => delta,
             accumulateWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
-            accumulateBiasGradients: (biasGrads, delta, layer_data) => biasGrads,
+            accumulateBiasGradients: (biasGrads) => biasGrads,
         }
     }
 
@@ -110,13 +107,14 @@ class Layers {
      * @method connectedLayer
      * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
      * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
+     * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
      * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
      * @returns {Object}
      *
      * Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will
      * build connected layers or multilayer perceptron
      */
-    connectedLayer(layer_size = 5, activation_function = 'relu') {
+    connectedLayer(layer_size = 5, activation_function = 'relu', useBias = true) {
         try {
 
             if (!activation_function || !layer_size || layer_size <= 0) {
@@ -135,6 +133,7 @@ class Layers {
                 derivative_activation_function: activation.derivatives[function_name],
                 layer_size: layer_size,
                 isParametric: true,
+                useBias: useBias,
                 initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer) => ann.feedforward(input, current_layer, pointer),
@@ -142,7 +141,7 @@ class Layers {
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => ann.applyOwnDerivative(delta, z, layer_data),
                 accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
-                accumulateBiasGradients: (biasgrads, deltas, layer_data) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
+                accumulateBiasGradients: (biasgrads, deltas) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
             };
         }
         catch (error) {
@@ -158,12 +157,13 @@ class Layers {
      * @param {Array<Number>} kernel_size - the size of the kernel (or filter) that will slide and extracts input features
      * @param {String} activation_function - the activation function to be use for this layer
      * @param {String} padding - adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+     * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
      * @throws {Error} - if any of the parameters are invalid.
      * @returns {Object}
      *
      * Allows you to add convolutional layers in your model architecture in sequential building.
      */
-    convolutionalLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same') {
+    convolutionalLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same', useBias = true) {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -193,6 +193,7 @@ class Layers {
                 padding: padding.toLowerCase(),
                 strides: strides,
                 isParametric: true,
+                useBias: useBias,
                 initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
                 determineInferenceType: () => cnn.determineInferenceType(),
                 feedforward: (input, current_layer, pointer) => cnn.feedforward(input, current_layer, pointer),
@@ -259,9 +260,9 @@ class Layers {
      * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
      * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
      * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
-     * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
+     * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
      */
-    recurrentCell(units, activation_function = "tanh", return_sequence = false, return_state = false) {
+    recurrentCell(units, activation_function = "tanh", return_sequence = false, useBias = true) {
         try {
             let function_name = activation_function.toLowerCase();
 
@@ -274,8 +275,8 @@ class Layers {
                 derivative_activation_function: activation.derivatives[function_name],
                 units: units,
                 return_sequence: return_sequence,
-                return_state: return_state,
                 isParametric: true,
+                useBias: useBias,
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (input, current_layer, pointer) => rnn.feedforward(input, current_layer, pointer),

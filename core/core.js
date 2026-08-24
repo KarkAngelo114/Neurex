@@ -16,7 +16,7 @@ const path = require('path');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
-const { calculateTensorShape, XavierInitialization, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
+const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, gradientClipping, scaleGrads } = require('./bindings');
@@ -225,6 +225,7 @@ class Neurex {
      * 
      * saveModel() allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
      *  as a .nrx (neurex) model
+     * @async
      * @method saveModel()
      * @param {string} modelName the filename of your model
      * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model size when adding miscellaneous.
@@ -281,11 +282,11 @@ class Neurex {
     }
 
     /**
-     * 
+     * @async
      * @param {String} model path to your model
      * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`. 
      */
-    loadSavedModel(model, showLog = true) {
+    async loadSavedModel(model, showLog = true) {
         try {
             if (!model) {
                 throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
@@ -400,7 +401,6 @@ class Neurex {
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     const [H, W, D] = layerData.outputShape;
-                    const totalSize = H * W * D;
                 }
                 else if (layerData.layer_name === "Embedding Layer") {
                     const vocabSize = layerData.vocabSize;
@@ -571,6 +571,7 @@ class Neurex {
     * This method initializes the weights and biases for each layer, then iteratively performs forward propagation,
     * computes the loss, backpropagates the error, and updates the weights and biases using gradient descent.
     *
+    * @async
     * @method train()
     * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
     * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
@@ -625,8 +626,6 @@ class Neurex {
             trainX.push(inputs[i] instanceof Float32Array ? inputs[i] : new Float32Array(inputs[i].flat(Infinity)));
         }
 
-        // Infer task type based on output layer and loss/activation
-        let lastLayer = this.layers[this.layers.length - 1];
         this.loss_function = loss.toLowerCase();
         const loss_function = lossFunctions[this.loss_function.toLowerCase()];
             

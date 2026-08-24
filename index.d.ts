@@ -294,21 +294,22 @@ declare module 'neurex' {
         * 
         * `saveModel()` allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
         *  as a .nrx (neurex) model
-        * 
+        * @async
         * @method saveModel()
         * @param {string} modelName the filename of your model
         * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model file size when adding miscellaneous.
         *   
         */
-        saveModel(modelName: string, miscellaneous: object): void;
+        async saveModel(modelName: string, miscellaneous: object): void;
 
         /**
+        * @async
         * @method loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
         * @param {String} model the trained model file name
         * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
         * @returns {void}
         */
-        loadSavedModel(model: string, showLog: Boolean): void;
+        async loadSavedModel(model: string, showLog: Boolean): void;
 
         /**
         * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
@@ -338,7 +339,7 @@ declare module 'neurex' {
         /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
-        * 
+        * @async 
         * @method train()
         * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
         * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
@@ -367,18 +368,19 @@ declare module 'neurex' {
         * 
         * 
         */
-        train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number): void;
+        async train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number): void;
 
         /**
         * 
-        @method predict
-        @param {Array} input - input data 
-        @returns Array of predictions
-        @throws Error when there's shape mismatch and no input data
+        * @async
+        * @method predict
+        * @param {Array} input - input data 
+        * @returns Array of predictions
+        * @throws Error when there's shape mismatch and no input data
 
         produces predictions based on the input data
         */
-        predict(input: number[][]): number[];
+        async predict(input: number[][]): number[];
     }
 
     /**
@@ -558,10 +560,11 @@ declare module 'neurex' {
         /**
         * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
         * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
+        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
         */
-        connectedLayer(layer_size: number, activation: string): Object;
+        connectedLayer(layer_size: number, activation: string, useBias: boolean): Object;
 
         /**
         * 
@@ -571,10 +574,11 @@ declare module 'neurex' {
         * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
         * @param {String} activation_function the activation function to be use for this layer
         * @param {String} padding adds extra values (typically 0s) around the border of an input before applying a convolutional filter
+        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @returns {Object} The convolutional layer object configuration
         * @throws {Error} if any of the parameters are invalid.
         */
-        convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string): Object;
+        convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string, useBias: boolean): Object;
 
         /**
         * @method maxPooling is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
@@ -591,11 +595,11 @@ declare module 'neurex' {
          * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
          * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
          * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
-         * @param {Boolean} return_state default value is `false`. If `true`, the layer will return its final hidden state vector as a separate tensor alongside its standard output.
+         * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
          * @returns {Object} The Recurrent Cell configuration
          * @throws {Error} if internal initialization and computational process has an error.
          */
-        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean): Object;
+        recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, useBias: boolean): Object;
 
         /**
         * 

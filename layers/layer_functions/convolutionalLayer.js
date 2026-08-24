@@ -16,6 +16,7 @@ const initParams = (size, shape, layer_data) => {
     const [kH, kW] = layer_data.kernel_size;
     const stride = layer_data.strides || 1;
     const padding = layer_data.padding || "same";
+    const useBias = layer_data.useBias;
 
     const inputH = shape[0];
     const inputW = shape[1];
@@ -37,9 +38,12 @@ const initParams = (size, shape, layer_data) => {
         kernels[i] = (Math.random() * 2 - 1) * limit;
     }
 
-    for (let i = 0; i < filters; i++) {
-        biases[i] = (Math.random() * 2 - 1) * limit;
+    if (useBias) {
+        for (let i = 0; i < filters; i++) {
+            biases[i] = (Math.random() * 2 - 1) * limit;
+        }
     }
+    
 
     // Calculate output shape
     const { OutputHeight, OutputWidth, CalculatedTensorShape } = calculateTensorShape(inputH, inputW, kH, kW, filters, stride, padding);

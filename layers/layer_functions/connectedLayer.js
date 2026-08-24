@@ -14,6 +14,7 @@ const initParams = (size, shape, layer_data) => {
     const inputSize = size;
     const outputSize = layer_data.layer_size;
     const TotalWeightSize = outputSize * inputSize;
+    const useBias = layer_data.useBias;
                     
     const weights = new Float32Array(TotalWeightSize);
     const weightGrads = new Float32Array(TotalWeightSize);
@@ -25,10 +26,13 @@ const initParams = (size, shape, layer_data) => {
     for (let i = 0; i < TotalWeightSize; i++) {
         weights[i] = (Math.random() * 2 - 1) * limit;
     }
-                    
-    for (let i = 0; i < outputSize; i++) {
-        biases[i] = (Math.random() * 2 - 1) * limit;
+    
+    if (useBias) {
+        for (let i = 0; i < outputSize; i++) {
+            biases[i] = (Math.random() * 2 - 1) * limit;
+        }
     }
+    
 
     const weightShape = [inputSize, outputSize];
     const updatedShape = [1, 1, outputSize]
