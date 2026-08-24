@@ -11,6 +11,7 @@ const runCommand = (command) => {
 };
 
 (async () => {
+    runCommand("cls");
     runCommand('git checkout main');
     runCommand('git pull origin experimental');
     runCommand('git push origin main');
