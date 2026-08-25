@@ -19,7 +19,7 @@ const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init, gradientClipping, scaleGrads } = require('./bindings');
+const { init, gradientClipping, scale } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const version = require('../package.json').version;
 
@@ -837,10 +837,10 @@ class Neurex {
                         }
 
                         // scale weight gradients
-                        weightGrads[pointer] = scaleGrads(weightGrads[pointer], actualBatchSize, layer_data_obj);
+                        weightGrads[pointer] = scale(weightGrads[pointer], actualBatchSize, layer_data_obj);
 
                         // scale bias gradients
-                        biasGrads[pointer] = scaleGrads(biasGrads[pointer], actualBatchSize);
+                        biasGrads[pointer] = scale(biasGrads[pointer], actualBatchSize);
                         
                         // clip accumulated weight gradients using a threshold
                         weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
