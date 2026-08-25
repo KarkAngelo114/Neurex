@@ -115,6 +115,10 @@ const feedforward = (input, current_layer, pointer) => {
     const activation_function = activation[current_layer.activation_function.name]; // activation function
     let outputs = activation_function(z_values); // use the activation function       
     if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
+
+    current_layer.cache = {
+        layer_output: outputs,
+    }
                     
     return {
         outputs, 
@@ -189,7 +193,10 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
  */
 const applyOwnDerivative = (delta, z, layer_data) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const dAct = dActivation(z);
+    const storedOutput = layer_data.cache.layer_output;
+
+    const dAct = dActivation(z, storedOutput); // just in case this layer uses softmax activation if this layer is a hidden layer. Softmax derivative uses two array inputs
+
     const result = element_wise_mul(dAct, delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in applyOwnDerivative (connectedLayer)");
     return result;

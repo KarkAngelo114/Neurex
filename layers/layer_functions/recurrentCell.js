@@ -238,7 +238,8 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
     const sequenceLength = layer_data.maxSequenceLength;
     const units = layer_data.units;
     const featureSize = layer_data.weightShape[0];
-    const recurrentZs = layer_data.cache.recurrentZs;
+    const hiddenStates = layer_data.cache.hidden_states; // Array of Float32Array
+    const recurrentZs = layer_data.cache.recurrentZs; // Array of Float32Array
     const dActivation = activation.derivatives[layer_data.activation_function.name];
 
     const inputDeltas = new Float32Array(sequenceLength * featureSize);
@@ -250,19 +251,28 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 
         if (layer_data.return_sequence) {
             dUpper.set(delta.subarray(t * units, (t + 1) * units));
-        } 
-        else if (t === sequenceLength - 1) {
+        } else if (t === sequenceLength - 1) {
             dUpper.set(delta);
         }
 
         let dTotal = new Float32Array(units);
-        for (let i = 0; i < units; i++) dTotal[i] = dUpper[i] + dNextTime[i];
+        for (let i = 0; i < units; i++) {
+            dTotal[i] = dUpper[i] + dNextTime[i];
+        }
 
-        const delta_t = element_wise_mul(dTotal, dActivation(recurrentZs[t]));
+        // pass both recurrentZs[t] and hiddenStates[t]
+        // the recurrenZs are array of float32array that are not yet passed through an activation function. While the hidden states are the activated outputs
+        const dAct = dActivation(recurrentZs[t], hiddenStates[t]);
+        
+        // For element-wise activations, dAct is dL/dz. 
+        // For Softmax, dsoftmax(a_t, dTotal) computes the Jacobian-vector product J^T * dTotal directly.
+        const delta_t = (layer_data.activation_function.name === "softmax") 
+            ? dAct // dsoftmax already calculates the vector product if passed (a, delta)
+            : element_wise_mul(dTotal, dAct);
+
         if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrentCell.projectDeltaBackward");
 
         deltaTs[t] = delta_t;
-
         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer);
         const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer);
         inputDeltas.set(dInput_t, t * featureSize);

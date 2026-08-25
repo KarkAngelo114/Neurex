@@ -201,10 +201,11 @@ const dtanh = (input) => functions.DTanh(input);
 /**
  * "✅☑️"
  * @function dsoftmax
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} arr1 - Float32Array input
+ * @param {Float32Array} arr2 - Float32Array input
  * @returns - 1D array of activated features (Using Softmax Derivative)
  */
-const dsoftmax = (input) => functions.DSoftmax(input)
+const dsoftmax = (arr1, arr2) => functions.DSoftmax(arr1, arr2);
 
 /**
  * "✅☑️"
@@ -617,17 +618,21 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
  * @param {Number} outputSize 
  * @returns {Float32Array}
  */
-const dotProduct = (arr1, arr2, inputSize, outputSize) => float32_Modules.dotProduct(arr1, arr2, inputSize, outputSize);
+const dotProduct = (arr1, arr2, inputSize, outputSize) => functions.dotProduct(arr1, arr2, inputSize, outputSize);
 
-
+/**
+ * 
+ * @param {Float32Array} input 
+ * @param {Object} layerData 
+ * @param {Number} pointer 
+ * @returns 
+ */
 const CoreAttention = (input, layerData, pointer) => {
-    const embedDim = layerData.embedDim;
-    const dkRoot = layerData.dkRoot;
-    const seqLen = layerData.seqLen;
+    const { embedDim, dkRoot, seqLen } = layerData;
     const weights = getGlobalParams().globalWeights[pointer];
     const biases = getGlobalParams().globalBiases[pointer];
 
-    const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKV(weights, biases, embedDim);
+    const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKV(weights, biases, null, null, embedDim);
 
     const Q = new Float32Array(seqLen * embedDim);
     const K = new Float32Array(seqLen * embedDim);
@@ -663,8 +668,98 @@ const CoreAttention = (input, layerData, pointer) => {
         const orow = dotProduct(srow, V, seqLen, embedDim); // inputSize=seqLen, outputSize=embedDim
         output.set(orow, t * embedDim);
     }
+
+    layerData.cache = {
+        X: input,
+        Q: Q, 
+        K: K, 
+        V: V,
+        S: softmaxOutput
+    };
     
     return output;
+}
+
+/**
+ * 
+ * @param {Float32Array} incomingDelta 
+ * @param {Object} layerData 
+ * @param {Number} pointer 
+ */
+const CoreAttentionBackward = (incomingDelta, layerData, pointer) => {
+    const { embedDim, dkRoot, seqLen } = layerData;
+    const { Q, K, V, S: storedS } = layerData.cache; 
+    const weights = getGlobalParams().globalWeights[pointer];
+
+    // just like in feedforward, we unpack the weights, but we pass "null" to the 2nd - 4th argument of the function because we only want the weights for QKV
+    const {Q_weights, K_weights, V_weights} = unpackQKV(weights, null, null, null, embedDim);
+
+    const transpose_V = transpose2D(V, seqLen, embedDim); 
+    const dS = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const deltaRow = incomingDelta.subarray(t * embedDim, (t + 1) * embedDim);
+        dS.set(dotProduct(deltaRow, transpose_V, embedDim, seqLen), t * seqLen);
+    }
+
+    const transpose_S = transpose2D(storedS, seqLen, seqLen); // Sᵀ
+    const dV = new Float32Array(seqLen * embedDim);
+    for (let k = 0; k < seqLen; k++) {
+        const sCol = transpose_S.subarray(k * seqLen, (k + 1) * seqLen);
+        dV.set(dotProduct(sCol, incomingDelta, seqLen, embedDim), k * embedDim);
+    }
+
+    // apply the softmax derivative (Jacobian matrix)
+    const dScaled = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const sRow = storedS.subarray(t * seqLen, (t + 1) * seqLen);
+        const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
+        
+        // we pass the sRow (storedS during feedfoward) and dSRow
+        dScaled.set(functions.DSoftmax(sRow, dSRow), t * seqLen);
+    }
+
+    const dScores = scale(dScaled, dkRoot);
+
+    const dQ = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const dScoreRow = dScores.subarray(t * seqLen, (t + 1) * seqLen);
+        dQ.set(dotProduct(dScoreRow, K, seqLen, embedDim), t * embedDim);
+    }
+
+    const transpose_dScores = transpose2D(dScores, seqLen, seqLen);
+    const dK = new Float32Array(seqLen * embedDim);
+    for (let k = 0; k < seqLen; k++) {
+        const col = transpose_dScores.subarray(k * seqLen, (k + 1) * seqLen);
+        dK.set(dotProduct(col, Q, seqLen, embedDim), k * embedDim);
+    }
+
+    const transpose_Qw = transpose2D(Q_weights, embedDim, embedDim);
+    const transpose_Kw = transpose2D(K_weights, embedDim, embedDim);
+    const transpose_Vw = transpose2D(V_weights, embedDim, embedDim);
+
+    const dX = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+
+        const fromQ = dotProduct(dQrow, transpose_Qw, embedDim, embedDim);
+        const fromK = dotProduct(dKrow, transpose_Kw, embedDim, embedDim);
+        const fromV = dotProduct(dVrow, transpose_Vw, embedDim, embedDim);
+
+        for (let d = 0; d < embedDim; d++) {
+            dX[t * embedDim + d] = fromQ[d] + fromK[d] + fromV[d];
+        }
+    }
+
+
+    layerData.cache = {
+        dQ: dQ,
+        dK: dK,
+        dV: dV
+    }
+
+    return dX;
 }
 
 
@@ -710,6 +805,7 @@ module.exports = {
     gradientClipping,
     CoreAttention,
     dotProduct,
+    CoreAttentionBackward,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

@@ -114,6 +114,10 @@ const feedforward = (input, current_layer, pointer) => {
 
     if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");
 
+    current_layer.cache = {
+        layer_output: outputs,
+    }
+
     return {
         outputs: outputs,
         z_values: convolve_result,
@@ -203,7 +207,9 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
  */
 const applyOwnDerivative = (delta, z, layer_data) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const result = element_wise_mul(dActivation(z), delta);
+    const storedOutput = layer_data.cache.layer_output;
+    
+    const result = element_wise_mul(dActivation(z, storedOutput), delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
     return result;
 }

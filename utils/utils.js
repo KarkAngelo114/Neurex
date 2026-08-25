@@ -181,24 +181,84 @@ const concatenateFloat32Array = (chunks) => {
 }
 
 /**
- * @function unpackQKV allows you to unpack parameters of weights and biases of Q, K and V
- * @param {float32Array} weights QKV weights concatenated to one contagious array
- * @param {float32Array} biases QKV biases concatenated to one contagious array
+ * @function unpackQKV allows you to unpack parameters of weights and biases of Q, K and V as well as the weights and biases zeroed accumulator
+ * @param {Float32Array} weights QKV weights concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} biases QKV biases concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} weightGrads QKV weightsGrads concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} biasesGrads QKV biasesGrads concatenated to one contagious array. (Nullable)
  * @param {Number} embeddingDim embedding dimension value
- * @returns {{ Q_weights: Float32Array, K_weights: Float32Array, V_weights: Float32Array, Q_bias: Floa32Array, K_bias: Float32Array, V_bias: float32Array }}
+ * @returns {{ 
+ *   Q_weights: Float32Array, 
+ *   K_weights: Float32Array, 
+ *   V_weights: Float32Array, 
+ *   Q_bias: Floa32Array, 
+ *   K_bias: Float32Array, 
+ *   V_bias: Float32Array,
+ *   Q_weightGrads: Float32Array,
+ *   K_weightGrads: Float32Array,
+ *   V_weightGrads: Float32Array,
+ *   Q_biasGrads: Float32Array,
+ *   K_biasGrads: Float32Array,
+ *   V_biasGrads: Float32Array,
+ * }}
+ *
+ *
+ *
+ *
  */
-const unpackQKV = (weights, biases, embeddingDim) => {
+const unpackQKV = (weights, biases, weightGrads, biasGrads, embeddingDim) => {
     const matrixSize = embeddingDim * embeddingDim;
+    let Qw; // Q_weights
+    let Kw; // K_weights
+    let Vw; // V_weights
+    let Qb; // Q_bias
+    let Kb; // K_bias
+    let Vb; // V_bias
+    let QwG; // Q_weightGrads
+    let KwG; // K_weightGrads
+    let VwG; // V_weightGrads
+    let QbG; // Q_biasGrads
+    let KbG; // K_biasGrads
+    let VbG; // V_biasGrads
 
-    const Q_weights = weights.subarray(0, matrixSize);
-    const K_weights = weights.subarray(matrixSize, matrixSize * 2);
-    const V_weights = weights.subarray(matrixSize * 2, matrixSize * 3);
+    if (weights) {
+        Qw = weights.subarray(0, matrixSize);
+        Kw = weights.subarray(matrixSize, matrixSize * 2);
+        Vw = weights.subarray(matrixSize * 2, matrixSize * 3);
+    }
 
-    const Q_bias = biases.subarray(0, embeddingDim);
-    const K_bias = biases.subarray(embeddingDim, embeddingDim * 2);
-    const V_bias = biases.subarray(embeddingDim * 2, embeddingDim * 3);
+    if (biases) {
+        Qb = biases.subarray(0, embeddingDim);
+        Kb = biases.subarray(embeddingDim, embeddingDim * 2);
+        Vb = biases.subarray(embeddingDim * 2, embeddingDim * 3);
+    }
 
-    return { Q_weights, K_weights, V_weights, Q_bias, K_bias, V_bias };
+    if (weightGrads) {
+        QwG = weightGrads.subarray(0, matrixSize);
+        KwG = weightGrads.subarray(matrixSize, matrixSize * 2);
+        VwG = weightGrads.subarray(matrixSize * 2, matrixSize * 3);
+    }
+
+    if (biasGrads) {
+        QbG = biasGrads.subarray(0, embeddingDim);
+        KbG = biasGrads.subarray(embeddingDim, embeddingDim * 2);
+        VbG = biasGrads.subarray(embeddingDim * 2, embeddingDim * 3);
+    }
+
+    return { 
+        Q_weights: Qw, 
+        K_weights: Kw, 
+        V_weights: Vw, 
+        Q_bias: Qb, 
+        K_bias: Kb, 
+        V_bias: Vb,
+        Q_weightGrads: QwG,
+        K_weightGrads: KwG,
+        V_weightGrads: VwG,
+        Q_biasGrads: QbG,
+        K_biasGrads: KbG,
+        V_biasGrads: VbG
+    };
 };
 
 /**

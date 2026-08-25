@@ -1,6 +1,6 @@
 const activation = require('../../core/bindings');
-const { CoreAttention } = require('../../core/bindings');
-const { XavierInitialization, concatenateFloat32Array } = require('../../utils');
+const { CoreAttention, CoreAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings');
+const { XavierInitialization, concatenateFloat32Array, unpackQKV } = require('../../utils');
 
 /**
  * Initialized parameters for this layer
@@ -41,7 +41,7 @@ const initParams = (size, shape, layer_data) => {
     layer_data.seqLen = shape[3];
 
     return {
-        updatedSize: embeddingDim,
+        updatedSize: embeddingDim * shape[3],
         updatedShape: [1, 1, embeddingDim, shape[3]], // seqLen unchanged, embedDim unchanged
         weights,
         biases,
@@ -77,11 +77,6 @@ const feedforward = (input, current_layer, pointer) => {
 
     if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during feed forward)");
 
-    current_layer.cache = {
-        softmax_output: output
-    }
-
-
     return {
         outputs: output,
         z_values: output,
@@ -100,41 +95,9 @@ const feedforward = (input, current_layer, pointer) => {
  * @returns {Float32Array} the delta of the output layer
  */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
-    let dActivation = activation.derivatives[layerObj.activation_function.name];
-    let dOutputLayer = new Float32Array(preds.length); 
-
-    
-    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
-        dOutputLayer = element_wise_sub(preds, actuals);
-    }
-    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
-        dOutputLayer.set(preds);
-        dOutputLayer[actuals[0]] -= 1;
-                        
-    }
-    else if (tasktype === "regression") {
-        if (preds.length != actuals.length) throw new Error("Predictions array is not equal to actuals array");
-
-        const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs); 
-
-        dOutputLayer = scaleDiff(preds, actuals, dAct);
-
-        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
-
-    }
-
-    return dOutputLayer;
 }
 
 /**
- * Projects the incoming delta backward through THIS conv layer's own kernels.
- * Called on the *next* layer (in feedforward direction) from the core backprop loop.
- * No branching on layer type — each layer implements this for itself.
- *
- * Math: we dilate the incoming delta (to undo strides), pad it (to undo the
- * original padding mode), then cross-correlate with the flipped kernels to
- * recover the gradient w.r.t. the previous layer's output.
  *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
  * @param {Number} pointer - weight pointer for THIS conv layer
@@ -144,23 +107,19 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 
-    return [];
+    const output = CoreAttentionBackward(delta, layer_data, pointer);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
+    return output;
 }
 
 /**
- * Applies this conv layer's own activation derivative to the projected delta.
- * Called on the *current* layer from the core backprop loop.
- *
  * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
  * @param {Float32Array} z - pre-activation values (z) for this layer
  * @param {Object} layer_data - this layer's own configuration
  * @returns {Float32Array} delta for the layer before this one
  */
-const applyOwnDerivative = (delta, z, layer_data) => {
-    const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const result = element_wise_mul(dActivation(z), delta);
-    if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
-    return result;
+const applyOwnDerivative = (delta) => {
+    return delta;
 }
 
 /**
@@ -172,7 +131,21 @@ const applyOwnDerivative = (delta, z, layer_data) => {
  * @returns {Float32Array} Float32Array accumulated gradients
  */
 const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
-    return [];
+    const { embedDim, seqLen, cache } = layer_data;
+    const { dQ, dK, dV } = cache;
+    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads } = unpackQKV(null, null, weightGrads, null, embedDim);
+
+    for (let t = 0; t < seqLen; t++) {
+        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+
+        computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
+        computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
+        computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
+    }
+    return weightGrads;
 }
 
 /**
@@ -182,8 +155,17 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
  * @param {Object} layer_data layer configuration data
  * @returns {Float32Array} Float32Array accumulated gradients
  */
-const accumulateBiasGradients = (biasgrads, deltas, layer_data) => {
-    return [];
+const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
+    const { embedDim, seqLen, cache } = layer_data;
+    const { dQ, dK, dV } = cache;
+    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads } = unpackQKV(null, null, null, biasGrads, embedDim);
+
+    for (let t = 0; t < seqLen; t++) {
+        computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
+        computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
+        computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
+    }
+    return biasGrads;
 }
 
 module.exports = {

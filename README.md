@@ -58,36 +58,58 @@ const { Neurex, Layers } = require('neurex');
 ```
 
 
-Built-in layers:
+### Built-in layers:
+The `Layers` class acts as a factory for generating neural network layer configurations. Here are some layers that are avaulable to use:
 
-`connectedLayer(layer_size: number, activation: string)`
+connectedLayer(`layer_size: number, activation: string, useBias: boolean`)
+- Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
 
 ```JavaScript
 layer.connectedLayer(5, 'tanh');
 ```
 
-`convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string)`
-
+convolutionalLayer(`filters: number, strides: number, kernel_size: number[], activation_function: string, padding: string, useBias: boolean`)
+-  Allows you to add convolutional layers in your model architecture in sequential building.
 ```JavaScript
 layer.convolutionalLayer(12, 1, [3, 3], 'relu', 'same'); // or use 'valid'
 ```
 
-`embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number)`
-
+embeddingLayer(`vocabSize: number, embeddingDim: number, maxSequenceLength: number`)
+- Creates an embedding layer for token encoding.
 ```JavaScript
 layer.embeddingLayer(5000, 50, 10)
 ```
 
-`maxPooling(poolSize: Number[], strides: Number, padding: String)`
+maxPooling(`poolSize: number[], strides: number, padding: string`)
+- is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
 
 ```JavaScript
 layer.maxPooling([2, 2], 2, 'same'); // or use 'valid'
 ```
 
-`recurrentCell(units: Number, activation_function: String, return_sequence: Boolean, return_state: Boolean)`
+recurrentCell(`units: Number, activation_function: string, return_sequence: boolean, useBias: boolean`)
+- is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
 
 ```JavaScript
 layer.recurrentCell(18, 'tanh', true); // or false if the next layer in the stack is not recurrent
+```
+
+reshape(`targetSize: number[]`);
+- changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `connector` to bridge data from different layers (e.g: from connected layer to convolutional layer). 
+```JavaScript
+layer.reshape([28, 28, 1]);
+```
+
+transConvLayer(`filters: number, strides: number, kernel_size: number[], activation_function: string,  padding: string, inputShape: number[], useBias: boolean`)
+- `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
+```JavaScript
+layer.transConvLayer(3, 2, [3, 3], 'linear', 'same', [56, 56, 5], false),
+```
+
+simpleAttention(`useBias: boolean`)
+- `simpleAttention` is the implementation of an attention layer in its simpliest and basic form.
+```JavaScript
+layer.simpleAttention()
 ```
 
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).

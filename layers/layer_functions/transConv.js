@@ -125,6 +125,10 @@ const feedforward = (input, current_layer, pointer) => {
     const output = activation_function(transConvOutput);
     if (output.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after applying activation");
 
+    current_layer.cache = {
+        layer_output: output,
+    }
+
     return {
         outputs: output,
         z_values: transConvOutput,
@@ -203,7 +207,9 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
  */
 const applyOwnDerivative = (delta, z, layer_data) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const result = element_wise_mul(dActivation(z), delta);
+    const storedOutput = layer_data.cache.layer_output;
+
+    const result = element_wise_mul(dActivation(z, storedOutput), delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
 
     return result;

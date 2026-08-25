@@ -560,8 +560,8 @@ declare module 'neurex' {
         /**
         * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
         * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
-        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
+        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
         * @throws {Error} When activation function is undefined (no activation is provided) or layer size is not provided or it's 0
         */
         connectedLayer(layer_size: number, activation: string, useBias: boolean): Object;
@@ -617,9 +617,26 @@ declare module 'neurex' {
         transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: String, inputShape: Number[], useBias: boolean): Object;
         
         /**
-        * @method `simpleAttention` layer is the implementation of an attention mechanism in its simpliest and basic form.
-        * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
-        * @return {Object} simple attention layer configs
+        * @method `simpleAttention` is the implementation of an attention layer in its simpliest and basic form. This layer creates a single-head Scaled Dot-Product Self-Attention layer inspired/based on the attention mechanism introduced by Vaswani et al. (2017).
+        *
+        * This layer projects an input sequence matrix X of shape `[1, 1, embedDim, seqLen]`
+        * into Query (Q), Key (K), and Value (V) representations via learnable linear transformations. 
+        * It computes attention weights using scaled dot-product attention:
+        * 
+        *   Attention(Q, K, V) = softmax( (Q * K^T) / sqrt(d_k) ) * V
+        *
+        * @param {Boolean} useBias  Dictates whether linear projections for Q, K, and V initialize and apply additive bias parameters. Default is `true`.
+        * @returns {Object} Layer configuration object for model architecture assembly, backpropagation, and execution.
+        * 
+        * @see {@link https://arxiv.org/abs/1706.03762 | Vaswani et al. (2017) - "Attention Is All You Need"}
+        * 
+        * @example
+        * // Adding simple self-attention after an embedding layer:
+        * model.sequentialBuild([
+        *   layer.embeddingLayer(5000, 64, 128),
+        *   layer.simpleAttention(),
+        *   layer.connectedLayer(10, "softmax")
+        * ]);
         */
         simpleAttention(useBias: boolean): object;
     }

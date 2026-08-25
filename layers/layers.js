@@ -378,7 +378,7 @@ class Layers {
             getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => simple_attention.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
             projectDeltaBackward: (delta, pointer, targetShape, layer_data) => simple_attention.projectDeltaBackward(delta, pointer, targetShape, layer_data),
             applyOwnDerivative: (delta, z, layer_data) => simple_attention.applyOwnDerivative(delta, z, layer_data),
-            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => simple_attention.accumulateKernelGrads(activation_outputs, deltas, weightGrads, layer_data),
+            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => simple_attention.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
             accumulateBiasGradients: (biasgrads, deltas, layer_data) => simple_attention.accumulateBiasGradients(biasgrads, deltas, layer_data),
         };
     }
