@@ -31,8 +31,6 @@ const initParams = (size, shape, layer_data) => {
     const weightGrads = new Float32Array(total_input_weights + total_recurrent_weights); 
     const biasGrads = new Float32Array(totalBiases);
 
-    const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
-
     const limit1 = XavierInitialization(feature_size, units); // Use feature_size
     const limit2 = XavierInitialization(units, units);
                     
@@ -57,7 +55,11 @@ const initParams = (size, shape, layer_data) => {
     const weightShape = [feature_size, units, units, units]; 
 
     layer_data.maxSequenceLength = return_sequence ? maxSequenceLength : 1;
-    const updatedShape = [1, 1, outputUnits];
+    const updatedShape = return_sequence
+        ? [1, 1, units, maxSequenceLength]   // matches attention's expected [_, _, embedDim, seqLen]
+        : [1, 1, units];                      // no sequence dimension left, this is fine as-is
+
+    const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
 
     return {
         updatedSize: outputUnits,

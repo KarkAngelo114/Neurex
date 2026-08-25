@@ -199,11 +199,11 @@ const computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
     return output;
 }
 
-const scaleGrad = (grads, batchSize) => {
-    const output = grads;
+const scale = (input, scalingValue) => {
+    const output = input;
 
-    for (let i = 0; i < grads.length; i++) {
-        output[i] /= batchSize;
+    for (let i = 0; i < input.length; i++) {
+        output[i] /= scalingValue;
     }
 
     return output;
@@ -1043,7 +1043,7 @@ module.exports = {
     DeltaMatMul,
     computeWeightGradientsForWeightsInConnectedLayer,
     computeBiasGradsForConnected_Layer,
-    scaleGrad,
+    scale,
     SGD,
     Adam,
     ApplyPadding,

@@ -390,11 +390,11 @@ const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => function
 
 /**
  * "✅☑️" performs X[i] /= scaling_value
- * @param {Float32Array} grad - accumulated gradients
- * @param {Number} batchSize - batch size
- * @returns A float32 array of scaled gradients
+ * @param {Float32Array} input - float32Array input
+ * @param {Number} scalingValue - scaling value
+ * @returns A float32 array of scaled outpur
  */
-const scale = (input, scalingValue) => functions.scaleGrad(input, scalingValue);
+const scale = (input, scalingValue) => functions.scale(input, scalingValue);
 
 /**
  * 
@@ -784,7 +784,7 @@ module.exports = {
     accumulateKernelGradsForTransConv,
     computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
-    scaleGrads: scale,
+    scale,
     ApplySGD,
     ApplyAdam,
     element_wise_mul,
