@@ -274,6 +274,7 @@ class Neurex {
                 return_state: layer.return_state || false,
                 isParametric: layer.isParametric,
                 dkRoot: layer.dkRoot || null,
+                useBias: layer.useBias ?? true,
             })),
             "miscellaneous": miscellaneous
         };
@@ -333,6 +334,7 @@ class Neurex {
             const metaJson = zlib.inflateSync(metaCompressed).toString('utf-8');
             const modelData = JSON.parse(metaJson);
 
+
             // Read tensor block (weights/biases as raw concatenated Float32 bytes).
             // This is never run through JSON.parse/stringify; we slice typed array
             // views directly out of the decompressed buffer instead.
@@ -376,6 +378,10 @@ class Neurex {
             const layerBuilder = new Layers();
             this.layers = modelData.layers.map(layerData => {
 
+                if (layerData.isParametric) {
+                    this.parametric_layers.push(layerData.layer_name);
+                }
+
                 let newLayer;
                 if (layerData.layer_name === "Connected Layer") {
                     // Recreate the connected layer with the correct activation and size
@@ -383,7 +389,6 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "Input Layer") {
                     // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
                     newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
@@ -394,14 +399,10 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    const [H, W, D] = layerData.outputShape;
-                    const totalSize = H * W * D;
-                    this.parametric_layers.push(layerData.layer_name);
                 } else if (layerData.layer_name === "Max Pooling") {
                     newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    const [H, W, D] = layerData.outputShape;
                 }
                 else if (layerData.layer_name === "Embedding Layer") {
                     const vocabSize = layerData.vocabSize;
@@ -413,7 +414,6 @@ class Neurex {
                     newLayer.outputShape = [1, 1, outputSize];
                     newLayer.weightShape = [vocabSize, embeddingDim];
                     newLayer.outputSize = outputSize;
-                    this.parametric_layers.push(layerData.layer_name);
                 }
                 else if (layerData.layer_name === "Recurrent Cell") {
                     const units = layerData.units;
@@ -424,7 +424,6 @@ class Neurex {
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
-                    this.parametric_layers.push(layerData.layer_name);
                 }
                 else if (layerData.layer_name === "Trans Convolution") {
                     const filters = layerData.filters;
@@ -441,6 +440,15 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
+                }
+                else if (layerData.layer_name === "Simple Attention") {
+                    newLayer = layerBuilder.simpleAttention(layerData.useBias);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.dkRoot = layerData.dkRoot;
+                    newLayer.embedDim = layerData.embeddingDim;
+                    newLayer.seqLen = layerData.maxSequenceLength;
                 }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
@@ -494,8 +502,8 @@ class Neurex {
                 // extract input size
                 if (layer.layer_name === "Input Layer") {
                     this.input_size = layer.layer_size;
-                    this.input_shape = layer.input_shape || [1, 1, this.input_size || 0];
-                    this.depth = this.input_shape[2] || 0;
+                    this.input_shape = layer.input_shape || [1, 1, this.input_size || 1];
+                    this.depth = this.input_shape[2] || 1;
 
                     this.currentShape = [this.input_shape[0],this.input_shape[1], this.input_shape[2]];
                     this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
@@ -1310,10 +1318,10 @@ class Neurex {
     }
 
     #recalculateShape() {
-        let H = this.input_shape[0];
-        let W = this.input_shape[1];
-        let D = this.input_shape[2];
-        let sequenceLength = 1;
+        let H = this.input_shape[0] || 1;
+        let W = this.input_shape[1] || 1;
+        let D = this.input_shape[2] || 1;
+        let S = this.input_shape[3] || 1;
 
         for (let i = 0; i < this.layers.length; i++) {
             const layer = this.layers[i];
@@ -1328,6 +1336,7 @@ class Neurex {
                 H = OutputHeight;
                 W = OutputWidth;
                 D = filters;
+                S = 1;
             }
             else if (layer.layer_name === "Max Pooling") {
                 const [poolHeight, poolWidth] = layer.poolSize;
@@ -1337,23 +1346,26 @@ class Neurex {
                 const {OutputHeight, OutputWidth} = calculateTensorShape(H, W, poolHeight, poolWidth, D, stride, padding);
                 H = OutputHeight;
                 W = OutputWidth;
+                S = 1;
             } 
 
             else if (layer.layer_name === "Connected Layer") {
                 H = 1;
                 W = 1;
                 D = layer.layer_size;
+                S = 1;
             }
-            else if (layer.layer_name === "Embedding Layer") {
+            else if (layer.layer_name === "Embedding Layer" || layer.layer_name === "Simple Attention") {
                 H = 1;
                 W = 1;
-                D = layer.maxSequenceLength * layer.embeddingDim;
-                sequenceLength = layer.maxSequenceLength;
+                D = layer.maxSequenceLength || layer.seqLen * layer.embeddingDim || layer.embedDim;
+                S = layer.maxSequenceLength || layer.seqLen;
             }
             else if (layer.layer_name === "Recurrent Cell") {
                 H = 1;
                 W = 1;
                 D = layer.return_sequence ? (layer.units * layer.maxSequenceLength) : layer.units;
+                S = layer.return_sequence ? layer.maxSequenceLength : 1;
             }
             else if (layer.layer_name === "Trans Convolution") {
                 const filters = layer.filters;
@@ -1365,13 +1377,21 @@ class Neurex {
                 H = OutputHeight;
                 W = OutputWidth;
                 D = filters;
+                S = 1;
             }
             else if (layer.layer_name === "Reshape") {
-                const [h, w, d] = layer.targetShape;
+                const h = layer.targetShape[0];
+                const w = layer.targetShape[1];
+                const d = layer.targetShape[2];
+                const s = layer.targetShape[3] || 1; 
 
                 H = h;
-                W = W;
+                W = w;
                 D = d;
+                S = s;
+            }
+            else if (layer.layer_name === "Simple Attention") {
+
             }
         }
 
