@@ -266,13 +266,14 @@ class Neurex {
                 targetShape: layer.targetShape || [],
                 outputShape: layer.outputShape || [],
                 poolSize: layer.poolSize || [],
-                embeddingDim: layer.embeddingDim || 1,
+                embeddingDim: layer.embeddingDim || layer.embedDim || 1,
                 vocabSize: layer.vocabSize || 1,
-                maxSequenceLength: layer.maxSequenceLength || 1,
+                maxSequenceLength: layer.maxSequenceLength || layer.seqLen || 1,
                 units: layer.units || 1,
                 return_sequence: layer.return_sequence || false,
                 return_state: layer.return_state || false,
-                isParametric: layer.isParametric
+                isParametric: layer.isParametric,
+                dkRoot: layer.dkRoot || null,
             })),
             "miscellaneous": miscellaneous
         };
@@ -1076,9 +1077,9 @@ class Neurex {
             let [H, W, D] = this.input_shape;
             this.currentShape = [H, W, D];
             this.currentSize = H * W * D;
-
+            let prevlayer = null;
             this.layers.forEach((layer_data) => {
-                
+                this.#validateShapeTransition(prevlayer, layer_data);
                 const {
                     updatedSize, 
                     updatedShape, 
@@ -1107,6 +1108,8 @@ class Neurex {
                     this.input_shape = overrides.input_shape; // to override the default `this.input_shape` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
                     this.input_size = overrides.input_size; // to override the default `this.input_size` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
                 }
+
+                prevlayer = layer_data
             });
 
             this.hasBuilt = true;
@@ -1120,7 +1123,9 @@ class Neurex {
     // it recieves layer data, same as `#build()` but instead of looping, it directly access the layer data being passed to
     // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
-        
+        let prevLayer = this.layers[this.layers.length -1]; // get the last layer from the stack
+
+        this.#validateShapeTransition(prevLayer, layer_data);
         const {
             updatedSize, 
             updatedShape, 
@@ -1144,6 +1149,8 @@ class Neurex {
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
         layer_data.outputShape = outputShape || [];
+
+        prevLayer = layer_data;
     }
 
     // backprop loop
@@ -1377,6 +1384,20 @@ class Neurex {
         for (let i = 0; i < this.weights.length; i ++) {
             this.weightGrads[i].fill(0);
             this.biasGrads[i].fill(0);
+        }
+    }
+
+    #validateShapeTransition(prevLayer, currentLayer) {
+        if (!prevLayer) return; // if the prev layer is null or undefined, then it is a first layer in the stack
+
+        const prevType = prevLayer.shapeType;
+        const currType = currentLayer.shapeType;
+
+        if (prevType && currType && prevType !== currType && currentLayer.layer_name !== "Reshape") {
+            console.warn(`\n${color.yellow}[SHAPE WARNING]------- Connecting "${prevLayer.layer_name}" (outputs ${prevType} data) directly to "${currentLayer.layer_name}" (expects ${currType} data).${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING]------- These layers interpret tensor shape differently, so this connection is likely unintentional.${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING]------- Consider inserting layer.reshape(targetShape) between them to make the conversion explicit.${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING]------- Proceeding anyway — if this is intentional, you can safely ignore this warning.\n${color.reset}\n`);
         }
     }
 }
