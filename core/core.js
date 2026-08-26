@@ -271,7 +271,6 @@ class Neurex {
                 maxSequenceLength: layer.maxSequenceLength || layer.seqLen || 1,
                 units: layer.units || 1,
                 return_sequence: layer.return_sequence || false,
-                return_state: layer.return_state || false,
                 isParametric: layer.isParametric,
                 dkRoot: layer.dkRoot || null,
                 useBias: layer.useBias ?? true,
@@ -413,8 +412,7 @@ class Neurex {
                 else if (layerData.layer_name === "Recurrent Cell") {
                     const units = layerData.units;
                     const return_sequence = layerData.return_sequence || false;
-                    const return_state = layerData.return_state || false;
-                    newLayer = layerBuilder.recurrentCell(units, layerData.activation_function_name, return_sequence, return_state);
+                    newLayer = layerBuilder.recurrentCell(units, layerData.activation_function_name, return_sequence);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
