@@ -8,8 +8,8 @@
         <script type="importmap">
         {
             "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+                "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
             }
         }
         </script>
@@ -17,17 +17,31 @@
     </head>
     <body>
         
-        <section class="left-div">
+        <section class="main-div">
+
+            <div id="hidden">
+                <button class="exit-full-screen-nav-button" onclick="exitFullScreen()">Exit Full Screen</button>
+            </div>
+
+            <div id="top-nav">
+                <p><b>Model Visualizer</b></p>
+                <button class="top-nav-button" onclick="viewFullScreen()">View Full screen</button>
+                <button class="top-nav-button" onclick="takeScreenshot()">Take a Screenshot</button>
+                <button class="top-nav-button" id = "gridControllerButton" onclick="gridDisplayController()"></button>
+            </div>
+
             <div id="renderer"></div>
             <div id="tooltip"></div>
-            <div class="right-div">
-                <img src="logo.png" class="logo"/>
-                <div style="text-align: left; display: flex; flex-direction: column; height: 100%;">
-                    <p style="margin: 4px 0;">Input shape: <span id="inputShape">Fetching data...</span></p>
-                    <p style="margin: 4px 0;">Number of Layers: <span id = "numLayers">Fetching data...</span></p>
-                    <div class="layer-list-container">
-                        <div id="list"></div>
+            
+            <div id="bottom-nav">
+                <div style="display: grid; place-items:center;">
+                    <div style="width: 100%; text-align: left;">
+                        <p>Input shape: <span id="inputShape">Fetching data...</span></p>
+                        <p>Number of Layers: <span id = "numLayers">Fetching data...</span></p>
                     </div>
+                </div>
+                <div class="scrollable">
+                    <div id="list"> Fetching layers...</div>
                 </div>
             </div>
 
@@ -36,4 +50,5 @@
     </body>
     <script src="L1.js"></script>
     <script type="module" src="api.js"></script>
+    <script src="button-actions.js"></script>
 </html>

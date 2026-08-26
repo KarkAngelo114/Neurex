@@ -1,10 +1,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { FontLoader } from "three/addons/loaders/FontLoader.js";
+import { TextGeometry } from "three/addons/geometries/TextGeometry.js";
 
 const ws = new WebSocket(`ws://${location.host}`);
 const viewer = document.getElementById('renderer');
 const tooltip = document.getElementById('tooltip');
 const list = document.getElementById('list');
+const gridController = document.getElementById('gridControllerButton');
 
 
 let scene = null;
@@ -17,8 +20,14 @@ let mouse = new THREE.Vector2();
 let hoveredObject = null;
 let originalEmissive = null;
 let dataFlowGroup = null;
+let isEnableGrid = true;
 const size = 5000;
 const divisions = 500;
+const gridHelper = new THREE.GridHelper(size, divisions);
+const fontLoader = new FontLoader();
+const reshapeFont = fontLoader.loadAsync(
+    "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/fonts/helvetiker_regular.typeface.json"
+);
 
 let clock = new THREE.Clock();
 let animatedLayers = []; // Track objects that have a sliding window
@@ -29,6 +38,7 @@ let width = viewer.clientWidth;
 (() => {
     createScene();
     animate();
+    gridDisplayController();
 })();
 
 ws.onmessage = async (event) => {
@@ -152,17 +162,6 @@ function renderModel(layer_data, weights, biases) {
             }
 
             cube.userData = layerData;
-
-            // 3. Update mouse coordinates AND move the tooltip directly in screen space
-            viewer.addEventListener("pointermove", (event) => {
-                const rect = viewer.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
-
-                // Position tooltip 12px away from cursor
-                tooltip.style.left = `${event.clientX + 12}px`;
-                tooltip.style.top = `${event.clientY + 12}px`;
-            });
         }
         else if (layer.layer_name === "Reshape") {
             const [iH, iW, iD] = layer.inputShape;
@@ -174,13 +173,15 @@ function renderModel(layer_data, weights, biases) {
 
 
             cube = createCube({
-                width: oW,
-                height: oH, 
-                depth: oD,
+                width: 30,
+                height: 1, 
+                depth: 10,
                 color: 0xFFFFFF,
                 outlineColor: 0xFFFFFF,
                 opacity: 0.5
-            })
+            });
+
+            
 
             if (index > 0) currentZ += visualDepth / 2;
             else currentZ = visualDepth / 2;
@@ -190,6 +191,8 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
 
+            addEngravedLabel(cube, "RESHAPE", 30, 10);
+
             const layerData = {
                 name: "Reshape",
                 inputShape: layer.inputShape,
@@ -198,16 +201,6 @@ function renderModel(layer_data, weights, biases) {
             };
 
             cube.userData = layerData;
-            
-            viewer.addEventListener("pointermove", (event) => {
-                const rect = viewer.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
-
-                // Position tooltip 12px away from cursor
-                tooltip.style.left = `${event.clientX + 12}px`;
-                tooltip.style.top = `${event.clientY + 12}px`;
-            });
         }
         else if (layer.layer_name === "Connected Layer") {
             const rawSize = layer.layer_size;
@@ -261,16 +254,6 @@ function renderModel(layer_data, weights, biases) {
             }
 
             cube.userData = layerData;
-            
-            viewer.addEventListener("pointermove", (event) => {
-                const rect = viewer.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
-
-                // Position tooltip 12px away from cursor
-                tooltip.style.left = `${event.clientX + 12}px`;
-                tooltip.style.top = `${event.clientY + 12}px`;
-            });
         }
         else if (layer.layer_name === "Embedding Layer") {
             // Determine 3D cube dimensions (Width: EmbeddingDim, Height: Sequence Length)
@@ -308,11 +291,6 @@ function renderModel(layer_data, weights, biases) {
 
             cube.userData = layerData;
 
-            // Row-scan highlight: a full-width bar that sweeps top -> bottom,
-            // one sequence-position "row" at a time. Reuses the same
-            // sliding-window animation loop as the conv/pooling/dense layers:
-            // winW == boundsW pins horizontal movement to a single step, so
-            // only the vertical (row) step advances.
             const numRows = Math.min(Math.max(Math.round(layer.maxSequenceLength), 2), 20);
             const rowHeight = visualHeight / numRows;
             const windowMesh = createSlidingWindow(visualWidth, rowHeight, visualDepth + 0.1, 0xffffff);
@@ -335,6 +313,7 @@ function renderModel(layer_data, weights, biases) {
             const visualWidth = Math.min(Math.max(layer.units / 2, 2), 30);
             const visualHeight = 4;
             const visualDepth = 4;
+            const zExtent = visualWidth;
 
             cube = createCube({
                 height: visualHeight,
@@ -345,13 +324,13 @@ function renderModel(layer_data, weights, biases) {
                 opacity: 0.6
             });
 
-            if (index > 0) currentZ += visualDepth / 2;
-            else currentZ = visualDepth / 2;
-
+            if (index > 0) currentZ += zExtent / 2;
+            else currentZ = zExtent / 2;
+            
+            cube.rotation.y = Math.PI / 2;
             cube.position.set(0, 0, currentZ);
-            currentZ += visualDepth / 2 + baseGap;
+            currentZ += zExtent / 2 + baseGap;
 
-            // Encircling Recurrence Loops (as drawn in your diagram)
             const recurrenceLoop = createRecurrenceLoop(visualWidth, visualHeight, visualDepth);
             cube.add(recurrenceLoop);
 
@@ -359,7 +338,7 @@ function renderModel(layer_data, weights, biases) {
                 type: "rnn",
                 parentCube: cube,
                 recurrenceLoop: recurrenceLoop,
-                boundsW: visualWidth,
+                boundsW: zExtent,
                 boundsH: visualHeight,
                 boundsD: visualDepth
             });
@@ -379,6 +358,58 @@ function renderModel(layer_data, weights, biases) {
 
 
             cube.userData = layerData;
+
+            modelGroup.add(cube);
+        }
+        else if (layer.layer_name === "Simple Attention") {
+            const visualWidth = Math.min(Math.max(layer.embedDim / 2, 2), 30);
+            const visualHeight = Math.min(Math.max(layer.seqLen / 2, 2), 30);
+            const visualDepth = 2;
+
+            cube = createCube({
+                height: visualHeight,
+                width: visualWidth,
+                depth: visualDepth,
+                color: 0x6b6d6e,
+                outlineColor: 0xf7fbfc,
+                opacity: 0.3
+            });
+
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ);
+            currentZ += visualDepth / 2 + baseGap;
+
+            const layerData = {
+                name: layer.layer_name,
+                inputShape: [1, 1, layer.embedDim, layer.seqLen],
+                outputShape: [1, 1, layer.embedDim, layer.seqLen],
+                desc: "Is the implementation of an attention layer in its simpliest and basic form. <br/> This layer creates a single-head Scaled Dot-Product Self-Attention layer <br/> inspired/based on the attention mechanism introduced by Vaswani et al. (2017).",
+            };
+
+            cube.userData = layerData;
+
+            // Create moving query/key scanning markers (the small travelling cubes)
+            const seqLen = Math.min(Math.max(Math.round(layer.seqLen), 2), 10);
+            const attentionGroup = createAttentionGridMarkers(visualWidth, visualHeight, visualDepth, seqLen);
+            cube.add(attentionGroup);
+
+            animatedLayers.push({
+                type: "attention",
+                parentCube: cube,
+                attentionGroup: attentionGroup,
+                boundsW: visualWidth,
+                boundsH: visualHeight,
+                boundsD: visualDepth,
+                seqLen: seqLen
+            });
+
+            if (layer.isParametric) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
 
             modelGroup.add(cube);
         }
@@ -420,6 +451,102 @@ function createSlidingWindow(width, height, depth, color) {
     return wireframe;
 }
 
+function createAttentionGridMarkers(width, height, depth, seqLen) {
+    const group = new THREE.Group();
+    const cellW = width / seqLen;
+    const cellH = height / seqLen;
+    const cubeGeo = new THREE.BoxGeometry(cellW * 0.5, cellH * 0.5, depth + 0.2);
+
+    // Stepped query column: one vertical strip of markers that jumps
+    // one cell to the right every timestep (pixel-y, not eased).
+    const queryMat = new THREE.MeshBasicMaterial({ color: 0xf7fbfc });
+    const queryMarkers = [];
+    for (let i = 0; i < seqLen; i++) {
+        const mesh = new THREE.Mesh(cubeGeo, queryMat);
+        group.add(mesh);
+        queryMarkers.push(mesh);
+    }
+
+    // Stepped key row: one horizontal strip of markers that jumps
+    // one cell downward every timestep. Fully independent of the
+    // query column - its own axis, its own step clock.
+    const keyMat = new THREE.MeshBasicMaterial({ color: 0xf7fbfc });
+    const keyMarkers = [];
+    for (let j = 0; j < seqLen; j++) {
+        const mesh = new THREE.Mesh(cubeGeo, keyMat);
+        group.add(mesh);
+        keyMarkers.push(mesh);
+    }
+
+    // Pool of "echo" columns: every time the query column steps, one of
+    // these is spawned at the query's current X, then flies off along
+    // local +Z (toward the next layer) and fades out independently of
+    // the query column's own movement.
+    const echoPoolSize = Math.max(seqLen * 2, 6);
+
+    const echoColumns = [];
+    for (let e = 0; e < echoPoolSize; e++) {
+        const echoGroup = new THREE.Group();
+        const markers = [];
+        for (let i = 0; i < seqLen; i++) {
+            const echoMat = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0
+            });
+            const mesh = new THREE.Mesh(cubeGeo, echoMat);
+            echoGroup.add(mesh);
+            markers.push(mesh);
+        }
+        echoGroup.visible = false;
+        echoGroup.userData = { active: false, spawnTime: 0, startX: 0 };
+        group.add(echoGroup);
+        echoColumns.push(echoGroup);
+    }
+
+    group.userData = {
+        queryMarkers,
+        keyMarkers,
+        echoColumns,
+        nextEcho: 0,     // round-robin pointer into the echo pool
+        lastStep: -1     // last seen step index, to detect a new timestep
+    };
+    return group;
+}
+
+async function addEngravedLabel(parent, label, surfaceWidth, surfaceDepth) {
+    const font = await reshapeFont;
+    const fontSize = Math.min(surfaceWidth / (label.length * 1.8), surfaceDepth * 0.45);
+    const textGeometry = new TextGeometry(label, {
+        font,
+        size: fontSize,
+        depth: 0.04,
+        curveSegments: 4,
+        bevelEnabled: true,
+        bevelThickness: 0.15,
+        bevelSize: 0.01,
+        bevelSegments: 2
+    });
+
+    textGeometry.computeBoundingBox();
+    const textWidth = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
+    textGeometry.translate(-textWidth / 2, 0, -fontSize / 2);
+    textGeometry.rotateX(-Math.PI / 2);
+
+    const engravedText = new THREE.Mesh(
+        textGeometry,
+        new THREE.MeshStandardMaterial({
+            color: 0xffff0,
+            roughness: 0.9,
+            metalness: 0.1,
+        })
+    );
+    engravedText.position.y = 1;
+    engravedText.position.z =  0;
+    engravedText.userData = parent.userData;
+    parent.add(engravedText);
+}
+
 function createScene() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(60, width / height, 0.5, 1000);
@@ -427,7 +554,7 @@ function createScene() {
     modelGroup = new THREE.Group();
     scene.add(modelGroup);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     viewer.appendChild(renderer.domElement);
@@ -476,7 +603,86 @@ function animate() {
 
                 });
             }
-        } 
+        }
+        else if (item.type === "attention") {
+            const { attentionGroup, boundsW, boundsH, boundsD, seqLen } = item;
+            const { queryMarkers, keyMarkers, echoColumns } = attentionGroup.userData;
+
+            const cellW = boundsW / seqLen;
+            const cellH = boundsH / seqLen;
+
+            const stepsPerSecond = 3; // how many timesteps per second (tweak to taste)
+            const totalSteps = seqLen;
+
+            // Discrete step index - jumps instantly, no easing/tweening
+            const step = Math.floor(elapsedTime * stepsPerSecond) % totalSteps;
+
+            const startX = -boundsW / 2 + cellW / 2;
+            const startY = boundsH / 2 - cellH / 2;
+
+            const stepX = startX + step * cellW;
+
+            // 1. Move the query column in discrete, pixel-y jumps (left -> right)
+            queryMarkers.forEach((m, idx) => {
+                const posY = startY - idx * cellH;
+                m.position.set(stepX, posY, 0);
+            });
+
+            // 1b. Move the key row in discrete, pixel-y jumps (top -> bottom).
+            // Independent axis and independent step clock from the query column.
+            const stepY = startY - step * cellH;
+            keyMarkers.forEach((m, idx) => {
+                const posX = startX + idx * cellW;
+                m.position.set(posX, stepY, 0);
+            });
+
+            // 2. Spawn a new independent echo column whenever the step changes
+            if (step !== attentionGroup.userData.lastStep) {
+                attentionGroup.userData.lastStep = step;
+
+                const echoColumns_ = echoColumns;
+                const poolIdx = attentionGroup.userData.nextEcho % echoColumns_.length;
+                attentionGroup.userData.nextEcho++;
+
+                const echoGroup = echoColumns_[poolIdx];
+                echoGroup.visible = true;
+                echoGroup.userData.active = true;
+                echoGroup.userData.spawnTime = elapsedTime;
+                echoGroup.userData.startX = stepX;
+
+                echoGroup.children.forEach((m, idx) => {
+                    const posY = startY - idx * cellH;
+                    m.position.set(stepX, posY, 0);
+                    m.material.opacity = 0.9;
+                });
+            }
+
+            // 3. Animate all active echo columns: fly along local +Z, fade out.
+            // Fully decoupled from the query column's own movement.
+            const travelDuration = 1.2;   // seconds to travel + fade
+            const travelDistanceZ = boundsD * 6; // how far forward it ejects
+
+            echoColumns.forEach(echoGroup => {
+                if (!echoGroup.userData.active) return;
+
+                const age = elapsedTime - echoGroup.userData.spawnTime;
+                const t = age / travelDuration;
+
+                if (t >= 1) {
+                    echoGroup.visible = false;
+                    echoGroup.userData.active = false;
+                    return;
+                }
+
+                const z = t * travelDistanceZ;
+                const fadeOpacity = 0.9 * (1 - t);
+
+                echoGroup.children.forEach(m => {
+                    m.position.z = z;
+                    m.material.opacity = fadeOpacity;
+                });
+            });
+        }
         else {
             const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
 
@@ -638,7 +844,7 @@ function createRecurrenceLoop(width, height, depth) {
         loop.add(arrow);
 
         loop.position.x = -width / 2 + spacing * (i + 1);
-        loop.rotation.y = Math.PI / 2;
+        loop.rotation.z = Math.PI / 2;
 
         group.add(loop);
     }
@@ -703,34 +909,28 @@ function createDataFlowParticles(animatedLayers) {
     return particleGroup;
 }
 
-function weightsToTexture(flatWeights, cols) {
-    const rows = Math.ceil(flatWeights.length / cols);
-    const canvas = document.createElement('canvas');
-    canvas.width = cols; canvas.height = rows;
-    const ctx = canvas.getContext('2d');
-    const img = ctx.createImageData(cols, rows);
-    const max = Math.max(...flatWeights.map(Math.abs)) || 1;
-    flatWeights.forEach((w, i) => {
-        const t = w / max; // -1..1
-        img.data[i*4]   = t > 0 ? t * 255 : 0;      // red = positive
-        img.data[i*4+2] = t < 0 ? -t * 255 : 0;     // blue = negative
-        img.data[i*4+3] = 255;
-    });
-    ctx.putImageData(img, 0, 0);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.magFilter = THREE.NearestFilter; // keep it crisp, not blurred
-    return tex;
-}
-
 viewer.addEventListener("pointermove", (event) => {
     const rect = viewer.getBoundingClientRect();
     mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
     mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
 });
 
-const gridHelper = new THREE.GridHelper(size, divisions);
-gridHelper.position.y = -20;
-scene.add(gridHelper);
+
+function gridDisplayController() {
+    gridHelper.position.y = -20;
+    if (isEnableGrid) {
+        scene.add(gridHelper);
+        gridController.innerText = "Disable Grid";
+        isEnableGrid = false;
+    }
+    else {
+        scene.remove(gridHelper);
+        isEnableGrid = true;
+        gridController.innerText = "Enable Grid";
+    }
+}
+
+
 
 
 function listLayers(layers) {
@@ -740,6 +940,7 @@ function listLayers(layers) {
         const p = document.createElement('p');
 
         const color = layer.layer_name === "Convolutional Layer" ? "#4f8cff": 
+                    layer.layer_name === "Simple Attention" ? "#6b6d6e": 
                     layer.layer_name === "Max Pooling" ? "#FFAE00" : 
                     layer.layer_name === "Recurrent Cell" ? "#FF69B4" :
                     layer.layer_name === "Embedding Layer" ? "#BB6BD9" :
@@ -748,14 +949,26 @@ function listLayers(layers) {
                     "red"; // default color: red for connected layer
 
         p.innerHTML = `
-            <div style = "display: flex; justify-content: flex-start; gap: 10px; align-items: center; width: 100%;">
+             <span style = "display: flex; justify-content: flex-start; gap: 10px; align-items: center; width: 100%; flex-wrap: no-wrap">
                 <p style = "height: 10px; width: 10px; background-color: ${color}"></p>
                 <p>${layer.layer_name}</p>
-            </div>
+            </span>
         `;
 
         list.appendChild(p);
     });
-
-
 }
+
+viewer.addEventListener("pointermove", (event) => {
+    const rect = viewer.getBoundingClientRect();
+
+    // 1. Update Raycaster normalized coordinates
+    mouse.x = ((event.clientX - rect.left) / viewer.clientWidth) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / viewer.clientHeight) * 2 + 1;
+
+    // 2. Position tooltip next to cursor
+    tooltip.style.left = `${event.clientX + 12}px`;
+    tooltip.style.top = `${event.clientY + 12}px`;
+});
+
+window.gridDisplayController = gridDisplayController;
