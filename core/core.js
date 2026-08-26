@@ -384,17 +384,12 @@ class Neurex {
 
                 let newLayer;
                 if (layerData.layer_name === "Connected Layer") {
-                    // Recreate the connected layer with the correct activation and size
                     newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                } else if (layerData.layer_name === "Input Layer") {
-                    // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
-                    newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
-                } 
+                }
                 else if (layerData.layer_name === "Convolutional Layer") {
-                    // recreate Convolutional layer
                     newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
@@ -410,8 +405,8 @@ class Neurex {
                     const sequence_length = layerData.maxSequenceLength;
                     const outputSize = sequence_length * embeddingDim;
                     newLayer = layerBuilder.embeddingLayer(vocabSize, embeddingDim, sequence_length);
-                    newLayer.inputShape = [];
-                    newLayer.outputShape = [1, 1, outputSize];
+                    newLayer.inputShape = [1, 1, sequence_length];
+                    newLayer.outputShape = [1, 1, embeddingDim, sequence_length];
                     newLayer.weightShape = [vocabSize, embeddingDim];
                     newLayer.outputSize = outputSize;
                 }
@@ -433,7 +428,6 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    this.parametric_layers.push(layerData.layer_name);
                 }
                 else if (layerData.layer_name === "Reshape") {
                     newLayer = layerBuilder.reshape(layerData.targetShape);
@@ -540,7 +534,6 @@ class Neurex {
         const removedLayer = this.layers[index];
 
         this.layers.splice(index, 1);
-        this.output_layers_templates.splice(index, 1);
         this.num_layers--;
         this.#recalculateShape();
 
@@ -1390,13 +1383,10 @@ class Neurex {
                 D = d;
                 S = s;
             }
-            else if (layer.layer_name === "Simple Attention") {
-
-            }
         }
 
-        this.currentShape = [H, W, D];
-        this.currentSize = H * W * D;
+        this.currentShape = [H, W, D, S];
+        this.currentSize = H * W * D * S;
     }
 
    #reinitiateWeightSBiasGrads() {
