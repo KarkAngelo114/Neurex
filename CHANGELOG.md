@@ -1,4 +1,4 @@
-# v0.1.0 (In Development)
+# v1.0.0 (In Development)
 ### What's New
 - Added `recurrentCell` to support RNN modeling. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Added `transConv` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
