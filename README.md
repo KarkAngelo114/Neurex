@@ -385,7 +385,7 @@ const { Neurex, Layers, lossVisualizer, modelVisualizer, lossLandscapeVisualizer
 })()
 ```
 
-![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115813_ksqvw9.png)
+![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1787725595/Screenshot_2026-08-06_115813_ksqvw9.png)
 ![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115739_fcrzv4.png)
 ![Dashboard](https://res.cloudinary.com/ddgfmkjjm/image/upload/v1785989320/Screenshot_2026-08-06_115828_tjt5zi.png)
 
