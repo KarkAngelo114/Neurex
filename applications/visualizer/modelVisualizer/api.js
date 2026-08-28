@@ -361,9 +361,10 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
         }
-        else if (layer.layer_name === "Simple Attention") {
+        else if (layer.layer_name === "Simple Attention" || layer.layer_name === "Multi Head Attention") {
             const visualWidth = Math.min(Math.max(layer.embedDim / 2, 2), 30);
             const visualHeight = Math.min(Math.max(layer.seqLen / 2, 2), 30);
+            const numHeads = layer.numHeads;
             const visualDepth = 2;
 
             cube = createCube({
@@ -377,15 +378,19 @@ function renderModel(layer_data, weights, biases) {
 
             if (index > 0) currentZ += visualDepth / 2;
             else currentZ = visualDepth / 2;
+           
 
             cube.position.set(0, 0, currentZ);
             currentZ += visualDepth / 2 + baseGap;
 
+            const desc = layer.layer_name === "Simple Attention" ? "Is the implementation of an attention layer in its simpliest and basic form. <br/> This layer creates a single-head Scaled Dot-Product Self-Attention layer <br/> inspired/based on the attention mechanism introduced by Vaswani et al. (2017)." : 
+            "Is the advance and improved variant of the existing <code>simpleAttention</code>. <br/> It splits Query, Key, and Value projections into multiple independent attention heads."
+ 
             const layerData = {
                 name: layer.layer_name,
                 inputShape: [1, 1, layer.embedDim, layer.seqLen],
                 outputShape: [1, 1, layer.embedDim, layer.seqLen],
-                desc: "Is the implementation of an attention layer in its simpliest and basic form. <br/> This layer creates a single-head Scaled Dot-Product Self-Attention layer <br/> inspired/based on the attention mechanism introduced by Vaswani et al. (2017).",
+                desc: desc,
             };
 
             cube.userData = layerData;
@@ -395,7 +400,8 @@ function renderModel(layer_data, weights, biases) {
             const attentionGroup = createAttentionGridMarkers(visualWidth, visualHeight, visualDepth, seqLen);
             cube.add(attentionGroup);
 
-            animatedLayers.push({
+
+            const animationData = {
                 type: "attention",
                 parentCube: cube,
                 attentionGroup: attentionGroup,
@@ -403,7 +409,14 @@ function renderModel(layer_data, weights, biases) {
                 boundsH: visualHeight,
                 boundsD: visualDepth,
                 seqLen: seqLen
-            });
+            }
+
+            if (layer.layer_name ===  "Multi Head Attention") {
+                const headsGroup = createMultiHeadArches(visualWidth, visualHeight, numHeads || 4);
+                cube.add(headsGroup);
+            }
+
+            animatedLayers.push(animationData);
 
             if (layer.isParametric) {
                 layerData.weight_L1 = L1_Mean(weights[pointer]);
@@ -605,13 +618,13 @@ function animate() {
             }
         }
         else if (item.type === "attention") {
-            const { attentionGroup, boundsW, boundsH, boundsD, seqLen } = item;
+            const { attentionGroup, boundsW, boundsH, boundsD, seqLen, recurrenceLoop } = item;
             const { queryMarkers, keyMarkers, echoColumns } = attentionGroup.userData;
 
             const cellW = boundsW / seqLen;
             const cellH = boundsH / seqLen;
 
-            const stepsPerSecond = 3; // how many timesteps per second (tweak to taste)
+            const stepsPerSecond = 10; // how many timesteps per second (tweak to taste)
             const totalSteps = seqLen;
 
             // Discrete step index - jumps instantly, no easing/tweening
@@ -682,6 +695,14 @@ function animate() {
                     m.material.opacity = fadeOpacity;
                 });
             });
+
+            if (recurrenceLoop) {
+                recurrenceLoop.children.forEach((loop, i) => {
+                    // slow spin
+                    loop.rotation.z = elapsedTime * 1.5;
+
+                });
+            }
         }
         else {
             const { windowMesh, boundsW, boundsH, winW, winH, strideX, strideY } = item;
@@ -790,61 +811,74 @@ const createCube = ({width = 1, height = 1, depth = 1, color = 0x4f8cff, opacity
     return mesh;
 };
 
+function createMultiHeadArches(width, height, numHeads) {
+    const group = new THREE.Group();
+    const spacing = width / (numHeads + 1);
+    const archRadius = spacing * 0.4;
+
+    for (let i = 0; i < numHeads; i++) {
+        // Semi-circle arc representing an individual head
+        const curve = new THREE.EllipseCurve(
+            0, 0,
+            archRadius, archRadius * 1.5,
+            0, Math.PI,
+            false, 0
+        );
+
+        const points = curve.getPoints(30);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ color: 0x00ffff });
+        const arc = new THREE.Line(geometry, material);
+
+        const posX = -width / 2 + spacing * (i + 1);
+        arc.position.set(posX, height / 2, 0);
+
+        group.add(arc);
+    }
+    return group;
+}
+
 function createRecurrenceLoop(width, height, depth) {
     const group = new THREE.Group();
 
-    const radius = height * 0.95;
-    const loops = Math.min(Math.max(Math.floor(width / 6), 2), 3);
-
+    // Set ring radius based on mesh height/depth
+    const radius = Math.max(height, depth) * 0.75;
+    const loops = Math.min(Math.max(Math.floor(width / 6), 2), 4);
     const spacing = width / (loops + 1);
 
     for (let i = 0; i < loops; i++) {
-
         const loop = new THREE.Group();
 
+        // 1. Create continuous 2D circular path
         const curve = new THREE.EllipseCurve(
             0, 0,
             radius, radius,
-            0,
-            Math.PI * 2,
-            false,
-            0
+            0, Math.PI * 2,
+            false, 0
         );
 
         const points = curve.getPoints(80);
-
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ color: 0x00ffff });
+        const circle = new THREE.LineLoop(geometry, material);
 
-        const material = new THREE.LineBasicMaterial({
-            color: 0x00ffff
-        });
+        // 2. Cone arrow placed at top of the loop (0, radius, 0)
+        const arrowGeom = new THREE.ConeGeometry(0.35, 1.0, 8);
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+        const arrow = new THREE.Mesh(arrowGeom, arrowMat);
 
-        const circle = new THREE.LineLoop(
-            geometry,
-            material
-        );
-
-
-        const arrowGeom = new THREE.ConeGeometry(0.28, 0.8, 8);
-        const arrowMat = new THREE.MeshBasicMaterial({
-            color: 0x00ffff
-        });
-
-        const arrow = new THREE.Mesh(
-            arrowGeom,
-            arrowMat
-        );
-
-        arrow.position.set(radius, 0, 0);
-
-        // Tangent direction
+        // Position arrow at top vertex
+        arrow.position.set(0, radius, 0);
+        // Point arrow horizontally along tangent (facing +X direction)
         arrow.rotation.z = -Math.PI / 2;
 
         loop.add(circle);
         loop.add(arrow);
 
+        // 3. Offset center so bottom portion clips into mesh top boundary
+        // Position X along mesh width, Y slightly above half-height
         loop.position.x = -width / 2 + spacing * (i + 1);
-        loop.rotation.z = Math.PI / 2;
+        loop.position.y = height / 2 - radius * 0.35; 
 
         group.add(loop);
     }
@@ -940,7 +974,7 @@ function listLayers(layers) {
         const p = document.createElement('p');
 
         const color = layer.layer_name === "Convolutional Layer" ? "#4f8cff": 
-                    layer.layer_name === "Simple Attention" ? "#6b6d6e": 
+                    layer.layer_name === "Simple Attention" || layer.layer_name === "Multi Head Attention" ? "#6b6d6e": 
                     layer.layer_name === "Max Pooling" ? "#FFAE00" : 
                     layer.layer_name === "Recurrent Cell" ? "#FF69B4" :
                     layer.layer_name === "Embedding Layer" ? "#BB6BD9" :
