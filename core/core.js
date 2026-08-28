@@ -1438,6 +1438,10 @@ class Neurex {
         const prevType = prevLayer.shapeType;
         const currType = currentLayer.shapeType;
 
+        if (prevLayer.layer_name === "Layer Normalization" || currentLayer.layer_name === "Layer Normalization") {
+            return;
+        }
+
         if (prevType && currType && prevType !== currType && currentLayer.layer_name !== "Reshape") {
             console.warn(`\n${color.yellow}[SHAPE WARNING]------- Connecting "${prevLayer.layer_name}" (outputs ${prevType} data) directly to "${currentLayer.layer_name}" (expects ${currType} data).${color.reset}`);
             console.warn(`${color.yellow}[SHAPE WARNING]------- These layers interpret tensor shape differently, so this connection is likely unintentional.${color.reset}`);

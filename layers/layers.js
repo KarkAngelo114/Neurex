@@ -29,6 +29,7 @@ const trans = require('./layer_functions/transConv');
 const reshaper = require('./layer_functions/reshape');
 const simple_attention = require("./layer_functions/simpleAttention");
 const mha = require("./layer_functions/MultiHeadAttention");
+const normModule = require('./layer_functions/layerNorm');
 
 class Layers {
     constructor () {
@@ -428,6 +429,28 @@ class Layers {
         catch (error) {
             console.error(error);
             process.exit(1);
+        }
+    }
+
+    /**
+    * @method layerNorm normalizes the activations of the previous layer for each individual sample independently.
+    * @param {Number} eps Small epsilon constant to prevent division by zero. Default is 1e-5.
+    * @returns {Object} LayerNorm configuration object
+    */
+    layerNorm(epsilon = 1e-5) {
+        return {
+            layer_name: "Layer Normalization",
+            epsilon: epsilon,
+            shapeType: "flat",
+            isParametric: true,
+            initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
+            determineInferenceType: () => normModule.determineInferenceType(),
+            feedforward: (input, current_layer, pointer) => normModule.feedforward(input, current_layer, pointer),
+            getOutputLayerDelta: () => normModule.getOutputLayerDelta(),
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data) => normModule.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+            applyOwnDerivative: (delta, z, layer_data) => normModule.applyOwnDerivative(delta, z, layer_data),
+            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => normModule.accumulateGammaGrads(activation_outputs, deltas, weightGrads, layer_data),
+            accumulateBiasGradients: (biasgrads, deltas, layer_data) => normModule.accumulateBetaGrads(biasgrads, deltas, layer_data),
         }
     }
 

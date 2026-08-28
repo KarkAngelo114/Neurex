@@ -1025,6 +1025,34 @@ const dotProduct = (arr1, arr2, inputSize, outputSize) => {
     return output;
 }
 
+const computelayerNorm = (input, size, gamma, beta, eps) => {
+
+    let mean = 0;
+    for (let i = 0; i < size; i++) {
+        mean += input[i];
+    };
+
+    mean /= size;
+
+    let variance = 0;
+    for (let i = 0; i < size; i++) {
+        variance += (input[i] - mean) ** 2;
+    }
+
+    variance /= size;
+
+    const std = Math.sqrt(variance + eps);
+    const outputs = new Float32Array(size);
+
+    for (let i = 0; i < size; i++) {
+        const xHat = (input[i] - mean) / std;
+        outputs[i] = gamma[i] * xHat + beta[i];
+    }
+
+    return outputs;
+
+}
+
 
 module.exports = {
     Relu,
@@ -1071,5 +1099,6 @@ module.exports = {
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
     gradientClipping,
-    dotProduct
+    dotProduct,
+    computelayerNorm
 }

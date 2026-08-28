@@ -647,6 +647,13 @@ declare module 'neurex' {
         * @returns {object} multiHeadAttention config
         */
         multiHeadAttention(numHeads: number, useBias: boolean): object;
+
+        /**
+        * @method layerNorm normalizes the activations of the previous layer for each individual sample independently.
+        * @param {Number} eps Small epsilon constant to prevent division by zero. Default is 1e-5.
+        * @returns {Object} LayerNorm configuration object
+        */
+        layerNorm(epsilon: number): object;
     }
 
     /**

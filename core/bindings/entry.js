@@ -621,6 +621,22 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
 const dotProduct = (arr1, arr2, inputSize, outputSize) => functions.dotProduct(arr1, arr2, inputSize, outputSize);
 
 /**
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {number} size 
+ * @param {number} eps
+ * @param {number} pointer 
+ * @returns 
+ */
+const computeLayerNorm = (input, size, eps, pointer) => float32_Modules.computelayerNorm(
+    input, 
+    size, 
+    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalBiases[pointer], 
+    eps
+);
+
+/**
  * 
  * @param {Float32Array} input 
  * @param {Object} layerData 
@@ -987,6 +1003,7 @@ module.exports = {
     gradientClipping,
     CoreAttention,
     dotProduct,
+    computeLayerNorm,
     CoreAttentionBackward,
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
