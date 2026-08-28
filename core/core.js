@@ -53,6 +53,7 @@ class Neurex {
         this.clip_norm_value = 1.0;
         this.onChange_optimizer = null;
         this.visualizers = [];
+        this.shuffle = true;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -272,8 +273,10 @@ class Neurex {
                 units: layer.units || 1,
                 return_sequence: layer.return_sequence || false,
                 isParametric: layer.isParametric,
-                dkRoot: layer.dkRoot || null,
+                dkRoot: layer.dkRoot || 0,
                 useBias: layer.useBias ?? true,
+                headDim: layer.headDim || 1,
+                numHeads: layer.numHeads || 8,
             })),
             "miscellaneous": miscellaneous
         };
@@ -441,6 +444,17 @@ class Neurex {
                     newLayer.dkRoot = layerData.dkRoot;
                     newLayer.embedDim = layerData.embeddingDim;
                     newLayer.seqLen = layerData.maxSequenceLength;
+                }
+                else if (layerData.layer_name === "Multi Head Attention") {
+                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads ,layerData.useBias);
+                    newLayer.weightShape = layerData.weightShape;
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.dkRoot = layerData.dkRoot;
+                    newLayer.embedDim = layerData.embeddingDim;
+                    newLayer.seqLen = layerData.maxSequenceLength;
+                    newLayer.numHeads = layerData.numHeads;
+                    newLayer.headDim = layerData.headDim;
                 }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
@@ -731,6 +745,18 @@ class Neurex {
             
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
+
+                // Create sample indices for this epoch
+                let sampleIndices = new Array(trainX.length);
+
+                for (let i = 0; i < trainX.length; i++) {
+                    sampleIndices[i] = i;
+                }
+
+                // Shuffle the order of samples for this epoch
+                if (this.shuffle) {
+                    this.#shuffleIndices(sampleIndices);
+                }
                 
                 if (this.lr_scheduler && current_epoch > 0) {
                     this.learning_rate = this.lr_scheduler({
@@ -759,7 +785,9 @@ class Neurex {
 
                 // batch size
                 for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
-                    numBatches++; // Increment batch count
+
+                    numBatches++;
+
                     const currentBatch = Math.floor(batchStart / batchSize) + 1;
 
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
@@ -772,7 +800,10 @@ class Neurex {
                     let batchLoss = 0;                  
 
                     // Accumulate gradients for each sample in the batch
-                    for (let sample_index = batchStart; sample_index < batchEnd; sample_index++) {
+                   for (let batchPosition = batchStart; batchPosition < batchEnd; batchPosition++) {
+
+                        // Get the actual dataset index from the shuffled index array
+                        const sample_index = sampleIndices[batchPosition];
 
                         let input = trainX[sample_index];
                         let actual = trainY[sample_index];
@@ -780,7 +811,6 @@ class Neurex {
                         // feed forward
                         const {predictions, activations, zs} = this.#Feedforward(input);
                         let deltas = [];
-                        let dOutputlayer = [];
                         
 
                         batchLoss += loss_function(predictions, actual);
@@ -1346,17 +1376,24 @@ class Neurex {
                 D = layer.layer_size;
                 S = 1;
             }
-            else if (layer.layer_name === "Embedding Layer" || layer.layer_name === "Simple Attention") {
+            else if (layer.layer_name === "Embedding Layer") {
                 H = 1;
                 W = 1;
-                D = layer.maxSequenceLength || layer.seqLen * layer.embeddingDim || layer.embedDim;
-                S = layer.maxSequenceLength || layer.seqLen;
+                D = layer.embeddingDim;
+                S = layer.maxSequenceLength;
+            }
+            else if (layer.layer_name === "Simple Attention" || layer.layer_name === "Multi Head Attention") {
+                H = 1;
+                W = 1;
+                D = layer.embedDim || layer.embeddingDim;
+                S = layer.seqLen || layer.maxSequenceLength;
             }
             else if (layer.layer_name === "Recurrent Cell") {
                 H = 1;
                 W = 1;
-                D = layer.return_sequence ? (layer.units * layer.maxSequenceLength) : layer.units;
+                D = layer.units;
                 S = layer.return_sequence ? layer.maxSequenceLength : 1;
+                
             }
             else if (layer.layer_name === "Trans Convolution") {
                 const filters = layer.filters;
@@ -1407,6 +1444,16 @@ class Neurex {
             console.warn(`${color.yellow}[SHAPE WARNING]------- Consider inserting layer.reshape(targetShape) between them to make the conversion explicit.${color.reset}`);
             console.warn(`${color.yellow}[SHAPE WARNING]------- Proceeding anyway — if this is intentional, you can safely ignore this warning.\n${color.reset}\n`);
         }
+    }
+
+    #shuffleIndices(indices) {
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+
+        return indices;
     }
 }
 

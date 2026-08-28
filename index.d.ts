@@ -639,6 +639,14 @@ declare module 'neurex' {
         * ]);
         */
         simpleAttention(useBias: boolean): object;
+
+        /**
+        * @method `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
+        * @param {number} numHeads Total number of attention heads. Default is `8.`
+        * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
+        * @returns {object} multiHeadAttention config
+        */
+        multiHeadAttention(numHeads: number, useBias: boolean): object;
     }
 
     /**

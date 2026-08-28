@@ -1,6 +1,5 @@
-const activation = require('../../core/bindings');
-const { CoreAttention, CoreAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings');
-const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('../../utils');
+const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings/entry');
+const { XavierInitialization, concatenateFloat32Array, unpackQKV, unpackQKVO } = require('../../utils/utils');
 
 /**
  * Initialized parameters for this layer
@@ -10,47 +9,63 @@ const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('.
  * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
-    // assume that next to embedding layer is simpleAttention(),
-    // the incoming shape is [1, 1, embedDim, seqLen]
-    const embeddingDim = shape[2];
-    const useBias = layer_data.useBias;
+    try {
+        // assume that next to embedding layer is multiHeadAttention(),
+        // the incoming shape is [1, 1, embedDim, seqLen]
+        const embeddingDim = shape[2];
+        const useBias = layer_data.useBias;
+        const numHeads = layer_data.numHeads;
+        const headDim = embeddingDim / numHeads;
 
-    const Q_weights = new Float32Array(embeddingDim * embeddingDim);
-    const K_weights = new Float32Array(embeddingDim * embeddingDim);
-    const V_weights = new Float32Array(embeddingDim * embeddingDim);
-
-    const limit = XavierInitialization(embeddingDim, embeddingDim);
-    for (let i = 0; i < Q_weights.length; i++) {
-        Q_weights[i] = (Math.random() * 2 - 1) * limit;
-        K_weights[i] = (Math.random() * 2 - 1) * limit;
-        V_weights[i] = (Math.random() * 2 - 1) * limit;
-    }
-
-    const biases = new Float32Array(embeddingDim * 3);
-    if (useBias) {
-        for (let i = 0; i < biases.length; i++) {
-            biases[i] = (Math.random() * 2 - 1) * limit;
+        // in MHA, embedding dim must strictly be divisible by num_heads in order to have equal number of sets
+        if (embeddingDim % numHeads != 0) {
+            throw new Error(`[MULTI-HEAD ATTENTION ERROR]------- embeddingDim is not divisible to numHeads. Embedding dim: ${embeddingDim} | Num heads: ${numHeads}`);
         }
+
+        const Q_weights = new Float32Array(embeddingDim * embeddingDim);
+        const K_weights = new Float32Array(embeddingDim * embeddingDim);
+        const V_weights = new Float32Array(embeddingDim * embeddingDim);
+        const O_weights = new Float32Array(embeddingDim * embeddingDim);
+
+        const limit = XavierInitialization(embeddingDim, embeddingDim);
+        for (let i = 0; i < Q_weights.length; i++) {
+            Q_weights[i] = (Math.random() * 2 - 1) * limit;
+            K_weights[i] = (Math.random() * 2 - 1) * limit;
+            V_weights[i] = (Math.random() * 2 - 1) * limit;
+            O_weights[i] = (Math.random() * 2 - 1) * limit;
+        }
+
+        const biases = new Float32Array(embeddingDim * 4);
+        if (useBias) {
+            for (let i = 0; i < biases.length; i++) {
+                biases[i] = (Math.random() * 2 - 1) * limit;
+            }
+        }
+
+        const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights, O_weights]);
+        const weightShape = [embeddingDim, embeddingDim * 4]; // combined QKVO projection
+
+        layer_data.dkRoot = Math.sqrt(headDim);
+        layer_data.embedDim = embeddingDim;
+        layer_data.seqLen = shape[3];
+        layer_data.headDim = headDim;
+
+        return {
+            updatedSize: embeddingDim * shape[3],
+            updatedShape: [1, 1, embeddingDim, shape[3]], // seqLen unchanged, embedDim unchanged
+            weights,
+            biases,
+            weightGrads: new Float32Array(weights.length),
+            biasGrads: new Float32Array(biases.length),
+            inputShape: shape,
+            outputShape: [1, 1, embeddingDim, shape[3]],
+            paramShape: weightShape,
+        };
     }
-
-    const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights]);
-    const weightShape = [embeddingDim, embeddingDim * 3]; // combined QKV projection
-
-    layer_data.dkRoot = Math.sqrt(embeddingDim);
-    layer_data.embedDim = embeddingDim;
-    layer_data.seqLen = shape[3];
-
-    return {
-        updatedSize: embeddingDim * shape[3],
-        updatedShape: [1, 1, embeddingDim, shape[3]], // seqLen unchanged, embedDim unchanged
-        weights,
-        biases,
-        weightGrads: new Float32Array(weights.length),
-        biasGrads: new Float32Array(biases.length),
-        inputShape: shape,
-        outputShape: [1, 1, embeddingDim, shape[3]],
-        paramShape: weightShape,
-    };
+    catch (e) {
+        console.error(e);
+        process.exit(1);
+    }
 }
 
 /**
@@ -61,7 +76,7 @@ const initParams = (size, shape, layer_data) => {
  * @returns {string} task type
  */
 const determineInferenceType = (layerObject, lossFunc, trainY) => {
-    throw new Error('simple attention layer cannot be an output layer for now');
+    throw new Error('multi-head attention layer cannot be an output layer for now');
 }
 
 /**
@@ -73,9 +88,9 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
 const feedforward = (input, current_layer, pointer) => {
-    const output = CoreAttention(input, current_layer, pointer);
+    const output = CoreMultiHeadAttention(input, current_layer, pointer);
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during feed forward)");
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during feed forward)");
 
     return {
         outputs: output,
@@ -107,7 +122,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
 
-    const output = CoreAttentionBackward(delta, layer_data, pointer);
+    const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer);
     if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
     return output;
 }
@@ -132,12 +147,13 @@ const applyOwnDerivative = (delta) => {
  */
 const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
-    const { dQ, dK, dV } = cache;
-    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim);
+    const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
+    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads, O_weightGrads: OwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim, true);
 
     let QwG;
     let KwG;
     let VwG;
+    let OwG;
 
     for (let t = 0; t < seqLen; t++) {
         const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
@@ -148,9 +164,13 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
         QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
         KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
         VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
+
+        const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        const dMhaRow = dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        OwG = computeWeightGradientsForWeightsInConnectedLayer(mhaRow, dMhaRow, OwGrads, embedDim, embedDim);
     }
 
-    return concatenateFloat32Array([QwG, KwG, VwG]);
+    return concatenateFloat32Array([QwG, KwG, VwG, OwG]);
 }
 
 /**
@@ -162,20 +182,21 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
  */
 const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
-    const { dQ, dK, dV } = cache;
-    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads } = unpackQKVO(null, null, null, biasGrads, embedDim);
-    
+    const { dQ, dK, dV, dMhaOutput } = cache;
+    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads, O_biasGrads: ObGrads }= unpackQKVO(null, null, null, biasGrads, embedDim, true);
+
     let QbG;
     let KbG;
     let VbG;
+    let ObG;
 
     for (let t = 0; t < seqLen; t++) {
         QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
         KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
         VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
+        ObG = computeBiasGradsForConnected_Layer(ObGrads, dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim));
     }
-    
-    return concatenateFloat32Array([QbG, KbG, VbG]);
+    return concatenateFloat32Array([QbG, KbG, VbG, ObG]);
 }
 
 module.exports = {

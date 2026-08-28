@@ -27,7 +27,8 @@ const embedding = require('./layer_functions/embeddingLayer');
 const rnn = require('./layer_functions/recurrentCell');
 const trans = require('./layer_functions/transConv');
 const reshaper = require('./layer_functions/reshape');
-const simple_attention = require("./layer_functions/simpleAttention")
+const simple_attention = require("./layer_functions/simpleAttention");
+const mha = require("./layer_functions/MultiHeadAttention");
 
 class Layers {
     constructor () {
@@ -388,6 +389,46 @@ class Layers {
             accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => simple_attention.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
             accumulateBiasGradients: (biasgrads, deltas, layer_data) => simple_attention.accumulateBiasGradients(biasgrads, deltas, layer_data),
         };
+    }
+
+    /**
+     * @method `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Q, K, and V into different parts called `heads`
+     * @param {number} numHeads Total number of attention heads. Default is `8.`
+     * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
+     * @returns {object} multiHeadAttention config
+     */
+    multiHeadAttention(numHeads = 8, useBias = true) {
+        try {
+            if (numHeads <= 0 || !numHeads) {
+                throw new Error("Num heads cannot be 0, null, or a negative number")
+            }
+            
+            let function_name = "softmax";// same for the simpleAttention, default is softmax
+
+            return {
+                layer_name: "Multi Head Attention",
+                useBias: useBias,
+                activation_function: activation[function_name], 
+                derivative_activation_function: activation.derivatives[function_name],
+                isParametric: true,
+                useBias: useBias,
+                numHeads: numHeads,
+                shapeType: "sequential",
+                initParams: (size, shape, layer_data) => mha.initParams(size, shape, layer_data),
+                determineInferenceType: (layerObject, lossFunc, trainY) => mha.determineInferenceType(layerObject, lossFunc, trainY),
+                feedforward: (input, current_layer, pointer) => mha.feedforward(input, current_layer, pointer),
+                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => mha.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
+                projectDeltaBackward: (delta, pointer, targetShape, layer_data) => mha.projectDeltaBackward(delta, pointer, targetShape, layer_data),
+                applyOwnDerivative: (delta, z, layer_data) => mha.applyOwnDerivative(delta, z, layer_data),
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => mha.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
+                accumulateBiasGradients: (biasgrads, deltas, layer_data) => mha.accumulateBiasGradients(biasgrads, deltas, layer_data),
+            }
+
+        }
+        catch (error) {
+            console.error(error);
+            process.exit(1);
+        }
     }
 
 }

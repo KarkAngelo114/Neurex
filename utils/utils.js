@@ -181,83 +181,111 @@ const concatenateFloat32Array = (chunks) => {
 }
 
 /**
- * @function unpackQKV allows you to unpack parameters of weights and biases of Q, K and V as well as the weights and biases zeroed accumulator
- * @param {Float32Array} weights QKV weights concatenated to one contagious array. (Nullable)
- * @param {Float32Array} biases QKV biases concatenated to one contagious array. (Nullable)
- * @param {Float32Array} weightGrads QKV weightsGrads concatenated to one contagious array. (Nullable)
- * @param {Float32Array} biasesGrads QKV biasesGrads concatenated to one contagious array. (Nullable)
- * @param {Number} embeddingDim embedding dimension value
+ * @function unpackQKVO allows you to unpack parameters of weights and biases of Q, K and V as well as the weights and biases zeroed accumulator. Optionally, you can get the Output projection parameters by passing `true` on the last argument if the allocated buffers is able to reach the fourth memory block.
+ * @param {Float32Array} weights QKVO weights concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} biases QKVO biases concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} weightGrads QKVO weightsGrads concatenated to one contagious array. (Nullable)
+ * @param {Float32Array} biasesGrads QKVO biasesGrads concatenated to one contagious array. (Nullable)
+ * @param {number} embeddingDim embedding dimension value
+ * @param {boolean} includeOutputProjectionParameters use to get the output projection parameters if needed. Default is `false`.
  * @returns {{ 
  *   Q_weights: Float32Array, 
  *   K_weights: Float32Array, 
- *   V_weights: Float32Array, 
+ *   V_weights: Float32Array,
+ *   O_weights: Float32Array,
  *   Q_bias: Floa32Array, 
  *   K_bias: Float32Array, 
  *   V_bias: Float32Array,
+ *   O_bias: Float32Array,
  *   Q_weightGrads: Float32Array,
  *   K_weightGrads: Float32Array,
  *   V_weightGrads: Float32Array,
+ *   O_weightGrads: Float32Array,
  *   Q_biasGrads: Float32Array,
  *   K_biasGrads: Float32Array,
  *   V_biasGrads: Float32Array,
+ *   O_biasGrads: Float32Array,
  * }}
  *
  *
  *
  *
  */
-const unpackQKV = (weights, biases, weightGrads, biasGrads, embeddingDim) => {
+const unpackQKVO = (weights, biases, weightGrads, biasGrads, embeddingDim, includeOutputProjectionParameters = false) => {
     const matrixSize = embeddingDim * embeddingDim;
     let Qw; // Q_weights
     let Kw; // K_weights
     let Vw; // V_weights
+    let Ow; // O_weights
+
     let Qb; // Q_bias
     let Kb; // K_bias
     let Vb; // V_bias
+    let Ob // O_bias
+
     let QwG; // Q_weightGrads
     let KwG; // K_weightGrads
     let VwG; // V_weightGrads
+    let OwG; // O_weightGrad
+
     let QbG; // Q_biasGrads
     let KbG; // K_biasGrads
     let VbG; // V_biasGrads
+    let ObG; // O_weightGrad
 
     if (weights) {
         Qw = weights.subarray(0, matrixSize);
         Kw = weights.subarray(matrixSize, matrixSize * 2);
         Vw = weights.subarray(matrixSize * 2, matrixSize * 3);
+        if (includeOutputProjectionParameters) {
+            Ow = weights.subarray(matrixSize * 3, matrixSize * 4);
+        }
     }
 
     if (biases) {
         Qb = biases.subarray(0, embeddingDim);
         Kb = biases.subarray(embeddingDim, embeddingDim * 2);
         Vb = biases.subarray(embeddingDim * 2, embeddingDim * 3);
+        if (includeOutputProjectionParameters) {
+            Ob = biases.subarray(embeddingDim * 3, embeddingDim * 4);
+        }
     }
 
     if (weightGrads) {
         QwG = weightGrads.subarray(0, matrixSize);
         KwG = weightGrads.subarray(matrixSize, matrixSize * 2);
         VwG = weightGrads.subarray(matrixSize * 2, matrixSize * 3);
+        if (includeOutputProjectionParameters) {
+            OwG = weightGrads.subarray(matrixSize * 3, matrixSize * 4);
+        }
     }
 
     if (biasGrads) {
         QbG = biasGrads.subarray(0, embeddingDim);
         KbG = biasGrads.subarray(embeddingDim, embeddingDim * 2);
         VbG = biasGrads.subarray(embeddingDim * 2, embeddingDim * 3);
+        if (includeOutputProjectionParameters) {
+            ObG = biasGrads.subarray(embeddingDim * 3, embeddingDim * 4);
+        }
     }
 
     return { 
         Q_weights: Qw, 
         K_weights: Kw, 
-        V_weights: Vw, 
+        V_weights: Vw,
+        O_weights: Ow,
         Q_bias: Qb, 
         K_bias: Kb, 
         V_bias: Vb,
+        O_bias: Ob,
         Q_weightGrads: QwG,
         K_weightGrads: KwG,
         V_weightGrads: VwG,
+        O_weightGrads: OwG,
         Q_biasGrads: QbG,
         K_biasGrads: KbG,
-        V_biasGrads: VbG
+        V_biasGrads: VbG,
+        O_biasGrads: ObG
     };
 };
 
@@ -288,6 +316,6 @@ module.exports = {
     formatDuration,
     concatenateFloat32Array,
     getTransposedPaddingSizes,
-    unpackQKV,
+    unpackQKVO,
     transpose2D
 }
