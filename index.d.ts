@@ -340,13 +340,13 @@ declare module 'neurex' {
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
         * 
         * @async 
-        * @method train()
-        * @param {Array<Array<number>>} trainX - The input training data. Each element is an array representing a single sample's features.
-        * @param {Array<number>} trainY - The target values (ground truth) corresponding to each sample in trainX.
-        * @param {string} loss - loss function to use: MSE, MAE, binary_cross_entropy, categorical_cross_entropy, sparse_categorical_cross_entropy
-        * @param {Number} epoch - the number of training iteration
-        * @param {Number} batch_size - mini batch sizing
-        * 
+        * @method train starts the model training.
+        * @param {Array<Array<number>>} trainX The input training data. Each element is an array representing a single sample's features.
+        * @param {Array<Array<number>>} trainY The target values (ground truth) corresponding to each sample in trainX.
+        * @param {string} loss loss function to use: MSE, MAE, binary_cross_entropy, categorical_cross_entropy, sparse_categorical_cross_entropy
+        * @param {Number} epoch the number of training iteration
+        * @param {Number} batch_size mini batch sizing
+        * @param {boolean} shuffle shuffles training data per epoch. Default value is `true`
         * @throws {Error} Throws an error if any required parameter is missing.
         * @returns Progress of every epoch can be print in the console.
         * 
@@ -368,7 +368,7 @@ declare module 'neurex' {
         * 
         * 
         */
-        async train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number): void;
+        async train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number, shuffle: boolean): void;
 
         /**
         * 

@@ -621,7 +621,9 @@ class Neurex {
     * * After training, you can use the network for predictions
     */
 
-    async train(inputs, trainY, loss, epoch, batch_size = 1) {
+    async train(inputs, trainY, loss, epoch, batch_size = 1, shuffle = true) {
+        this.shuffle = shuffle;
+
         if (!this.isInit) {
             init();
             this.isInit = true;
