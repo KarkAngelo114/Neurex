@@ -374,8 +374,8 @@ const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, output
 
 /**
  * "✅☑️"
- * @param {Float32Array>} biasGrads 
- * @param {Float32Array>} delta 
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} delta 
  * @returns float32array of accumulated bias gradients
  */
 const computeBiasGradsForConnected_Layer = (biasGrads, delta) => functions.computeBiasGradsForConnected_Layer(biasGrads, delta);
@@ -621,20 +621,36 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
 const dotProduct = (arr1, arr2, inputSize, outputSize) => functions.dotProduct(arr1, arr2, inputSize, outputSize);
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {number} size 
  * @param {number} eps
  * @param {number} pointer 
  * @returns 
  */
-const computeLayerNorm = (input, size, eps, pointer) => float32_Modules.computelayerNorm(
+const computeLayerNorm = (input, size, eps, pointer) => functions.computelayerNorm(
     input, 
     size, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer], 
     eps
 );
+
+/**
+ * @function accumulate_element_wise_mul performs an accumulating element-wise multiplication operation wherein the 3rd array input will be accumulated on. (Not to be confused with `element_wise_mul()`)
+ * @param {Float32Array} flat_arr_1 input array
+ * @param {Float32Array} flat_arr_2 input array
+ * @param {Float32Array} flat_arr_3 input array to accumulated on
+ * @returns {Float32Array} accumulated result
+ */
+const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
+
+    if (!flat_arr_1 || !flat_arr_2 || !flat_arr_3) throw new Error("[ERROR]------- requires '3' input arrays for this operation."); 
+
+    if (flat_arr_1.length !== flat_arr_2.length || flat_arr_1.length !== flat_arr_3.length) throw new Error(`${red}[ERROR]------- Error: 3 input arrays are not equal in length. array1: ${flat_arr_1.length} | array2: ${flat_arr_2.length} ${reset} | array3: ${flat_arr_3.length}`);
+
+    return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3);
+};
 
 /**
  * 
@@ -987,6 +1003,7 @@ module.exports = {
     ApplyAdam,
     element_wise_mul,
     element_wise_sub,
+    accumulate_element_wise_mul,
     MaxPool,
     MaxPoolDelta,
     init,

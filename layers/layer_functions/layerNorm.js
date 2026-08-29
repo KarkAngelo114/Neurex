@@ -1,4 +1,4 @@
-const { computeLayerNorm } = require("../../core/bindings/entry");
+const { computeLayerNorm, accumulate_element_wise_mul, computeBiasGradsForConnected_Layer } = require("../../core/bindings/entry");
 
 const initParams = (size, shape, layer_data) => {
     // gamma initialized to 1s, beta initialized to 0s
@@ -47,18 +47,12 @@ const applyOwnDerivative = (delta, z, layer_data)  => {
 }
 
 const accumulateGammaGrads = (a_prev, delta, gammaGrads, layer_data) => {
-    for (let i = 0; i < delta.length; i++) {
-        gammaGrads[i] += delta[i] * a_prev[i];
-    }
-    return gammaGrads;
+    return accumulate_element_wise_mul(a_prev, delta, gammaGrads);
 }
 
 const accumulateBetaGrads = (betaGrads, delta) => {
-    for (let i = 0; i < delta.length; i++) {
-        betaGrads[i] += delta[i];
-    }
     
-    return betaGrads;
+    return computeBiasGradsForConnected_Layer(betaGrads, delta);
 }
 
 module.exports = {
