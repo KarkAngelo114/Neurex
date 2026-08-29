@@ -52,7 +52,9 @@ const accumulateGammaGrads = (a_prev, delta, gammaGrads, layer_data) => {
 
 const accumulateBetaGrads = (betaGrads, delta) => {
     
-    return computeBiasGradsForConnected_Layer(betaGrads, delta);
+    const output =  computeBiasGradsForConnected_Layer(betaGrads, delta);
+
+    return output;
 }
 
 module.exports = {

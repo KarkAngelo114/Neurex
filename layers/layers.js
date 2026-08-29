@@ -442,6 +442,7 @@ class Layers {
             layer_name: "Layer Normalization",
             eps: epsilon,
             shapeType: "flat",
+            useBias: true, // true by default
             isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
             determineInferenceType: () => normModule.determineInferenceType(),

@@ -169,7 +169,7 @@ class Neurex {
             let paramCount = 0;
             if (isParametric) {
                 const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = this.biases[pointer] && !this.biases[pointer].every(v => v == 0)  ? this.biases[pointer].length : 0;
+                const b = (this.biases[pointer] && layer.useBias) ? this.biases[pointer].length : 0;
                 paramCount = w + b;
                 pointer++;
             }
@@ -905,7 +905,6 @@ class Neurex {
                         // store states
                         this.optimizerStates.weights[pointer] = res1.state;
 
-
                         // Update bias only if the layer actually has a bias and has the property `useBias`
                         if (layer_data_obj?.useBias) {
 
@@ -922,14 +921,8 @@ class Neurex {
                             });
 
                             this.biases[pointer] = res2.params;
+
                             this.optimizerStates.biases[pointer] = res2.state;
-
-                        } else {
-
-                            // This layer has no bias parameter.
-                            this.biases[pointer].fill(0);
-                            this.biasGrads[pointer].fill(0);
-                            this.optimizerStates.biases[pointer] = this.biases[pointer];
 
                         }
 

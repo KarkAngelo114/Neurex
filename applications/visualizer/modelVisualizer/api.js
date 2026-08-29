@@ -426,6 +426,49 @@ function renderModel(layer_data, weights, biases) {
 
             modelGroup.add(cube);
         }
+        else if (layer.layer_name === "Layer Normalization") {
+            // 1. Inherit spatial dimensions from the previous layer/cube in the sequence
+            const prevAnimated = animatedLayers[animatedLayers.length - 1];
+            const visualWidth = prevAnimated ? prevAnimated.boundsW : 10;
+            const visualHeight = prevAnimated ? prevAnimated.boundsH : 10;
+            const visualDepth = 2; // Keep depth thin to represent an element-wise inline operation
+
+            // 2. Create a distinct visual style (e.g., cyan/green semi-transparent plate)
+            cube = createCube({
+                width: visualWidth,
+                height: visualHeight,
+                depth: visualDepth,
+                color: 0x8df78f,
+                outlineColor: 0x8df78f,
+                opacity: 0.35
+            });
+
+            // 3. Position along the Z-axis
+            if (index > 0) currentZ += visualDepth / 2;
+            else currentZ = visualDepth / 2;
+
+            cube.position.set(0, 0, currentZ);
+            currentZ += visualDepth / 2 + baseGap;
+
+            // 4. Register metadata and add to scene
+            const layerData = {
+                name: layer.layer_name,
+                inputShape: layer.inputShape,
+                outputShape: layer.outputShape,
+                desc: "Normalizes features across the hidden dimensions for each individual sample, maintaining shape without spatial downsampling.",
+            };
+
+            if (layer.isParametric) {
+                layerData.weight_L1 = L1_Mean(weights[pointer]);
+                layerData.bias_L1 = L1_Mean(biases[pointer]);
+                pointer++;
+            }
+
+            cube.userData = layerData;
+
+            
+            modelGroup.add(cube);
+        }
     });
 
     if (dataFlowGroup) {
@@ -979,7 +1022,8 @@ function listLayers(layers) {
                     layer.layer_name === "Recurrent Cell" ? "#FF69B4" :
                     layer.layer_name === "Embedding Layer" ? "#BB6BD9" :
                     layer.layer_name === "Trans Convolution" ? "#00d52e" :
-                    layer.layer_name === "Reshape" ? "#fbfffc" :
+                    layer.layer_name === "Reshape" ?  "#fbfffc" :
+                    layer.layer_name === "Layer Normalization" ?"#8df78f":
                     "red"; // default color: red for connected layer
 
         p.innerHTML = `

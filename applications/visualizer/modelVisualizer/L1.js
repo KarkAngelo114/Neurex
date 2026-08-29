@@ -4,6 +4,7 @@
  * @returns {number} L1 Mean Value
  */
 function L1_Mean(params) {
+
     if (!params || !params.length) return 0;
 
     // Flatten nested arrays if params are multi-dimensional

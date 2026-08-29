@@ -1026,7 +1026,6 @@ const dotProduct = (arr1, arr2, inputSize, outputSize) => {
 }
 
 const computelayerNorm = (input, size, gamma, beta, eps) => {
-
     let mean = 0;
 
     for (let i = 0; i < size; i++) {
@@ -1054,7 +1053,7 @@ const computelayerNorm = (input, size, gamma, beta, eps) => {
 }
 
 const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
-    for (let i = 0; i < delta.length; i++) {
+    for (let i = 0; i < arr1.length; i++) {
         arr3[i] += arr2[i] * arr1[i];
     }
     return arr3;
