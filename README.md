@@ -112,6 +112,20 @@ simpleAttention(`useBias: boolean`)
 layer.simpleAttention()
 ```
 
+multiHeadAttention(`numHeads: number, useBias: boolean`)
+- `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
+```JavaScript
+layer.multiHeadAttention(8, true)
+```
+
+layerNorm(`epsilon: number`)
+- normalizes the activations of the previous layer for each individual sample independently.
+```JavaScript
+layer.layerNorm(1e-5) // default value is `1e-5`
+```
+
+
+
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 
 

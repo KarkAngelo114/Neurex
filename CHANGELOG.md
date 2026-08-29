@@ -4,6 +4,8 @@
 - Added `transConv` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Addded `reshape` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Added `simpleAttention` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Added `multiHeadAttention` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Added `layerNorm` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - added learning rate schedulers
 - added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
 - You can now add you own optimizers and learning rate scheduler. See the latest documentation about [optimizers](https://neurex-documentation.vercel.app/javascript-nodejs#optimizers), and [lr_schedulers](https://neurex-documentation.vercel.app/javascript-nodejs#schedulers), and how to plug in your own.
