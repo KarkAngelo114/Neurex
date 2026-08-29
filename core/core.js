@@ -277,6 +277,8 @@ class Neurex {
                 useBias: layer.useBias ?? true,
                 headDim: layer.headDim || 1,
                 numHeads: layer.numHeads || 8,
+                shapeType: layer.shapeType || null,
+                eps: layer.eps
             })),
             "miscellaneous": miscellaneous
         };
@@ -455,6 +457,12 @@ class Neurex {
                     newLayer.seqLen = layerData.maxSequenceLength;
                     newLayer.numHeads = layerData.numHeads;
                     newLayer.headDim = layerData.headDim;
+                }
+                else if (layerData.layer_name === "Layer Normalization") {
+                    newLayer = layerBuilder.layerNorm(layerData.eps);
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.weightShape = layerData.weightShape;
                 }
                 else {
                     throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);

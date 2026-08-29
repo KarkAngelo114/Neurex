@@ -1028,6 +1028,7 @@ const dotProduct = (arr1, arr2, inputSize, outputSize) => {
 const computelayerNorm = (input, size, gamma, beta, eps) => {
 
     let mean = 0;
+
     for (let i = 0; i < size; i++) {
         mean += input[i];
     };
@@ -1050,7 +1051,13 @@ const computelayerNorm = (input, size, gamma, beta, eps) => {
     }
 
     return outputs;
+}
 
+const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
+    for (let i = 0; i < delta.length; i++) {
+        arr3[i] += arr2[i] * arr1[i];
+    }
+    return arr3;
 }
 
 
@@ -1087,6 +1094,7 @@ module.exports = {
     MaxPooling,
     MaxPoolDelta,
     element_wise_mul,
+    accumulate_element_wise_mul,
     scaleDiff,
     element_wise_sub,
     mse,

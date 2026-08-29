@@ -440,7 +440,7 @@ class Layers {
     layerNorm(epsilon = 1e-5) {
         return {
             layer_name: "Layer Normalization",
-            epsilon: epsilon,
+            eps: epsilon,
             shapeType: "flat",
             isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
