@@ -13,25 +13,11 @@ __kernel void recurrentMatMul(
 
     float z = biases[j];
 
-    int i = 0;
-    for (; i + 3 < inputSize; i += 4) {
-        z += input_data[i] * input_weights[i * units + j];
-        z += input_data[i + 1] * input_weights[(i + 1) * units + j];
-        z += input_data[i + 2] * input_weights[(i + 2) * units + j];
-        z += input_data[i + 3] * input_weights[(i + 3) * units + j];
-    }
-    for (; i < inputSize; ++i) {
+    for (int i = 0; i < inputSize; ++i) {
         z += input_data[i] * input_weights[i * units + j];
     }
 
-    int h = 0;
-    for (; h + 3 < units; h += 4) {
-        z += prevHiddenState[h] * recurrent_weights[h * units + j];
-        z += prevHiddenState[h + 1] * recurrent_weights[(h + 1) * units + j];
-        z += prevHiddenState[h + 2] * recurrent_weights[(h + 2) * units + j];
-        z += prevHiddenState[h + 3] * recurrent_weights[(h + 3) * units + j];
-    }
-    for (; h < units; ++h) {
+    for (int h = 0; h < units; ++h) {
         z += prevHiddenState[h] * recurrent_weights[h * units + j];
     }
 
@@ -49,14 +35,7 @@ __kernel void recurrentTimeDelta(
     if (c >= C) return;
 
     float sum = 0.0f;
-    int d = 0;
-    for (; d + 3 < D; d += 4) {
-        sum += recurrent_weights[c * D + d] * delta[d];
-        sum += recurrent_weights[c * D + d + 1] * delta[d + 1];
-        sum += recurrent_weights[c * D + d + 2] * delta[d + 2];
-        sum += recurrent_weights[c * D + d + 3] * delta[d + 3];
-    }
-    for (; d < D; ++d) {
+    for (int d = 0; d < D; ++d) {
         sum += recurrent_weights[c * D + d] * delta[d];
     }
 
