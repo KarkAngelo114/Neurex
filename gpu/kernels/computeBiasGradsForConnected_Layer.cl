@@ -4,7 +4,8 @@ __kernel void computeBiasGradsForConnected_Layer(
     const int gradSize
 ) {
     int idx = get_global_id(0);
-    if (idx < gradSize) {
-        biasgrad[idx] += delta[idx];
-    }
+
+    if (idx >= gradSize) return;
+
+    biasgrad[idx] += delta[idx];
 }

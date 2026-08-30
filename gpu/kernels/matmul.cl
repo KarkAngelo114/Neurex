@@ -10,9 +10,20 @@ __kernel void matmul(
     if (j >= outputSize) return;
 
     float acc = biases[j];
-    for (int i = 0; i < inputSize; ++i) {
+
+    int i = 0;
+
+    for (; i + 3 < inputSize; i += 4) {
+        acc += input[i] * weights[i * outputSize + j];
+        acc += input[i + 1] * weights[(i + 1) * outputSize + j];
+        acc += input[i + 2] * weights[(i + 2) * outputSize + j];
+        acc += input[i + 3] * weights[(i + 3) * outputSize + j];
+    }
+
+    for (; i < inputSize; ++i) {
         acc += input[i] * weights[i * outputSize + j];
     }
+
     output_tensor_template[j] = acc;
 }
 
@@ -29,8 +40,18 @@ __kernel void dot_product(
     if (j >= outputSize) return;
 
     float sum = 0.0f;
+    
+    int i = 0;
 
-    for (int i = 0; i < inputSize; ++i) {
+    for (; i + 3 < inputSize; i += 4) {
+        sum += arr1[i] * arr2[i * outputSize + j];
+        sum += arr1[i + 1] * arr2[(i + 1) * outputSize + j];
+        sum += arr1[i + 2] * arr2[(i + 2) * outputSize + j];
+        sum += arr1[i + 3] * arr2[(i + 3) * outputSize + j];
+    }
+
+
+    for (; i < inputSize; ++i) {
         sum += arr1[i] * arr2[i * outputSize + j];
     }
 
