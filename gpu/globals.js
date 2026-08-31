@@ -1,12 +1,17 @@
 const path = require('path');
 const { BooleanAvailability } = require('./modeSelector');
+let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 let globalWeights = []; // global array of weights
 let globalBiases = []; // global array of biases
 
 
-exports.setGlobalParams = (weights, biases, outputTemplates) => {
+exports.setGlobalParams = (weights, biases) => {
     globalWeights = weights;
     globalBiases = biases;
+
+    // if (BooleanAvailability().hasGPU) {
+    //     addon.UploadParams(weights, biases);
+    // }
 }
 
 /** 

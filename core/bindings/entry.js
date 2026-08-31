@@ -636,7 +636,7 @@ const computeLayerNorm = (input, size, eps, pointer) => functions.computelayerNo
     eps
 );
 
-/**
+/**"✅☑️"
  * @function accumulate_element_wise_mul performs an accumulating element-wise multiplication operation wherein the 3rd array input will be accumulated on. (Not to be confused with `element_wise_mul()`)
  * @param {Float32Array} flat_arr_1 input array
  * @param {Float32Array} flat_arr_2 input array
@@ -653,6 +653,22 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
 };
 
 /**
+ * "✅☑️"
+ * @function `projectToQKV` projects the embedding vectors to QKV
+ * @param {Float32Array} input input tensor 
+ * @param {Float32Array} Q_weights Q weights
+ * @param {Float32Array} Q_bias Q bias
+ * @param {Float32Array} K_weights K weights
+ * @param {Float32Array} K_bias V bias
+ * @param {Float32Array} V_weights V weights
+ * @param {Float32Array} V_bias V bias
+ * @param {Number} embedDim embedding dim value
+ * @param {Number} seqLen sequence length or token length value
+ * @returns {{ Q: Float32Array, K: Float32Array, V: Float32Array}}
+ */
+const projectToQKV = (input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen) => functions.projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+
+/**
  * 
  * @param {Float32Array} input 
  * @param {Object} layerData 
@@ -666,16 +682,7 @@ const CoreAttention = (input, layerData, pointer) => {
     
     const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKVO(weights, biases, null, null, embedDim);
 
-    const Q = new Float32Array(seqLen * embedDim);
-    const K = new Float32Array(seqLen * embedDim);
-    const V = new Float32Array(seqLen * embedDim);
-
-    for (let t = 0; t < seqLen; t++) {
-        const tokenVec = input.subarray(t * embedDim, (t + 1) * embedDim);
-        Q.set(functions.MatMul(tokenVec, embedDim, embedDim, Q_weights, Q_bias), t * embedDim);
-        K.set(functions.MatMul(tokenVec, embedDim, embedDim, K_weights, K_bias), t * embedDim);
-        V.set(functions.MatMul(tokenVec, embedDim, embedDim, V_weights, V_bias), t * embedDim);
-    }
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
 
     const transpose_K = transpose2D(K, seqLen, embedDim);
 
@@ -805,16 +812,7 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
     const { Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, O_weights, O_bias } = unpackQKVO(weights, biases, null, null, embedDim, true);
 
     // 2. Project Input to Q, K, V [seqLen, embedDim]
-    const Q = new Float32Array(seqLen * embedDim);
-    const K = new Float32Array(seqLen * embedDim);
-    const V = new Float32Array(seqLen * embedDim);
-
-    for (let t = 0; t < seqLen; t++) {
-        const tokenVec = input.subarray(t * embedDim, (t + 1) * embedDim);
-        Q.set(functions.MatMul(tokenVec, embedDim, embedDim, Q_weights, Q_bias), t * embedDim);
-        K.set(functions.MatMul(tokenVec, embedDim, embedDim, K_weights, K_bias), t * embedDim);
-        V.set(functions.MatMul(tokenVec, embedDim, embedDim, V_weights, V_bias), t * embedDim);
-    }
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
 
     const mhaOutput = new Float32Array(seqLen * embedDim);
     const S_per_head = [];

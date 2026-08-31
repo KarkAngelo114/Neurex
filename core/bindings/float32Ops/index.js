@@ -1060,6 +1060,38 @@ const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
 }
 
 
+const projectToQKV = (
+    input, 
+    Q_weights, 
+    Q_bias,
+    K_weights, 
+    K_bias,
+    V_weights,
+    V_bias,
+    embeddingDim,
+    sequenceLen
+) => {
+    const Q = new Float32Array(sequenceLen * embeddingDim);
+    const K = new Float32Array(sequenceLen * embeddingDim);
+    const V = new Float32Array(sequenceLen * embeddingDim);
+
+    for (let t = 0; t < sequenceLen; t++) {
+        const tokenVec = input.subarray(t * embeddingDim, (t + 1) * embeddingDim);
+        Q.set(MatMul(tokenVec, embeddingDim, embeddingDim, Q_weights, Q_bias), t * embeddingDim);
+        K.set(MatMul(tokenVec, embeddingDim, embeddingDim, K_weights, K_bias), t * embeddingDim);
+        V.set(MatMul(tokenVec, embeddingDim, embeddingDim, V_weights, V_bias), t * embeddingDim);
+    }
+
+    return {
+        Q: Q,
+        K: K,
+        V: V
+    }
+
+
+}
+
+
 module.exports = {
     Relu,
     Sigmoid,
@@ -1107,5 +1139,6 @@ module.exports = {
     recurrentBiasGradsAccumulation,
     gradientClipping,
     dotProduct,
-    computelayerNorm
+    computelayerNorm,
+    projectToQKV,
 }
