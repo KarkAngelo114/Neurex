@@ -12,10 +12,9 @@ const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
 const { getGlobalParams } = require('../../gpu/globals');
 const { transpose2D, unpackQKVO } = require('../../utils/utils');
+
 let addon;
-
 let functions;
-
 
 const init = () => {    
 
@@ -77,6 +76,12 @@ const init = () => {
     }
 }
 
+const shutdown = () => {
+    if (BooleanAvailability().hasGPU) {
+        addon.shutdown();
+    }
+}
+
 
 /**
  *  "✅☑️"
@@ -86,7 +91,12 @@ const init = () => {
  * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer) => functions.getEmbeddings(Array.from(tokenVector), embeddingDim, getGlobalParams().globalWeights[pointer]);
+const getEmbeddings = (tokenVector, embeddingDim, pointer) => functions.getEmbeddings(
+    Array.from(tokenVector), 
+    embeddingDim, 
+    getGlobalParams().globalWeights[pointer], 
+    pointer
+);
 
 /**
  * "✅☑️"
@@ -115,6 +125,7 @@ const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(
     outputSize, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer], 
+    pointer
 );
 
 /**
@@ -131,7 +142,8 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer) => functions.DeltaM
     deltas, 
     inputSize, 
     outputSize, 
-    getGlobalParams().globalWeights[pointer]
+    getGlobalParams().globalWeights[pointer],
+    pointer
 );
 
 /**
@@ -290,6 +302,7 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer)
     inputShape, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer],
+    pointer
 );
 
 /**
@@ -564,6 +577,7 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
     weightShape, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer],
+    pointer
 );
 
 /**
@@ -584,7 +598,8 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
     strides,
     filters,
     weightShape,
-    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams().globalWeights[pointer],
+    pointer
 );
 
 /**
@@ -633,7 +648,8 @@ const computeLayerNorm = (input, size, eps, pointer) => functions.computelayerNo
     size, 
     getGlobalParams().globalWeights[pointer], 
     getGlobalParams().globalBiases[pointer], 
-    eps
+    eps,
+    pointer
 );
 
 /**"✅☑️"
@@ -666,7 +682,7 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
  * @param {Number} seqLen sequence length or token length value
  * @returns {{ Q: Float32Array, K: Float32Array, V: Float32Array}}
  */
-const projectToQKV = (input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen) => functions.projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+const projectToQKV = (input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer) => functions.projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
 
 /**
  * 
@@ -682,7 +698,7 @@ const CoreAttention = (input, layerData, pointer) => {
     
     const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKVO(weights, biases, null, null, embedDim);
 
-    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
 
     const transpose_K = transpose2D(K, seqLen, embedDim);
 
@@ -812,7 +828,7 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
     const { Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, O_weights, O_bias } = unpackQKVO(weights, biases, null, null, embedDim, true);
 
     // 2. Project Input to Q, K, V [seqLen, embedDim]
-    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
 
     const mhaOutput = new Float32Array(seqLen * embedDim);
     const S_per_head = [];
@@ -1022,6 +1038,7 @@ module.exports = {
     CoreAttentionBackward,
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
+    shutdown,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

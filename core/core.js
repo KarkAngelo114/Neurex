@@ -19,7 +19,7 @@ const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init, gradientClipping, scale } = require('./bindings');
+const { init, gradientClipping, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const version = require('../package.json').version;
 
@@ -1102,6 +1102,8 @@ class Neurex {
             console.error(error);
         }
     }
+
+    releaseMem = () => shutdown();  
 
     // ========= Private methods =======
     #build() {

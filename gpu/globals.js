@@ -4,14 +4,18 @@ let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", 
 let globalWeights = []; // global array of weights
 let globalBiases = []; // global array of biases
 
-
+/**
+ * 
+ * @param {Array<Float32Array>} weights array of float32array weights
+ * @param {Array<Float32Array} biases array of float32array biases
+ */
 exports.setGlobalParams = (weights, biases) => {
     globalWeights = weights;
     globalBiases = biases;
 
-    // if (BooleanAvailability().hasGPU) {
-    //     addon.UploadParams(weights, biases);
-    // }
+    if (BooleanAvailability().hasGPU) {
+        addon.UploadParams(weights, biases);
+    }
 }
 
 /** 
