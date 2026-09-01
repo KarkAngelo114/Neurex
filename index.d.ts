@@ -381,6 +381,35 @@ declare module 'neurex' {
         produces predictions based on the input data
         */
         async predict(input: number[][]): number[];
+        
+
+        /**
+        * @method `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
+        * @param {Float32Array} input input vector
+        * @returns {{ predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]}}
+        */
+        feedforward(input: Float32Array): {predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]};
+
+        /**
+        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward.
+        * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
+        * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
+        * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
+        * @returns {{accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}}
+        */
+        backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}
+        
+        /**
+        * @method `updateParams` is the method to update the parameters of your model.
+        * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
+        * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
+        * @param {Number} batchSize the size per batch
+        * @param {Number} totalEpoch total training epoch
+        * @param {Number} previousEpochLoss previous epoch loss
+        * @param {Number} current_epoch current epoch
+        * @param {Number} trainingFeatureSize the number of input features.
+        */
+        updateParams(accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[], batchSize: number, totalEpoch: number, previousEpochLoss: number, current_epoch: number, trainingFeatureSize: number): void;
     }
 
     /**

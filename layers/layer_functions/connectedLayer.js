@@ -202,6 +202,7 @@ const applyOwnDerivative = (delta, z, layer_data) => {
     return result;
 }
 
+
 module.exports = {
     initParams,
     determineInferenceType,

@@ -803,10 +803,6 @@ class Neurex {
                     const batchEnd = Math.min(batchStart + batchSize, trainX.length);
                     const actualBatchSize = batchEnd - batchStart;
 
-                    let weightGrads = this.weightGrads;
-
-                    let biasGrads = this.biasGrads;
-
                     let batchLoss = 0;                  
 
                     // Accumulate gradients for each sample in the batch
@@ -819,43 +815,19 @@ class Neurex {
                         let actual = trainY[sample_index];
 
                         // feed forward
-                        const {predictions, activations, zs} = this.#Feedforward(input);
-                        let deltas = [];
-                        
+                        const {predictions, activations, zs} = this.feedforward(input);
 
+                        // compute batch loss
                         batchLoss += loss_function(predictions, actual);
 
-                        // === STEP 1: Compute delta for output layer === //
-                        let output_layer_index = this.num_layers - 1;
-                        
-                        deltas[output_layer_index] = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
+                        // get output layer delta to be projected backward
+                        const inputDelta = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
 
-                        // === STEP 2: backpropagate the output layer delta === //
-                        const {deltas:allDeltas} = this.#backpropagation(activations, zs, deltas);
+                        // backprogate
+                        const {accumulatedWeightGrads, accumulatedBiasGrads} = this.backpropagation(activations, zs, inputDelta);
 
-                        // console.log(allDeltas);
-
-                        // === STEP 3: Accumulate Gradients === //
-                        let pointer = 0;
-                        for (let l = 0; l < this.layers.length; l++) {
-                            const delta = allDeltas[l];
-                            const a_prev = activations[l];
-                            const layer_data_obj = this.layers[l];
-
-                            const parametric_layers = this.parametric_layers;
-
-                            if (!parametric_layers.includes(layer_data_obj.layer_name)) {
-                                continue;
-                            }
-
-
-                            // Accumulate weight gradients
-                            weightGrads[pointer] = layer_data_obj.accumulateWeightGradients(a_prev, delta, weightGrads[pointer], layer_data_obj);
-
-                            // Accumulate bias gradients
-                            biasGrads[pointer] = layer_data_obj.accumulateBiasGradients(biasGrads[pointer], delta, layer_data_obj);
-                            pointer++;
-                        }
+                        this.weightGrads = accumulatedWeightGrads;
+                        this.biasGrads = accumulatedBiasGrads;
                     }
 
                     batchLoss /= actualBatchSize;
@@ -864,79 +836,10 @@ class Neurex {
                     process.stdout.write(`\r`+logMessage);
 
 
-                    let pointer = 0;
-                    // Divide accumulated gradients by the actual batch size and use the optimizer function to update the paramters
-                    for (let l = 0; l < this.num_layers; l++) {
-                        
-                        const layer_data_obj = this.layers[l];
-
-                        const parametric_layers = this.parametric_layers;
-
-                        if (!parametric_layers.includes(layer_data_obj.layer_name)) {
-                            continue;
-                        }
-
-                        // scale weight gradients
-                        weightGrads[pointer] = scale(weightGrads[pointer], actualBatchSize, layer_data_obj);
-
-                        // scale bias gradients
-                        biasGrads[pointer] = scale(biasGrads[pointer], actualBatchSize);
-                        
-                        // clip accumulated weight gradients using a threshold
-                        weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
-
-                        // clip accumulated bias gradients using a threshold
-                        biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
-
-                        // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
-                        const res1 = this.optimizer({
-                            params: this.weights[pointer],
-                            grads: weightGrads[pointer],
-                            state: this.optimizerStates.weights[pointer],
-                            lr: this.learning_rate,
-                            previousEpochLoss,
-                            current_epoch,
-                            batchSize,
-                            totalEpoch: epoch,
-                            trainingFeatureSize: trainX[0].length
-                        });
-
-                        // update weights corresponding a parametric layer using a pointer
-                        this.weights[pointer] = res1.params;
-
-                        // store states
-                        this.optimizerStates.weights[pointer] = res1.state;
-
-                        // Update bias only if the layer actually has a bias and has the property `useBias`
-                        if (layer_data_obj?.useBias) {
-
-                            const res2 = this.optimizer({
-                                params: this.biases[pointer],
-                                grads: biasGrads[pointer],
-                                state: this.optimizerStates.biases[pointer],
-                                lr: this.learning_rate,
-                                previousEpochLoss,
-                                current_epoch,
-                                batchSize,
-                                totalEpoch: epoch,
-                                trainingFeatureSize: trainX[0].length
-                            });
-
-                            this.biases[pointer] = res2.params;
-
-                            this.optimizerStates.biases[pointer] = res2.state;
-
-                        }
-
-                        pointer++;                        
-                    }
-
-                    this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
-
-                    setGlobalParams(
-                        this.weights, 
-                        this.biases, 
-                    );
+                    // This section is the for updating weights and biases.
+                    // The remaining steps ahead are scaling accumulated gradients, gradient clipping and using the optimizer for param updates
+                    // before uploading to global store and resets gradient accumulators back to zeroes.
+                    this.updateParams(this.weightGrads, this.biasGrads, batchSize, previousEpochLoss, epoch, current_epoch, trainX[0].length);
 
                 }
 
@@ -963,7 +866,7 @@ class Neurex {
                 if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
                     let epochPredictions = [];
                     for (let i = 0; i < trainX.length; i++) {
-                        epochPredictions.push(this.#Feedforward(trainX[i]).predictions);
+                        epochPredictions.push(this.feedforward(trainX[i]).predictions);
                     }
 
                     accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, this.task);
@@ -1067,7 +970,7 @@ class Neurex {
             this.isInit = true;
         }
 
-        setGlobalParams(this.weights, this.biases, this.output_layers_templates);
+        setGlobalParams(this.weights, this.biases);
 
         if (!this.weights || !this.biases) {
             throw new Error("Parameters are missing");
@@ -1092,7 +995,7 @@ class Neurex {
             for (let sample_index = 0; sample_index < input.length; sample_index++) {
                 let input_data = input[sample_index];
 
-                const {predictions} = this.#Feedforward(input_data);
+                const {predictions} = this.feedforward(input_data);
                 outputs.push(predictions);
             }
 
@@ -1103,7 +1006,191 @@ class Neurex {
         }
     }
 
-    releaseMem = () => shutdown();  
+    releaseMem = () => shutdown();
+
+    /**
+     * @method `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
+     * @param {Float32Array} input input vector
+     * @returns {{ 
+     *     predictions: Float32Array, 
+     *     activations: Float32Array[],
+     *     zs: Float32Array[]
+     * }}
+     */
+    feedforward(input) {
+        let current_input = input
+        let all_layer_outputs = [input];
+        let zs = [];
+
+        let pointer = 0;
+        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
+            const current_layer = this.layers[layer_index];
+
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
+            pointer+=incrementor_value;
+
+            zs.push(z_values);
+            current_input = outputs;
+            all_layer_outputs.push(current_input);
+        }
+
+        return {
+            predictions: current_input, 
+            activations : all_layer_outputs,
+            zs: zs
+        };
+    }
+
+    /**
+     * @method `backpropagation` performs the backpropagation loop, traversing the delta backward.
+     * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
+     * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
+     * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
+     * @returns {{accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}}
+     */
+    backpropagation(activations, zs, outputLayerDelta) {
+        let current_delta = outputLayerDelta;
+
+        const layerPointers = [];
+        let p = 0;
+        const parametric = this.parametric_layers;
+        for (let i = 0; i < this.layers.length; i++) {
+            layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
+        }
+
+        // 1. Accumulate gradients for the output layer first
+        let outputLayerIndex = this.num_layers - 1;
+        let outputPointer = layerPointers[outputLayerIndex];
+        if (outputPointer !== -1) {
+            const layer = this.layers[outputLayerIndex];
+            const a_prev = activations[outputLayerIndex];
+
+            // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
+            this.weightGrads[outputPointer] = layer.accumulateWeightGradients(a_prev, current_delta, this.weightGrads[outputPointer], layer);
+            this.biasGrads[outputPointer] = layer.accumulateBiasGradients(this.biasGrads[outputPointer], current_delta, layer);
+        }
+
+        // 2. Loop backwards through remaining layers
+        for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
+            const current_layer = this.layers[layer_index];
+            const next_layer    = this.layers[layer_index + 1];
+
+            const nextPointer = layerPointers[layer_index + 1];
+
+            const dLda = next_layer.projectDeltaBackward(
+                current_delta,
+                nextPointer,
+                current_layer.outputShape,
+                next_layer
+            );
+
+            current_delta = current_layer.applyOwnDerivative(
+                dLda,
+                zs[layer_index],
+                current_layer
+            );
+
+            // Accumulate weight & bias gradients for hidden layer
+            const currentPointer = layerPointers[layer_index];
+            if (currentPointer !== -1) {
+                const a_prev = activations[layer_index];
+
+                // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
+                this.weightGrads[currentPointer] = current_layer.accumulateWeightGradients(a_prev, current_delta, this.weightGrads[currentPointer], current_layer);
+                this.biasGrads[currentPointer] = current_layer.accumulateBiasGradients(this.biasGrads[currentPointer], current_delta, current_layer);
+            }
+        }
+
+        return {
+            accumulatedWeightGrads: this.weightGrads, 
+            accumulatedBiasGrads: this.biasGrads 
+        };
+    }
+
+    /**
+     * @method `updateParams` is the method to update the parameters of your model.
+     * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
+     * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
+     * @param {Number} batchSize the size per batch
+     * @param {Number} totalEpoch total training epoch
+     * @param {Number} previousEpochLoss previous epoch loss
+     * @param {Number} current_epoch current epoch
+     * @param {Number} trainingFeatureSize the number of input features.
+     */
+    updateParams(accumulatedWeightGrads, accumulatedBiasGrads, batchSize, previousEpochLoss, totalEpoch, current_epoch, trainingFeatureSize) {
+        let weightGrads = accumulatedWeightGrads;
+        let biasGrads = accumulatedBiasGrads;
+        let pointer = 0;
+        for (let l = 0; l < this.num_layers; l++) {
+            const layer_data_obj = this.layers[l];
+            const parametric_layers = this.parametric_layers;
+
+            if (!parametric_layers.includes(layer_data_obj.layer_name)) {
+                continue;
+            }
+
+            // scale weight gradients
+            weightGrads[pointer] = scale(weightGrads[pointer], batchSize, layer_data_obj);
+
+            // scale bias gradients
+            biasGrads[pointer] = scale(biasGrads[pointer], batchSize);
+                        
+            // clip accumulated weight gradients using a threshold
+            weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
+
+            // clip accumulated bias gradients using a threshold
+            biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
+
+            // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
+            const res1 = this.optimizer({
+                params: this.weights[pointer],
+                grads: weightGrads[pointer],
+                state: this.optimizerStates.weights[pointer],
+                lr: this.learning_rate,
+                previousEpochLoss,
+                current_epoch,
+                batchSize,
+                totalEpoch: totalEpoch,
+                trainingFeatureSize: trainingFeatureSize
+            });
+
+            // update weights corresponding a parametric layer using a pointer
+            this.weights[pointer] = res1.params;
+
+            // store states
+            this.optimizerStates.weights[pointer] = res1.state;
+
+            // Update bias only if the layer actually has a bias and has the property `useBias`
+            if (layer_data_obj?.useBias) {
+
+                const res2 = this.optimizer({
+                    params: this.biases[pointer],
+                    grads: biasGrads[pointer],
+                    state: this.optimizerStates.biases[pointer],
+                    lr: this.learning_rate,
+                    previousEpochLoss,
+                    current_epoch,
+                    batchSize,
+                    totalEpoch: totalEpoch,
+                    trainingFeatureSize: trainingFeatureSize
+                });
+
+                this.biases[pointer] = res2.params;
+
+                this.optimizerStates.biases[pointer] = res2.state;
+
+            }
+
+            pointer++;                        
+        }
+
+        this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
+
+        setGlobalParams(
+            this.weights, 
+            this.biases, 
+        );
+    }
 
     // ========= Private methods =======
     #build() {
@@ -1185,73 +1272,6 @@ class Neurex {
         layer_data.outputShape = outputShape || [];
 
         prevLayer = layer_data;
-    }
-
-    // backprop loop
-    #backpropagation(activations, zs, deltas_array) {
-        let deltas = deltas_array;
-        let current_delta = deltas[this.num_layers - 1];
-        let all_deltas = [current_delta];
-
-        const layerPointers = [];
-        let p = 0;
-        const parametric = this.parametric_layers;
-        for (let i = 0; i < this.layers.length; i++) {
-            layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
-        }
-
-        for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
-            const current_layer = this.layers[layer_index];
-            const next_layer    = this.layers[layer_index + 1];
-
-            const pointer = layerPointers[layer_index + 1];
-
-            const dLda = next_layer.projectDeltaBackward(
-                current_delta,
-                pointer,
-                current_layer.outputShape,
-                next_layer
-            );
-
-            current_delta = current_layer.applyOwnDerivative(
-                dLda,
-                zs[layer_index],
-                current_layer
-            );
-
-            deltas[layer_index] = current_delta;
-            all_deltas.unshift(current_delta);
-        }
-
-        return { deltas, all_deltas };
-    }
-
-
-    // forward propagation
-    #Feedforward(input) {
-        let current_input = input
-        let all_layer_outputs = [input];
-        let zs = [];
-
-        let pointer = 0;
-        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
-            const current_layer = this.layers[layer_index];
-            // const layer_weights = this.weights[pointer];
-            // const layer_biases = this.biases[pointer];
-
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
-            pointer+=incrementor_value;
-
-            zs.push(z_values);
-            current_input = outputs;
-            all_layer_outputs.push(current_input);
-        }
-
-        return {
-            predictions: current_input, 
-            activations : all_layer_outputs,
-            zs: zs
-        };
     }
 
     /**

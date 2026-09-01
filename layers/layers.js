@@ -145,7 +145,7 @@ class Layers {
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data),
                 applyOwnDerivative: (delta, z, layer_data) => ann.applyOwnDerivative(delta, z, layer_data),
                 accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
-                accumulateBiasGradients: (biasgrads, deltas) => computeBiasGradsForConnected_Layer(biasgrads, deltas),
+                accumulateBiasGradients: (biasgrads, deltas) => computeBiasGradsForConnected_Layer(biasgrads, deltas)
             };
         }
         catch (error) {
