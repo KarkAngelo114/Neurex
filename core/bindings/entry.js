@@ -883,7 +883,7 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
 
     if (BooleanAvailability().hasGPU) {
         // optimized GPU function for projecting to O_weights and O_biases to MHA output
-        finalOutput = functions.projectOutput(mhaOutput, embedDim, seqLen, pointer);
+        finalOutput = functions.ProjectOutput_GPU(mhaOutput, embedDim, seqLen, pointer);
     } else {
         finalOutput = new Float32Array(seqLen * embedDim);
 
