@@ -878,11 +878,20 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
         }
     }
 
-    // 4. Final Linear Projection (W_O) [seqLen, embedDim]
-    const finalOutput = new Float32Array(seqLen * embedDim);
-    for (let t = 0; t < seqLen; t++) {
-        const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
-        finalOutput.set(functions.MatMul(mhaRow, embedDim, embedDim, O_weights, O_bias), t * embedDim);
+    // Step 4. Final Linear Projection (W_O) [seqLen, embedDim]
+    let finalOutput;
+
+    if (BooleanAvailability().hasGPU) {
+        // optimized GPU function for projecting to O_weights and O_biases to MHA output
+        finalOutput = functions.projectOutput(mhaOutput, embedDim, seqLen, pointer);
+    } else {
+        finalOutput = new Float32Array(seqLen * embedDim);
+
+        // if in CPU, utilized the Existing MatMul() as it accepts weights and biases
+        for (let t = 0; t < seqLen; t++) {
+            const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+            finalOutput.set(functions.MatMul(mhaRow, embedDim, embedDim, O_weights, O_bias), t * embedDim);
+        }
     }
 
     layerData.cache = {

@@ -72,3 +72,26 @@ __kernel void projectQKV(
     _helper_matMul(tokenVec, embeddingDim, embeddingDim, K_w, K_b, K + offset);
     _helper_matMul(tokenVec, embeddingDim, embeddingDim, V_w, V_b, V + offset);
 }
+
+// Add this kernel to attention.cl
+__kernel void OutputWeightProjection(
+    __global const float* mhaInput, 
+    __global const float* weights,
+    __global const float* biases,
+    __global float* output,
+    const int embeddingDim,
+    const int seqLen
+) {
+    int t = get_global_id(0);
+    if (t >= seqLen) return;
+
+    int offset = t * embeddingDim;
+    int matrixSize = embeddingDim * embeddingDim;
+
+    __global const float* tokenVec = mhaInput + offset;
+
+    __global const float* O_w = weights + (matrixSize * 3);
+    __global const float* O_b = biases + (embeddingDim * 3);
+
+    _helper_matMul(tokenVec, embeddingDim, embeddingDim, O_w, O_b, output + offset);
+}
