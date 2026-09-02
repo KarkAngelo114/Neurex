@@ -10,11 +10,22 @@ let globalBiases = []; // global array of biases
  * @param {Array<Float32Array} biases array of float32array biases
  */
 exports.setGlobalParams = (weights, biases) => {
-    globalWeights = weights;
-    globalBiases = biases;
+    try {
+        if (!weights || !biases) {
+            throw new Error('[ERROR] No parameters to store....')
+        }
 
-    if (BooleanAvailability().hasGPU) {
-        addon.UploadParams(weights, biases);
+        globalWeights = weights;
+        globalBiases = biases;
+
+        if (BooleanAvailability().hasGPU) {
+            addon.UploadParams(weights, biases);
+        }
+    }
+    catch (e) {
+        console.log(`${red}Parameter error${reset}`);
+        console.error(e);
+        process.exit(1);
     }
 }
 
@@ -23,8 +34,21 @@ exports.setGlobalParams = (weights, biases) => {
  * @returns {{globalWeights:Float32Array[], globalBiases: Float32Array[], globalOutputTensorTemplate: Float32Array[]}}
 */
 exports.getGlobalParams = () => {
-    return {
-        globalWeights: globalWeights,
-        globalBiases: globalBiases,
+    try {
+
+        if (globalWeights.length == 0 || globalBiases.length == 0) {
+            throw new Error('[ERROR] No parameters in stored. Call "setParams() first before your custom training loop."')
+        }
+
+        return {
+            globalWeights: globalWeights,
+            globalBiases: globalBiases,
+        }
     }
+    catch (e) {
+        console.log(`\n[GLOBAL STORE ERROR]`);
+        console.error(e);
+        process.exit(1);
+    }
+    
 }

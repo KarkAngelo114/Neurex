@@ -416,7 +416,7 @@ declare module 'neurex' {
         feedforward(input: Float32Array): {predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]};
 
         /**
-        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward. Note: In order to properly accumulate gradients when writing custom training loop, you must implement mini-batch training to properly accumulate gradients across batches, otherwise if the optimizer will see an entire training dataset has one batch.
+        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward. Note: In order to properly accumulate gradients when writing custom training loop, you must implement mini-batch training to properly accumulate gradients across batches, otherwise the optimizer will update per sample.
         * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
         * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
