@@ -485,10 +485,6 @@ class Neurex {
             }
 
             this.lastLayerObject = this.layers[this.layers.length - 1];
-
-            // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
-            const taskType = this.lastLayerObject.determineInferenceType(this.lastLayerObject, lossLower, trainY);
-            this.task = taskType;
             
         } catch (error) {
             console.log(error);
@@ -1101,19 +1097,9 @@ class Neurex {
             layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
         }
 
-        // 1. Accumulate gradients for the output layer first
-        let outputLayerIndex = this.num_layers - 1;
-        let outputPointer = layerPointers[outputLayerIndex];
-        if (outputPointer !== -1) {
-            const layer = this.layers[outputLayerIndex];
-            const a_prev = activations[outputLayerIndex];
+        const deltas = new Array(this.num_layers);
+        deltas[this.num_layers - 1] = current_delta;
 
-            // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
-            this.weightGrads[outputPointer] = layer.accumulateWeightGradients(a_prev, current_delta, this.weightGrads[outputPointer], layer);
-            this.biasGrads[outputPointer] = layer.accumulateBiasGradients(this.biasGrads[outputPointer], current_delta, layer);
-        }
-
-        // 2. Loop backwards through remaining layers
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
             const next_layer    = this.layers[layer_index + 1];
@@ -1133,15 +1119,20 @@ class Neurex {
                 current_layer
             );
 
-            // Accumulate weight & bias gradients for hidden layer
-            const currentPointer = layerPointers[layer_index];
-            if (currentPointer !== -1) {
-                const a_prev = activations[layer_index];
+            deltas[layer_index] = current_delta;
+        }
 
-                // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
-                this.weightGrads[currentPointer] = current_layer.accumulateWeightGradients(a_prev, current_delta, this.weightGrads[currentPointer], current_layer);
-                this.biasGrads[currentPointer] = current_layer.accumulateBiasGradients(this.biasGrads[currentPointer], current_delta, current_layer);
-            }
+        for (let layer_index = this.num_layers - 1; layer_index >= 0; layer_index--) {
+            const pointer = layerPointers[layer_index];
+            if (pointer === -1) continue;
+
+            const layer = this.layers[layer_index];
+            const a_prev = activations[layer_index];
+            const delta = deltas[layer_index];
+
+            // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
+            this.weightGrads[pointer] = layer.accumulateWeightGradients(a_prev, delta, this.weightGrads[pointer], layer);
+            this.biasGrads[pointer] = layer.accumulateBiasGradients(this.biasGrads[pointer], delta, layer);
         }
 
         return {
