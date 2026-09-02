@@ -133,7 +133,7 @@ For more info about layers, check the official [documentation](https://neurex-do
 Here's an example on how you can use `Neurex` to train on XOR problem.
 
 ```Javascript
-const {Neurex, Layers, Adam, SGD, stepDecay} = require('neurex');
+const {Neurex, Layers, Adam, SGD, stepDecay, modelVisualizer, lossVisualizer, lossLandscapeVisualizer} = require('neurex');
 
 const nrx = new Neurex();
 const layer = new Layers();
@@ -157,19 +157,25 @@ const layer = new Layers();
     // configurations
     nrx.configure({
         optimizer: Adam(), // use built-in optimizers or plug your own optimizer function here!
-        lr_scheduler: stepDecay() // use built-in scheduler or plug your own!
-        learning_rate:0.0001, // learning rate value
-        checkpoint_per_epoch: 10, // if set, it saved the model every N epoch.
+        learning_rate: 0.001, // learning rate value
         mode: "cpu", // "gpu" or "auto"
-        clip_norm_value: 5.0, // value to clip gradients
-        // onFloat32Module: true, if set to true, it won't use its native bindings and rather use the JS implementation fallback
+        onFLoat32Module: true, // if set to true, the underlying core engine will use pure JS ops and no need to use "mode"
 
-        // config to use Neurex auto-switch optimizer feature
-        onChange_optimizer: {
-            optimizer: SGD(), // optimizer to use (use the built-in or plug your own)
-            targetEpoch: 50 // when it reach the specific target epoch, it will swap the optimizer with the one you set in this config
-        }
+        visualizerPlugins: [ // visualizer plugins
+            modelVisualizer(),
+            lossVisualizer(),
+            lossLandscapeVisualizer()
+        ],
+
+        onChange_optimizer: { // on change optimizer mechanism
+            optimizer: SGD(), // optimizer to use. Use built-in optimizers or plug your own optimizer function here!
+            targetEpoch: 50 // target epoch
+        },
+
+        lr_scheduler: stepDecay(), // built-in learning rate schedulers or plug your own schedulers
+        clip_norm_value: 5.0 // clip normalization value for gradient clipping
     });
+
 
     // stack layers in sequential order
     nrx.sequentialBuild([
@@ -197,27 +203,100 @@ const layer = new Layers();
     *   Float32Array(1) [ 0.2107422947883606 ]
     * ]
     */
+    
+    for (let i = 0; i < trainY.length; i++) {
+        console.log('Predicted:',[predictions[i][0] > 0.5 ? 1 : 0], 'Actuals:',trainY[i]);
+    }
 })();
 ```
 
+## Write your own training loop (For Advance Users)
+While `train()` existed as a high-level API for convenience, `Neurex` still exposed low-level primitive APIs that you can use for writing custom training loops, offering full control of how you will train your model. By using `feedforward()`, `getOutputlayerDelta()`, `backpropagation()`, and `updateParams()`, you can create your own training loop and own training rules.
+
+```JavaScript
+
+const {Neurex, Layers, Adam} = require('neurex');
+
+const nrx = new Neurex();
+const layer = new Layers();
 
 
+(async () => {
+
+    /** ... data preparation, dataset splitting, model construction and configuration ... */
+
+
+    nrx.setParams(); // <- this is a MUST!
+
+    let batchSize = 12;
+    let totalEpoch = 10000;
+
+    // epoch loop
+    for (let epoch = 0; epoch < totalEpoch; epoch++) {
+        
+        // batch loop
+        for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
+
+            let weightGrads, biasGrads; // instantiate accumulator variables to be reference later
+
+            // loop through datasets
+            for (let j = batchStart; j < batchStart + batchSize && j < trainX.length; j++) {
+
+                let input = trainX[j];
+                let label = trainY[j];
+
+                // feedforward
+                const {predictions, activations, zs} = nrx.feedforward(new Float32Array(input));
+
+                // get output layer delta
+                const outputDelta = nrx.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
+
+                // backprop
+                // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally before returnig the accumulated gradients.
+                const {accumulatedWeightGrads, accumulatedBiasGrads} = nrx.backpropagation(activations, zs, outputDelta);
+
+                weightGrads = accumulatedWeightGrads;
+                biasGrads = accumulatedBiasGrads;
+
+            }
+
+            // model param update
+            // model param update must be placed outside mini-batch loop to get the accumulated gradients across batches
+            // internally, this method do scaling gradients and normalizing gradients before updating them using an optimizer.
+            nrx.updateParams(weightGrads, biasGrads);
+        }
+
+        console.log(`Epoch ${epoch+1} finished...`);
+    }
+
+    // await nrx.train(trainX, trainY, 'binary_cross_entropy', 10000, 12); // commented out to demonstrate custom training loop
+
+    // predict
+    const predictions = await nrx.predict(trainX);
+
+    console.log(predictions);
+})();
+```
+
+Having those exposed APis and writing custom training loops could theoretically allows you to train multiple model architecture at once or train a GAN-like network model.
+
+One thing to note though - when writing custom training loop, expect that the features that the `train()` method uses, like using of visualizer tools and learning rate schedulers, etc. will not take effect (yet). The core training APIs only does the process of forwarding the input where even lower-level internals does the processing of data when calling them, traversing the error, and updating the model parameters.
 
 ## Saving, loading, popping and adding new layers for transfer learning
 
 Saving models is very straightforward. 
 
 ```JavaScript
-    (async () => {
+const {Neurex, Layers} = require('neurex');
+
+(async () => {
         
-        const {Neurex, Layers} = require('neurex');
+    const nrx = new Neurex();
 
-        const nrx = new Neurex();
+    // ... data preprocessing, layer stacking, configurations, train()
 
-        // ... data preprocessing, layer stacking, configurations, train()
-
-        await nrx.saveModel()
-    })()
+    await nrx.saveModel()
+})()
 ```
 
 Your model will be saved in a binary file which can be use later on.
