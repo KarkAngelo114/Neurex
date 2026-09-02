@@ -70,6 +70,8 @@ class Neurex {
 
         this.parametric_layers = [];
         this.miscellaneous = null;
+
+        this.lastLayerObject = {};
         
     }
 
@@ -481,6 +483,12 @@ class Neurex {
             if (showLog) {
                 console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
             }
+
+            this.lastLayerObject = this.layers[this.layers.length - 1];
+
+            // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
+            const taskType = this.lastLayerObject.determineInferenceType(this.lastLayerObject, lossLower, trainY);
+            this.task = taskType;
             
         } catch (error) {
             console.log(error);
@@ -533,6 +541,8 @@ class Neurex {
             
             this.#build();
             
+            this.lastLayerObject = this.layers[this.layers.length - 1];
+
             return layer_data; 
         }
 
@@ -565,6 +575,9 @@ class Neurex {
             this.biases.splice(weightIndex, 1);
             this.biasGrads.splice(weightIndex, 1);
         }
+
+        this.lastLayerObject = this.layers[this.layers.length - 1];
+
     }
 
 
@@ -586,6 +599,7 @@ class Neurex {
 
         this.#buildSingle(layer_data);
 
+        this.lastLayerObject = this.layers[this.layers.length - 1];
     }
 
     /**
@@ -663,6 +677,10 @@ class Neurex {
             
         const lossLower = loss.toLowerCase();
 
+        // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
+        const taskType = this.lastLayerObject.determineInferenceType(this.lastLayerObject, lossLower, trainY);
+        this.task = taskType;
+
         try {
             if (!trainX || trainX.length == 0 || !trainY || trainY.length == 0 || !loss) {
                 this.isfailed = true;
@@ -681,12 +699,6 @@ class Neurex {
                 this.isfailed = true;
                 throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
             }
-
-            // Infer task type based on output layer and loss/activation
-            let lastLayerObject = this.layers[this.layers.length - 1];
-            // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
-            const taskType = lastLayerObject.determineInferenceType(lastLayerObject, lossLower, trainY);
-            this.task = taskType;
 
             if (this.visualizers.length > 0) {
                 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -821,10 +833,10 @@ class Neurex {
                         batchLoss += loss_function(predictions, actual);
 
                         // get output layer delta to be projected backward
-                        const inputDelta = lastLayerObject.getOutputLayerDelta(predictions, actual, zs, lossLower, this.task, lastLayerObject);
+                        const outputLayerDelta = this.getOutputLayerDelta(predictions, actual, zs, lossLower);
 
                         // backprogate
-                        const {accumulatedWeightGrads, accumulatedBiasGrads} = this.backpropagation(activations, zs, inputDelta);
+                        const {accumulatedWeightGrads, accumulatedBiasGrads} = this.backpropagation(activations, zs, outputLayerDelta);
 
                         this.weightGrads = accumulatedWeightGrads;
                         this.biasGrads = accumulatedBiasGrads;
@@ -839,7 +851,13 @@ class Neurex {
                     // This section is the for updating weights and biases.
                     // The remaining steps ahead are scaling accumulated gradients, gradient clipping and using the optimizer for param updates
                     // before uploading to global store and resets gradient accumulators back to zeroes.
-                    this.updateParams(this.weightGrads, this.biasGrads, batchSize, previousEpochLoss, epoch, current_epoch, trainX[0].length);
+                    this.updateParams(this.weightGrads, this.biasGrads, {
+                        batchSize: batchSize, 
+                        previousEpochLoss: previousEpochLoss, 
+                        epoch: epoch, 
+                        current_epoch: current_epoch, 
+                        trainingFeatureSize: trainX[0].length
+                    });
 
                 }
 
@@ -1006,7 +1024,32 @@ class Neurex {
         }
     }
 
+    /**
+     * 
+     * @method releaseMem is use to clear global store memory. This also calls a native function to clear compiled clKernels, clBuffers, clDevices, platforms, contexts, and queues
+     */
     releaseMem = () => shutdown();
+
+    /**
+     * @method `setParams` uploads all parameters in the global store. This must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
+     */
+    setParams() {
+        console.log(`\n${color.yellow}[INFO]${color.reset}------- parameter has been uploaded to global store memory.\n`);
+
+        setGlobalParams(this.weights, this.biases);
+    }
+
+    /**
+     * @method `getOutputLayerDelta` calculates the error of the output layer predictions towards the actuals or target outputs.
+     * @param {Float32Array} predictions output layer prediction of a sample 
+     * @param {Array<Number>} actuals target values to approximate
+     * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
+     * @param {String} loss loss function: `mse`, `mae`, `binary_cross_entropy`, `categorical_cross_entropy`, `sparse_categorical_cross_entropy`
+     * @returns {Float32Array} output layer delta to be projected backward
+     */
+    getOutputLayerDelta(predictions, actuals, zs, loss) {
+        return this.lastLayerObject.getOutputLayerDelta(predictions, actuals, zs, loss, this.task, this.lastLayerObject);
+    }
 
     /**
      * @method `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
@@ -1111,15 +1154,11 @@ class Neurex {
      * @method `updateParams` is the method to update the parameters of your model.
      * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
      * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
-     * @param {Number} batchSize the size per batch
-     * @param {Number} totalEpoch total training epoch
-     * @param {Number} previousEpochLoss previous epoch loss
-     * @param {Number} current_epoch current epoch
-     * @param {Number} trainingFeatureSize the number of input features.
      */
-    updateParams(accumulatedWeightGrads, accumulatedBiasGrads, batchSize, previousEpochLoss, totalEpoch, current_epoch, trainingFeatureSize) {
+    updateParams(accumulatedWeightGrads, accumulatedBiasGrads, options) {
         let weightGrads = accumulatedWeightGrads;
         let biasGrads = accumulatedBiasGrads;
+        let batchSize = options?.batchSize || 1;
         let pointer = 0;
         for (let l = 0; l < this.num_layers; l++) {
             const layer_data_obj = this.layers[l];
@@ -1147,11 +1186,11 @@ class Neurex {
                 grads: weightGrads[pointer],
                 state: this.optimizerStates.weights[pointer],
                 lr: this.learning_rate,
-                previousEpochLoss,
-                current_epoch,
-                batchSize,
-                totalEpoch: totalEpoch,
-                trainingFeatureSize: trainingFeatureSize
+                previousEpochLoss: options?.previousEpochLoss || 0,
+                current_epoch: options?.current_epoch || 1,
+                batchSize: options?.batchSize || 1,
+                totalEpoch: options?.totalEpoch || 1,
+                trainingFeatureSize: options?.trainingFeatureSize || 1
             });
 
             // update weights corresponding a parametric layer using a pointer
@@ -1168,11 +1207,11 @@ class Neurex {
                     grads: biasGrads[pointer],
                     state: this.optimizerStates.biases[pointer],
                     lr: this.learning_rate,
-                    previousEpochLoss,
-                    current_epoch,
-                    batchSize,
-                    totalEpoch: totalEpoch,
-                    trainingFeatureSize: trainingFeatureSize
+                    previousEpochLoss: options?.previousEpochLoss || 0,
+                    current_epoch: options?.current_epoch || 1,
+                    batchSize: options?.batchSize || 1,
+                    totalEpoch: options?.totalEpoch || 1,
+                    trainingFeatureSize: options?.trainingFeatureSize || 1
                 });
 
                 this.biases[pointer] = res2.params;

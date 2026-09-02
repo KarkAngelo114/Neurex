@@ -138,13 +138,14 @@ const feedforward = (input, current_layer, pointer) => {
  * @returns {Float32Array} the delta of the output layer
  */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
 
-    if (tasktype === "binary_classification" || (tasktype === "multi_class_classification" && lossFunc === "categorical_cross_entropy")) {
+    if (lossFunc === "categorical_cross_entropy" || lossFunc === "binary_cross_entropy") {
         dOutputLayer = element_wise_sub(preds, actuals);
     }
-    else if (tasktype === "multi_class_classification" && lossFunc === "sparse_categorical_cross_entropy") {
+    else if (lossFunc === "sparse_categorical_cross_entropy") {
         dOutputLayer.set(preds);
         if (!dOutputLayer[actuals[0]]) {
             throw new Error(`Actual index value not exist in range. Actual target label: ${actuals[0]} | Output layer size: ${preds.length}`)
@@ -152,10 +153,15 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
         dOutputLayer[actuals[0]] -= 1;
                         
     }
-    else if (tasktype === "regression") {
-        if (preds.length != actuals.length) throw new Error("Predictions array is not equal to actuals array");
+    else {
+        if (preds.length != actuals.length) {
+            throw new Error("Predictions array is not equal to actuals array");
+        }
 
-        dOutputLayer = element_wise_sub(preds, actuals);
+        const lastLayerZs = zs[zs.length - 1]; 
+        const dAct = dActivation(lastLayerZs); 
+
+        dOutputLayer = scaleDiff(preds, actuals, dAct);
 
         if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
 

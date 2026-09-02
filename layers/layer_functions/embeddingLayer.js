@@ -70,7 +70,7 @@ const initParams = (size, shape, layer_data) => {
  * @returns {string} task type
  */
 const determineInferenceType = (layerObject, lossFunc, trainY) => {
-    throw new Error('Embedding layer cannot be an output layer.');
+    console.error('Embedding layer cannot be an output layer.');
     process.exit(1);
 }
 
@@ -107,7 +107,7 @@ const feedforward = (input, current_layer, pointer) => {
  * @returns {Float32Array} the delta of the output layer
  */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
-    throw new Error('Embedding layer cannot be an output layer.');
+    console.error('Embedding layer cannot be an output layer.');
     process.exit(1);
 }
 

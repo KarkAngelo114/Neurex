@@ -236,6 +236,21 @@ declare module 'neurex' {
         visualizerPlugins?: pluginFactoryObject[];
     }
 
+    export interface updateParamsOptions {
+        /** the size per batch */ 
+        batchSize?: number,
+        /** total training epoch  */
+        totalEpoch?: number,
+        /** previous epoch loss  */
+        previousEpochLoss?: number,
+        /** current epoch  */
+        current_epoch?: number
+        /** training feature size  */
+        trainingFeatureSize?: number
+
+
+    }
+
     /**
      *
      * The core class of the library.
@@ -343,7 +358,7 @@ declare module 'neurex' {
         * @method train starts the model training.
         * @param {Array<Array<number>>} trainX The input training data. Each element is an array representing a single sample's features.
         * @param {Array<Array<number>>} trainY The target values (ground truth) corresponding to each sample in trainX.
-        * @param {string} loss loss function to use: MSE, MAE, binary_cross_entropy, categorical_cross_entropy, sparse_categorical_cross_entropy
+        * @param {string} loss loss function to use: mse, mae, binary_cross_entropy, categorical_cross_entropy, sparse_categorical_cross_entropy
         * @param {Number} epoch the number of training iteration
         * @param {Number} batch_size mini batch sizing
         * @param {boolean} shuffle shuffles training data per epoch. Default value is `true`
@@ -382,6 +397,16 @@ declare module 'neurex' {
         */
         async predict(input: number[][]): number[];
         
+        /**
+        * @method `setParams` uploads all parameters in the global store. This method must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
+        */
+        setParams(): void;
+
+        /**
+         * 
+         * @method `releaseMem` is use to clear global store memory. This also calls a native function to clear compiled clKernels, clBuffers, clDevices, platforms, contexts, and queues. 
+        */
+        releaseMem(): void;
 
         /**
         * @method `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
@@ -391,7 +416,7 @@ declare module 'neurex' {
         feedforward(input: Float32Array): {predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]};
 
         /**
-        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward.
+        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward. Note: In order to properly accumulate gradients when writing custom training loop, you must implement mini-batch training to properly accumulate gradients across batches, otherwise if the optimizer will see an entire training dataset has one batch.
         * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
         * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
@@ -400,16 +425,22 @@ declare module 'neurex' {
         backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}
         
         /**
-        * @method `updateParams` is the method to update the parameters of your model.
+        * @method `updateParams` is the method to update the parameters of your model. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
         * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
         * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
-        * @param {Number} batchSize the size per batch
-        * @param {Number} totalEpoch total training epoch
-        * @param {Number} previousEpochLoss previous epoch loss
-        * @param {Number} current_epoch current epoch
-        * @param {Number} trainingFeatureSize the number of input features.
+        * @param {updateParamsOptions} options update params options
         */
-        updateParams(accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[], batchSize: number, totalEpoch: number, previousEpochLoss: number, current_epoch: number, trainingFeatureSize: number): void;
+        updateParams(accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[], options: updateParamsOptions): void;
+    
+        /**
+        * @method `getOutputLayerDelta` calculates the error of the output layer predictions towards the actuals or target outputs.
+        * @param {Float32Array} predictions output layer prediction of a sample 
+        * @param {Array<Number>} actuals target values to approximate
+        * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
+        * @param {String} loss loss function: `mse`, `mae`, `binary_cross_entropy`, `categorical_cross_entropy`, `sparse_categorical_cross_entropy`
+        * @returns {Float32Array} output layer delta to be projected backward
+        */
+        getOutputLayerDelta(predictions: Float32Array, actuals: Number[], zs: Float32Array[], loss: string): Float32Array;
     }
 
     /**
