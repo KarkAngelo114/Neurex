@@ -10,6 +10,7 @@
 - added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
 - You can now add you own optimizers and learning rate scheduler. See the latest documentation about [optimizers](https://neurex-documentation.vercel.app/javascript-nodejs#optimizers), and [lr_schedulers](https://neurex-documentation.vercel.app/javascript-nodejs#schedulers), and how to plug in your own.
 - added plugins for visualizer tools. Built-in visualizers are `lossVisualizer()`, `lossLandscapeVisualizer()`, and `modelVisualizer()`
+- exposed core training primitives methods that makes up the existing high-level API `train()` method: `setParams()`, `feedforward()`, `getOutputLayerDelta()`, `backpropagation()`, and `updateParams()`. With these exposed methods. Writing custom training loops is now possible for advance users. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 
 ### Fixes
 - fixed all derivative activation functions.
