@@ -35,5 +35,7 @@ export const {
     reduceOnPlateau,
     lossLandscapeVisualizer,
     lossVisualizer,
-    modelVisualizer
+    modelVisualizer,
+    Adam,
+    SGD
 } = pkg;

@@ -199,6 +199,7 @@ class Neurex {
         console.log(`Total learnable parameters: ${(totalWeights + totalBiases).toLocaleString()}`);
         console.log(`Total size (MegaBytes): ${totalSizeMB.toFixed(2)} MB`);
         console.log(hr('='));
+        console.log("\n");
     }
 
     /**
@@ -1030,7 +1031,7 @@ class Neurex {
      * @method `setParams` uploads all parameters in the global store. This must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
      */
     setParams() {
-        console.log(`\n${color.yellow}[INFO]${color.reset}------- parameter has been uploaded to global store memory.\n`);
+        console.log(`${color.yellow}[INFO]${color.reset} Parameters for mode ${color.yellow}${this.modelID}${color.reset} has been uploaded to global store.`);
 
         setGlobalParams(this.modelID, this.weights, this.biases);
     }
