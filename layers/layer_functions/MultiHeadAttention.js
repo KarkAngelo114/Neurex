@@ -84,11 +84,11 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Float32Array} input input features 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
+ * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer) => {
-    const output = CoreMultiHeadAttention(input, current_layer, pointer);
+const feedforward = (input, current_layer, pointer, modelID) => {
+    const output = CoreMultiHeadAttention(input, current_layer, pointer, modelID);
 
     if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during feed forward)");
 
@@ -115,14 +115,15 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 /**
  *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer for THIS conv layer
+ * @param {Number} pointer - weight pointer for layer
  * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
- * @param {Object} layer_data - THIS conv layer's own configuration (weightShape, outputShape, strides, padding)
+ * @param {Object} layer_data - layer data
+ * @param {String} modelID model ID
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
 
-    const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer);
+    const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer, modelID);
     if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
     return output;
 }

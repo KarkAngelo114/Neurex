@@ -13,6 +13,7 @@ import necessary modules
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
+const UUID = require('crypto')
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
@@ -54,6 +55,7 @@ class Neurex {
         this.onChange_optimizer = null;
         this.visualizers = [];
         this.shuffle = true;
+        this.modelID = null;
 
         // Optimizer state for each layer (weights and biases)
         this.optimizerStates = {
@@ -157,6 +159,7 @@ class Neurex {
         console.log(`Input size: ${this.input_size}`);
         console.log(`Input Shape: [${this.input_shape}]`);
         console.log(`Number of layers: ${this.num_layers}`);
+        console.log(`Model ID: ${color.yellow}${this.modelID}${color.reset}`);
         console.log(hr('-'));
         console.log(row(COLS.map(c => c.title)));
         console.log(hr('='));
@@ -246,6 +249,7 @@ class Neurex {
             "task":this.task,
             "loss_function":this.loss_function,
             "epoch":this.epoch_count,
+            "modelID": this.modelID || UUID.randomUUID(),
             "batch_size":this.batch_size,
             "learning_rate":this.learning_rate,
             "input_size":this.input_size,
@@ -367,22 +371,23 @@ class Neurex {
             const loadedBiases = readTensors(modelData.biasLengths);
 
             // Assign properties
-            this.miscellaneous = modelData.miscellaneous;
-            this.initial_learning_rate = modelData.learning_rate || 0.001;
-            this.task = modelData.task;
-            this.loss_function = modelData.loss_function;
-            this.epoch_count = modelData.epoch;
-            this.batch_size = modelData.batch_size;
-            this.learning_rate = modelData.learning_rate;
-            this.input_size = modelData.input_size;
-            this.output_size = modelData.output_size;
-            this.num_layers = modelData.num_layers;
+            this.miscellaneous = modelData?.miscellaneous;
+            this.modelID = modelData?.modelID || UUID.randomUUID();
+            this.initial_learning_rate = modelData?.learning_rate || 0.001;
+            this.task = modelData?.task || null;
+            this.loss_function = modelData?.loss_function;
+            this.epoch_count = modelData?.epoch;
+            this.batch_size = modelData?.batch_size;
+            this.learning_rate = modelData?.learning_rate;
+            this.input_size = modelData?.input_size;
+            this.output_size = modelData?.output_size;
+            this.num_layers = modelData?.num_layers;
             this.weights = loadedWeights;
             this.biases = loadedBiases;
-            this.input_shape = modelData.input_shape;
-            this.clip_norm_value = modelData.clip_norm_value || 1.0;
+            this.input_shape = modelData?.input_shape;
+            this.clip_norm_value = modelData?.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
-            this.layers = modelData.layers.map(layerData => {
+            this.layers = modelData?.layers.map(layerData => {
 
                 if (layerData.isParametric) {
                     this.parametric_layers.push(layerData.layer_name);
@@ -539,6 +544,8 @@ class Neurex {
             
             this.lastLayerObject = this.layers[this.layers.length - 1];
 
+            this.modelID = UUID.randomUUID();
+
             return layer_data; 
         }
 
@@ -640,6 +647,7 @@ class Neurex {
         }
     
         setGlobalParams(
+            this.modelID,
             this.weights, 
             this.biases, 
         );
@@ -686,8 +694,6 @@ class Neurex {
                 console.log(`Batch Size: ${batch_size ? "specified" : "not specified"}`);
                 throw new Error(`[FAILED]------- There is/are missing parameter/s. Failed to start training...`);
             }
-
-
 
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
@@ -754,11 +760,9 @@ class Neurex {
                 }
                     
             }
-            
-
+        
             console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
-
-            
+      
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
 
@@ -812,7 +816,7 @@ class Neurex {
                     let batchLoss = 0;                  
 
                     // Accumulate gradients for each sample in the batch
-                   for (let batchPosition = batchStart; batchPosition < batchEnd; batchPosition++) {
+                    for (let batchPosition = batchStart; batchPosition < batchEnd; batchPosition++) {
 
                         // Get the actual dataset index from the shuffled index array
                         const sample_index = sampleIndices[batchPosition];
@@ -980,7 +984,7 @@ class Neurex {
             this.isInit = true;
         }
 
-        setGlobalParams(this.weights, this.biases);
+        setGlobalParams(this.modelID, this.weights, this.biases);
 
         if (!this.weights || !this.biases) {
             throw new Error("Parameters are missing");
@@ -1028,7 +1032,7 @@ class Neurex {
     setParams() {
         console.log(`\n${color.yellow}[INFO]${color.reset}------- parameter has been uploaded to global store memory.\n`);
 
-        setGlobalParams(this.weights, this.biases);
+        setGlobalParams(this.modelID, this.weights, this.biases);
     }
 
     /**
@@ -1067,7 +1071,7 @@ class Neurex {
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer, this.modelID);
             pointer+=incrementor_value;
 
             zs.push(z_values);
@@ -1112,7 +1116,8 @@ class Neurex {
                 current_delta,
                 nextPointer,
                 current_layer.outputShape,
-                next_layer
+                next_layer,
+                this.modelID
             );
 
             current_delta = current_layer.applyOwnDerivative(
@@ -1219,6 +1224,7 @@ class Neurex {
         this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
         setGlobalParams(
+            this.modelID,
             this.weights, 
             this.biases, 
         );

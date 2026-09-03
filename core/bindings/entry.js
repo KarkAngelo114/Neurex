@@ -88,14 +88,16 @@ const shutdown = () => {
  * @function getEmbeddings
  * @param {Array<Number>} tokenVector an array of token vector 
  * @param {Number} embeddingDim embedding dim value
- * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
+ * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases
+ * @param {String} modelID model ID
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer) => functions.getEmbeddings(
+const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions.getEmbeddings(
     Array.from(tokenVector), 
     embeddingDim, 
-    getGlobalParams().globalWeights[pointer], 
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer], 
+    pointer,
+    modelID
 );
 
 /**
@@ -117,15 +119,17 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functio
  * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
  * @param {Number} outputSize - the layer size of this layer
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
+ * @param {String} modelID model ID
  * @returns 1D array of output
  */
-const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(
+const MatMul = (inputs, inputSize, outputSize, pointer, modelID) => functions.MatMul(
     inputs, 
     inputSize, 
     outputSize, 
-    getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer], 
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer], 
+    pointer,
+    modelID
 );
 
 /**
@@ -136,14 +140,16 @@ const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(
  * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
  * @param {Number} outputSize - the layer size of this layer
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
+ * @param {String} modelID model ID
  * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
  */
-const DeltaMatMul = (deltas, inputSize, outputSize, pointer) => functions.DeltaMatMul(
+const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID) => functions.DeltaMatMul(
     deltas, 
     inputSize, 
     outputSize, 
-    getGlobalParams().globalWeights[pointer],
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer],
+    pointer,
+    modelID
 );
 
 /**
@@ -157,7 +163,7 @@ const relu = (input) => functions.Relu(input)
 /**
  * "✅☑️"
  * @function sigmoid
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid)
  */
 const sigmoid = (input) => functions.Sigmoid(input);
@@ -165,7 +171,7 @@ const sigmoid = (input) => functions.Sigmoid(input);
 /**
  * "✅☑️"
  * @function tanh
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh)
  */
 const tanh = (input) => functions.Tanh(input);
@@ -173,7 +179,7 @@ const tanh = (input) => functions.Tanh(input);
 /**
  * "✅☑️"
  * @function softmax
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax)
  */
 const softmax = (input) => functions.Softmax(input);
@@ -181,7 +187,7 @@ const softmax = (input) => functions.Softmax(input);
 /**
  * "✅☑️"
  * @function linear
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear)
  */
 const linear = (input) => functions.Linear(input); 
@@ -189,7 +195,7 @@ const linear = (input) => functions.Linear(input);
 /**
  * "✅☑️"
  * @function drelu
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu Derivative)
  */
 const drelu = (input) => functions.DReLu(input);
@@ -197,7 +203,7 @@ const drelu = (input) => functions.DReLu(input);
 /**
  * "✅☑️"
  * @function dsigmoid
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid Derivative)
  */
 const dsigmoid = (input) => functions.DSigmoid(input);
@@ -205,7 +211,7 @@ const dsigmoid = (input) => functions.DSigmoid(input);
 /**
  * "✅☑️"
  * @function dtanh
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh Derivative)
  */
 const dtanh = (input) => functions.DTanh(input);
@@ -222,7 +228,7 @@ const dsoftmax = (arr1, arr2) => functions.DSoftmax(arr1, arr2);
 /**
  * "✅☑️"
  * @function dlinear
- * @param {Array<Number>} input - 1D array of features 
+ * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear Derivative)
  */
 const dlinear = (input) => functions.DLinear(input);
@@ -292,17 +298,19 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {Array<Number>} kernelShape [num_filters, Kh, Kw, channels]
  * @param {Array<Number>} inputShape [iH, iW] 
  * @param {Number} pointer pointer value to fetch corresponding parameters of the layer from the global store
+ * @param {String} modelID model ID
  * @returns {Float32Array} convolution result
  */
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer) => functions.Convolve(
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, modelID) => functions.Convolve(
     input, 
     strides, 
     outputShape, 
     kernelShape, 
     inputShape, 
-    getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer],
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer],
+    pointer,
+    modelID
 );
 
 /**
@@ -322,15 +330,17 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
  * @param {Array<Number>} outputShape output shape: [oH, oW]
  * @param {Numer} pointer pointer value to fetch parameters from the global store
  * @param {Nunber} stride stride value
+ * @param {String} modelID model ID
  * @returns {Float32Array} convolve result
  */
-const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1) => functions.ConvolveDelta(
+const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1, modelID) => functions.ConvolveDelta(
     input, 
     deltaShape, 
     kernel_shape, 
     outputShape, 
-    getGlobalParams().globalWeights[pointer],
-    stride
+    getGlobalParams(modelID).globalWeights[pointer],
+    stride,
+    modelID
 );
 
 /**
@@ -425,7 +435,6 @@ const element_wise_mul = (flat_arr_1, flat_arr_2) => {
     return functions.element_wise_mul(flat_arr_1, flat_arr_2);
 }
 
-
 /**
  * 
  * "✅☑️"
@@ -485,16 +494,18 @@ const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, 
  * @param {Float32Array} prevHiddenState hidden temporal state
  * @param {Array<Number>} inputWeightShape input weight shape
  * @param {Array<Number>} recurrentWeightShape recurrent weight shape
- * @param {Number} pointer value to reference the weights and biases 
+ * @param {Number} pointer value to reference the weights and biases
+ * @param {String} modelID model ID 
  * @returns 
  */
-const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer) => functions.recurrentMatMul(
+const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer, modelID) => functions.recurrentMatMul(
     input, 
     prevHiddenState,
     inputWeightShape, 
     recurrentWeightShape, 
-    getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer],
+    getGlobalParams(modelID).globalWeights[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer],
+    modelID
 );
 
 
@@ -504,13 +515,15 @@ const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeig
  * @param {Array<Number>} inputWeightShape 
  * @param {Array<Number>} recurrentWeightShape 
  * @param {Number} pointer 
+ * @param {String} modelID model ID
  * @returns 
  */
-const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer) => functions.recurrentTimeDelta(
+const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer, modelID) => functions.recurrentTimeDelta(
     input, 
     inputWeightShape,
     recurrentWeightShape,
-    getGlobalParams().globalWeights[pointer], 
+    getGlobalParams(modelID).globalWeights[pointer],
+    modelID
 );
 
 /**
@@ -566,18 +579,20 @@ const gradientClipping = (grads, threshold) => functions.gradientClipping(grads,
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
  * @param {Number} pointer 
+ * @param {String} modelID model ID
  * @returns {Float32Array} trans conv output.
  */
-const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConv(
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID) => functions.transConv(
     input, 
     inputShape, 
     outputShape, 
     strides, 
     filters, 
     weightShape, 
-    getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer],
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer],
+    pointer,
+    modelID
 );
 
 /**
@@ -589,17 +604,19 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
  * @param {pointer} pointer 
+ * @param {String} modelID model ID
  * @returns {Float32Array} delta tensor to be projected
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConvBackward(
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID) => functions.transConvBackward(
     input,
     inputShape,
     outputShape,
     strides,
     filters,
     weightShape,
-    getGlobalParams().globalWeights[pointer],
-    pointer
+    getGlobalParams(modelID).globalWeights[pointer],
+    pointer,
+    modelID
 );
 
 /**
@@ -641,15 +658,17 @@ const dotProduct = (arr1, arr2, inputSize, outputSize) => functions.dotProduct(a
  * @param {number} size 
  * @param {number} eps
  * @param {number} pointer 
+ * @param {String} modelID model ID
  * @returns 
  */
-const computeLayerNorm = (input, size, eps, pointer) => functions.computelayerNorm(
+const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.computelayerNorm(
     input, 
     size, 
-    getGlobalParams().globalWeights[pointer], 
-    getGlobalParams().globalBiases[pointer], 
+    getGlobalParams(modelID).globalWeights[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer], 
     eps,
-    pointer
+    pointer,
+    modelID
 );
 
 /**"✅☑️"
@@ -680,25 +699,27 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
  * @param {Float32Array} V_bias V bias
  * @param {Number} embedDim embedding dim value
  * @param {Number} seqLen sequence length or token length value
+ * @param {String} modelID model ID
  * @returns {{ Q: Float32Array, K: Float32Array, V: Float32Array}}
  */
-const projectToQKV = (input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer) => functions.projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
+const projectToQKV = (input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer, modelID) => functions.projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer, modelID);
 
 /**
  * 
  * @param {Float32Array} input 
  * @param {Object} layerData 
  * @param {Number} pointer 
+ * @param {String} modelID model ID
  * @returns 
  */
-const CoreAttention = (input, layerData, pointer) => {
+const CoreAttention = (input, layerData, pointer, modelID) => {
     const { embedDim, dkRoot, seqLen } = layerData;
-    const weights = getGlobalParams().globalWeights[pointer];
-    const biases = getGlobalParams().globalBiases[pointer];
+    const weights = getGlobalParams(modelID).globalWeights[pointer];
+    const biases = getGlobalParams(modelID).globalBiases[pointer];
     
     const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKVO(weights, biases, null, null, embedDim);
 
-    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer, modelID);
 
     const transpose_K = transpose2D(K, seqLen, embedDim);
 
@@ -740,11 +761,12 @@ const CoreAttention = (input, layerData, pointer) => {
  * @param {Float32Array} incomingDelta 
  * @param {Object} layerData 
  * @param {Number} pointer 
+ * @param {String} modelID model ID
  */
-const CoreAttentionBackward = (incomingDelta, layerData, pointer) => {
+const CoreAttentionBackward = (incomingDelta, layerData, pointer, modelID) => {
     const { embedDim, dkRoot, seqLen } = layerData;
     const { Q, K, V, S: storedS } = layerData.cache; 
-    const weights = getGlobalParams().globalWeights[pointer];
+    const weights = getGlobalParams(modelID).globalWeights[pointer];
 
     // just like in feedforward, we unpack the weights, but we pass "null" to the 2nd - 4th argument of the function because we only want the weights for QKV
     const {Q_weights, K_weights, V_weights} = unpackQKVO(weights, null, null, null, embedDim);
@@ -817,18 +839,18 @@ const CoreAttentionBackward = (incomingDelta, layerData, pointer) => {
     return dX;
 }
 
-const CoreMultiHeadAttention = (input, layerData, pointer) => {
+const CoreMultiHeadAttention = (input, layerData, pointer, modelID) => {
 
     const {embedDim, seqLen, numHeads, headDim, dkRoot} = layerData;
 
-    const weights = getGlobalParams().globalWeights[pointer];
-    const biases = getGlobalParams().globalBiases[pointer];
+    const weights = getGlobalParams(modelID).globalWeights[pointer];
+    const biases = getGlobalParams(modelID).globalBiases[pointer];
 
     // 1. Unpack Q, K, V, and O
     const { Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, O_weights, O_bias } = unpackQKVO(weights, biases, null, null, embedDim, true);
 
     // 2. Project Input to Q, K, V [seqLen, embedDim]
-    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer);
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen, pointer, modelID);
 
     const mhaOutput = new Float32Array(seqLen * embedDim);
     const S_per_head = [];
@@ -883,7 +905,7 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
 
     if (BooleanAvailability().hasGPU) {
         // optimized GPU function for projecting to O_weights and O_biases to MHA output
-        finalOutput = functions.ProjectOutput_GPU(mhaOutput, embedDim, seqLen, pointer);
+        finalOutput = functions.ProjectOutput_GPU(mhaOutput, embedDim, seqLen, pointer, modelID);
     } else {
         finalOutput = new Float32Array(seqLen * embedDim);
 
@@ -904,11 +926,11 @@ const CoreMultiHeadAttention = (input, layerData, pointer) => {
     return finalOutput;
 };
 
-const CoreMultiHeadAttentionBackward = (incomingDelta, layerData, pointer) => {
+const CoreMultiHeadAttentionBackward = (incomingDelta, layerData, pointer, modelID) => {
     const { embedDim, seqLen, numHeads, headDim, dkRoot, cache } = layerData;
     const { Q, K, V, S_perHead } = cache;
 
-    const weights = getGlobalParams().globalWeights[pointer];
+    const weights = getGlobalParams(modelID).globalWeights[pointer];
     const {Q_weights, K_weights, V_weights, O_weights} = unpackQKVO(weights, null, null, null, embedDim, true);
 
     // first we get the dMHAoutput by projecting the incoming delta to transposed O_weights

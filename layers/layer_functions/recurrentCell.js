@@ -129,10 +129,10 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Float32Array} inputSequence input sequence data 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
+ * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (inputSequence, current_layer, pointer) => {
+const feedforward = (inputSequence, current_layer, pointer, modelID) => {
 
     const units = current_layer.units;
     // Assume inputSequence is flat: [units * sequence_length]
@@ -160,7 +160,8 @@ const feedforward = (inputSequence, current_layer, pointer) => {
             current_hidden, 
             [current_layer.weightShape[0], current_layer.weightShape[1]], 
             [current_layer.weightShape[2], current_layer.weightShape[3]], 
-            pointer
+            pointer,
+            modelID
         );
 
         if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
@@ -238,7 +239,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
     const sequenceLength = layer_data.maxSequenceLength;
     const units = layer_data.units;
     const featureSize = layer_data.weightShape[0];
@@ -277,8 +278,8 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
         if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrentCell.projectDeltaBackward");
 
         deltaTs[t] = delta_t;
-        dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer);
-        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer);
+        dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer, modelID);
+        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer, modelID);
         inputDeltas.set(dInput_t, t * featureSize);
     }
 

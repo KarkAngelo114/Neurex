@@ -82,10 +82,10 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Float32Array} input input features 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
+ * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer) => {
+const feedforward = (input, current_layer, pointer, modelID) => {
     let [f, kh, kw, kd] = current_layer.weightShape;
     let [input_H, input_W, input_D] = current_layer.inputShape; 
     let padding = current_layer.padding;
@@ -104,7 +104,7 @@ const feedforward = (input, current_layer, pointer) => {
     const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
     // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer);
+    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID);
 
     if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
@@ -140,21 +140,14 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * Projects the incoming delta backward through THIS conv layer's own kernels.
- * Called on the *next* layer (in feedforward direction) from the core backprop loop.
- * No branching on layer type — each layer implements this for itself.
- *
- * Math: we dilate the incoming delta (to undo strides), pad it (to undo the
- * original padding mode), then cross-correlate with the flipped kernels to
- * recover the gradient w.r.t. the previous layer's output.
- *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
  * @param {Number} pointer - weight pointer for THIS conv layer
  * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
  * @param {Object} layer_data - THIS conv layer's own configuration (weightShape, outputShape, strides, padding)
+ * @param {String} modelID model ID
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
     const [Fn, KHn, KWn, KCn] = layer_data.weightShape;
     const [oHn, oWn, oDn]     = layer_data.outputShape;
     const [oHprev, oWprev]    = targetShape;   // output shape of the layer before this one
@@ -190,7 +183,7 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
         applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
-    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer);
+    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("ConvolveDelta result has NaNs in projectDeltaBackward (convolutionalLayer)");
 
     return result;

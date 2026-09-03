@@ -24,11 +24,11 @@ const determineInferenceType = () => {
     throw new Error("[ERROR] LayerNorm cannot be used as an output layer.");
 }
 
-const feedforward = (input, current_layer, pointer) => {
+const feedforward = (input, current_layer, pointer, modelID) => {
     const eps = current_layer.eps || 1e-5;
     const D = input.length;
 
-    const outputs = computeLayerNorm(input, D, eps, pointer);
+    const outputs = computeLayerNorm(input, D, eps, pointer, modelID);
 
     return { outputs, z_values: outputs, incrementor_value: 1 };
 };

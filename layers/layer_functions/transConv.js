@@ -107,10 +107,10 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Float32Array} input input features 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
+ * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer) => {
+const feedforward = (input, current_layer, pointer, modelID) => {
     
     const inputShape = current_layer.inputShape; // [iH, iW, iD]
     const outputShape = current_layer.outputShape; // [oH, oW, oD]
@@ -119,7 +119,7 @@ const feedforward = (input, current_layer, pointer) => {
     const filters = current_layer.filters;
     const activation_function = activation[current_layer.activation_function.name];
 
-    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer);
+    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
     if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
 
     const output = activation_function(transConvOutput);
@@ -183,19 +183,20 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 /**
  *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer for THIS conv layer
+ * @param {Number} pointer - weight pointer
  * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
- * @param {Object} layer_data - THIS conv layer's own configuration (weightShape, outputShape, strides, padding)
+ * @param {Object} layer_data - kayer data
+ * @param {String} modelID model ID
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
     const inputShape = layer_data.inputShape;
     const outputShape = layer_data.outputShape;
     const weightShape = layer_data.weightShape;
     const strides = layer_data.strides;
     const filters = layer_data.filters;
 
-    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer);
+    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
     
     return result;

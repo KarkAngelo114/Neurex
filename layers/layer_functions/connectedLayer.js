@@ -105,12 +105,12 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {Float32Array} input input features 
  * @param {Object} current_layer current layer object coonfiguration
  * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
+ * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (input, current_layer, pointer) => {
+const feedforward = (input, current_layer, pointer, modelID) => {
     const [inputSize, outputSize] = current_layer.weightShape; // weight shape [input, output]
-    const z_values = MatMul(input, inputSize, outputSize, pointer); // perform the MatMul() operation
+    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID); // perform the MatMul() operation
 
     const activation_function = activation[current_layer.activation_function.name]; // activation function
     let outputs = activation_function(z_values); // use the activation function       
@@ -172,19 +172,17 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 /**
- * Projects the incoming delta backward through THIS layer's own weight matrix.
- * Called on the *next* layer (in feedforward direction) from the core backprop loop.
- * No branching — each layer type implements this for itself.
  *
  * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
  * @param {Number} pointer - weight pointer for this layer
  * @param {Array<Number>} targetShape - output shape of the layer receiving the projected delta (unused here, kept for interface consistency)
  * @param {Object} layer_data - this layer's own configuration
+ * @param {String} modelID model ID
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data) => {
+const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
     const [inputSize, outputSize] = layer_data.weightShape;
-    const result = DeltaMatMul(delta, inputSize, outputSize, pointer);
+    const result = DeltaMatMul(delta, inputSize, outputSize, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("Error - DeltaMatMul result has NaNs in projectDeltaBackward (connectedLayer)");
     return result;
 }
