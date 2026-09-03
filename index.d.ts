@@ -438,9 +438,9 @@ declare module 'neurex' {
         * @param {Array<Number>} actuals target values to approximate
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
         * @param {String} loss loss function: `mse`, `mae`, `binary_cross_entropy`, `categorical_cross_entropy`, `sparse_categorical_cross_entropy`
-        * @returns {Float32Array} output layer delta to be projected backward
+        * @returns {{loss: number, outputLayerDelta: Float32Array}}
         */
-        getOutputLayerDelta(predictions: Float32Array, actuals: Number[], zs: Float32Array[], loss: string): Float32Array;
+        getOutputLayerDelta(predictions: Float32Array, actuals: Number[], zs: Float32Array[], loss: string): {loss: number, outputLayerDelta: Float32Array};
     }
 
     /**

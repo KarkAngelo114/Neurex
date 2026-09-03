@@ -34,7 +34,7 @@ class Neurex {
         this.currentShape = null;
         this.currentSize = null;
         this.accuracy = '';
-        this.loss_function = '';
+        this.loss_function = "";
         this.output_size = 0;
         this.task = null;
         this.epoch_count = 0;
@@ -661,8 +661,6 @@ class Neurex {
         }
 
         this.loss_function = loss.toLowerCase();
-        const loss_function = lossFunctions[this.loss_function.toLowerCase()];
-            
         this.epoch_count = epoch;
         this.batch_size = batch_size;
         const batchSize = batch_size;
@@ -825,11 +823,9 @@ class Neurex {
                         // feed forward
                         const {predictions, activations, zs} = this.feedforward(input);
 
-                        // compute batch loss
-                        batchLoss += loss_function(predictions, actual);
-
-                        // get output layer delta to be projected backward
-                        const outputLayerDelta = this.getOutputLayerDelta(predictions, actual, zs, lossLower);
+                        // compute loss and get the output layer delta
+                        const {outputLayerDelta, loss} = this.getOutputLayerDelta(predictions, actual, zs, lossLower);
+                        batchLoss += loss
 
                         // backprogate
                         const {accumulatedWeightGrads, accumulatedBiasGrads} = this.backpropagation(activations, zs, outputLayerDelta);
@@ -1041,10 +1037,16 @@ class Neurex {
      * @param {Array<Number>} actuals target values to approximate
      * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
      * @param {String} loss loss function: `mse`, `mae`, `binary_cross_entropy`, `categorical_cross_entropy`, `sparse_categorical_cross_entropy`
-     * @returns {Float32Array} output layer delta to be projected backward
+     * @returns {{loss: number, outputLayerDelta: Float32Array}}
      */
     getOutputLayerDelta(predictions, actuals, zs, loss) {
-        return this.lastLayerObject.getOutputLayerDelta(predictions, actuals, zs, loss, this.task, this.lastLayerObject);
+        const lossOutput = lossFunctions[loss.toLowerCase()](predictions, actuals);
+        const outputLayerDelta =  this.lastLayerObject.getOutputLayerDelta(predictions, actuals, zs, loss, this.task, this.lastLayerObject);
+
+        return {
+            loss: lossOutput,
+            outputLayerDelta: outputLayerDelta
+        }
     }
 
     /**
