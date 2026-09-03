@@ -1031,7 +1031,7 @@ class Neurex {
      * @method `setParams` uploads all parameters in the global store. This must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
      */
     setParams() {
-        console.log(`${color.yellow}[INFO]${color.reset} Parameters for mode ${color.yellow}${this.modelID}${color.reset} has been uploaded to global store.`);
+        console.log(`${color.yellow}[INFO]${color.reset} Parameters for model ${color.yellow}${this.modelID}${color.reset} has been uploaded to global store.`);
 
         setGlobalParams(this.modelID, this.weights, this.biases);
     }
