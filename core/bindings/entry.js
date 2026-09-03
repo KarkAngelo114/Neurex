@@ -92,17 +92,13 @@ const shutdown = () => {
  * @param {String} modelID model ID
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => {
-    
-    return functions.getEmbeddings(
-            Array.from(tokenVector), 
-            embeddingDim, 
-            getGlobalParams(modelID).globalWeights[pointer], 
-            pointer,
-            modelID
-        )
-
-};
+const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions.getEmbeddings(
+    Array.from(tokenVector), 
+    embeddingDim, 
+    getGlobalParams(modelID).globalWeights[pointer], 
+    pointer,
+    modelID
+)
 
 /**
  * "✅☑️"
