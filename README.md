@@ -231,42 +231,44 @@ const layer = new Layers();
     let batchSize = 12;
     let totalEpoch = 10000;
 
-    // epoch loop
+    // epoch loop:
     for (let epoch = 0; epoch < totalEpoch; epoch++) {
-        
-        // batch loop
+        let batchLoss = 0;
+
+        // batch loop:
         for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
 
             let weightGrads, biasGrads; // instantiate accumulator variables to be reference later
 
-            // loop through datasets
+            // loop through datasets:
             for (let j = batchStart; j < batchStart + batchSize && j < trainX.length; j++) {
 
                 let input = trainX[j];
                 let label = trainY[j];
 
-                // feedforward
+                // feedforward:
                 const {predictions, activations, zs} = nrx.feedforward(new Float32Array(input));
 
-                // get output layer delta
-                const outputDelta = nrx.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
+                // get output layer delta:
+                const { outputLayerDelta, loss } = nrx.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
+                batchLoss += loss;
 
-                // backprop
+                // backprop:
                 // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally before returnig the accumulated gradients.
-                const {accumulatedWeightGrads, accumulatedBiasGrads} = nrx.backpropagation(activations, zs, outputDelta);
+                const {accumulatedWeightGrads, accumulatedBiasGrads} = nrx.backpropagation(activations, zs, outputLayerDelta);
 
                 weightGrads = accumulatedWeightGrads;
                 biasGrads = accumulatedBiasGrads;
 
             }
 
-            // model param update
-            // model param update must be placed outside mini-batch loop to get the accumulated gradients across batches
+            // model param update:
+            // model parameter update must be placed outside mini-batch loop to get the accumulated gradients across batches
             // internally, this method do scaling gradients and normalizing gradients before updating them using an optimizer.
             nrx.updateParams(weightGrads, biasGrads);
         }
 
-        console.log(`Epoch ${epoch+1} finished...`);
+        console.log(`Epoch ${epoch+1} finished... Loss: ${((batchLoss /= batchSize).toFixed(7))}`);
     }
 
     // await nrx.train(trainX, trainY, 'binary_cross_entropy', 10000, 12); // commented out to demonstrate custom training loop
