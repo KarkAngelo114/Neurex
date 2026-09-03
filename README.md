@@ -100,10 +100,10 @@ reshape(`targetSize: number[]`);
 layer.reshape([28, 28, 1]);
 ```
 
-transConvLayer(`filters: number, strides: number, kernel_size: number[], activation_function: string,  padding: string, inputShape: number[], useBias: boolean`)
+transConvLayer(`filters: number, strides: number, kernel_size: number[], activation_function: string,  padding: string, useBias: boolean`)
 - `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
 ```JavaScript
-layer.transConvLayer(3, 2, [3, 3], 'linear', 'same', [56, 56, 5], false),
+layer.transConvLayer(3, 2, [3, 3], 'linear', 'same', false),
 ```
 
 simpleAttention(`useBias: boolean`)

@@ -1,7 +1,7 @@
-const { red, reset } = require('../../color-code');
+const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
 const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
-const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddingSizes } = require('../../utils/utils');
+const { XavierInitialization, calculateTransposedTensorShape } = require('../../utils/utils');
 
 
 /**
@@ -13,19 +13,19 @@ const { XavierInitialization, calculateTransposedTensorShape, getTransposedPaddi
  */
 const initParams = (size, shape, layer_data) => {
     try {
-        const currentInputShape = layer_data.inputShape.reduce((acc, current) => acc * current, 1);
-        const incomingInputShape = shape.reduce((acc, current) => acc * current, 1);
         const useBias = layer_data.useBias;
+        const [iH, iW, iD] = shape || [28, 28, 1];
 
-        if (currentInputShape != incomingInputShape) {
-            console.error(`[ERROR]------- Failed to initialized transpose convolution layer. Incoming shape must match current inputShape. Expected shape: ${layer_data.inputShape} or ${currentInputShape} | Incoming shape: ${shape} or ${incomingInputShape}`);
-            throw new Error('SHAPE ERROR')
-        }
+        // check if the height and width values. If height (shape[0]) is 1 and width (shape[1]) is also 1, warn the user the that it should use reshape() first to properly reshape the data
+        if (iH == 1 || iW == 1 ) {
+            console.warn(`${yellow}[WARN]${reset} It seems you haven't reshape the data first to properly represent the data as a spatial tensor.`);
+            console.warn(`${yellow}[WARN]${reset} Note that the data may be interpreted correctly, and will be propagated to subsequent layers.`);
+            console.warn(`${yellow}[WARN]${reset} Incoming layer shape: [${shape}]`);
+        } 
         
         const filters = layer_data.filters;
         const padding = layer_data.padding || "same";
         const [kh, kw] = layer_data.kernel_size || [3, 3];
-        const [iH, iW, iD] = layer_data.inputShape || [28, 28, 1];
         const strides = layer_data.strides || 1;
         const TotalSize = filters * kh * kw * iD;
 
@@ -65,7 +65,7 @@ const initParams = (size, shape, layer_data) => {
             biases: biases,
             weightGrads: weightGrads,
             biasGrads: biasGrads,
-            inputShape: layer_data.inputShape,
+            inputShape: shape,
             outputShape: outputShape,
             paramShape: weightShape,
         }
@@ -163,7 +163,8 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
     else {
         if (preds.length != actuals.length) {
-            throw new Error("Predictions array is not equal to actuals array");
+            console.error(`[${red}ERROR${reset}] Predictions array is not equal to actuals array. Prediction size: ${preds.length} || Target data output size:${actuals.length}`);
+            throw new Error("[ERROR] Output data shape mismatch");
         }
 
         const lastLayerZs = zs[zs.length - 1]; 

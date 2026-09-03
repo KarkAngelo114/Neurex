@@ -309,19 +309,17 @@ class Layers {
      * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
      * @param {String} activation_function the activation function to be use for this layer
      * @param {String} padding adds N amount of padding on all sides. Default is 0
-     * @param {Array<Number>} inputShape use to determine the shape of the input going to this layer, especially if the input comes from layers that works on 1D inputs (e.g. connected layers -> trans convolution where usual output shape of connected layers are [1, 1, outputSize])
      * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
      * @return {Object} transConv layer configs
      * @throws {Error} if any of the parameters are invalid.
      */
-    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = "Same", inputShape = [28, 28, 1], useBias = true) {
+    transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = "Same", useBias = true) {
         try {
             if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
             if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
             if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
             if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
-            if (inputShape.some(num => !(num > 0))) throw new Error('[ERROR]------- Input shape values should not be null, undefined, 0 or a negative number')
 
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
@@ -344,7 +342,6 @@ class Layers {
                 filters: filters,
                 padding: padding.toLowerCase(),
                 strides: strides,
-                inputShape: inputShape,
                 isParametric: true,
                 useBias: useBias,
                 shapeType: "spatial",

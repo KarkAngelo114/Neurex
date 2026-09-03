@@ -155,7 +155,8 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
     else {
         if (preds.length != actuals.length) {
-            throw new Error("Predictions array is not equal to actuals array");
+            console.error(`[${red}ERROR${reset}] Predictions array is not equal to actuals array. Prediction size: ${preds.length} || Target data output size:${actuals.length}`);
+            throw new Error("[ERROR] Output data shape mismatch");
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
