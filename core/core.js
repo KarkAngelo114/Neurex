@@ -416,7 +416,7 @@ class Neurex {
                 }
 
                 let newLayer;
-                if (layerData.layer_name === "ConnectedLayer") {
+                if (layerData.layer_name === "Connected Layer") {
                     newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
