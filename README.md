@@ -343,6 +343,14 @@ const { Neurex, Layers } = require('neurex');
 })();
 ```
 
+You can now also export trained `nrx` models to ONNX to use it on any environment that supports ONNX runtime. This can be done easily using the `export_to_ONNX()` method in `Neurex`.
+
+```JavaScript
+nrx.export_to_ONNX("model"); // this will be saved as model.onnx
+```
+
+_Note: this is yet an experimental proof-of-concept showing that it is possible to export to ONNX. This **SHOULD NOT** be a replacement for the native neurex (`.nrx`) model as there are no method or functions yet to map back trained models from ONNX to Neurex model internal semantics._
+
 ## Use built-in templates
 
 Want to train a model immediately? The `templates` module offers curated templates you can use which you can drop in to the `sequentialBuild()` method.

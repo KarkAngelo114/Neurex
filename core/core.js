@@ -416,7 +416,7 @@ class Neurex {
                 }
 
                 let newLayer;
-                if (layerData.layer_name === "Connected Layer") {
+                if (layerData.layer_name === "ConnectedLayer") {
                     newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
@@ -494,7 +494,8 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                 }
                 else {
-                    throw new Error(`${color.red}[ERROR] Unknown layer type '${layerData.layer_name}' found in model.${color.reset}`);
+                    console.error(`${color.red}[ERROR]${color.reset} Unknown layer type '${layerData.layer_name}' found in model. It might you've loaded a model that is not compatible to this version of Neurex yet nor has the corresponding layer type to map back. To confirm, you can check layer definitions in ${color.gray}https://neurex-documentation.vercel.app/javascript-nodejs#layers${color.reset} or update to the newest version of Neurex.`);
+                    throw new Error(`ERR_UKNOWN_LAYER_TYPE`);
                 }
                 
                 return newLayer;

@@ -13,6 +13,7 @@ const blue_violet = '\x1b[38;5;57m';
 const violet = `\x1b[35m`;
 const pink = `\x1b[38;5;205m`;
 const red_violet = `\x1b[38;5;161m`;
+const gray = "\x1b[90m";
 
 module.exports = {
     reset,
@@ -29,5 +30,6 @@ module.exports = {
     blue_violet,
     violet,
     pink,
-    red_violet
+    red_violet,
+    gray
 }
