@@ -63,7 +63,7 @@ const init = () => {
         }
 
         if (!hasGPU && !force_Use_Default_JS_Float32_Module) {
-            console.log(`${yellow}\n[INFO]${reset} Neurex will use the optimized CPU functions`);
+            console.log(`${yellow}[INFO]${reset} Neurex will use the optimized CPU functions`);
             addon.setOnGPU(false);
             functions = addon;
             return;

@@ -315,7 +315,7 @@ declare module 'neurex' {
         * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model file size when adding miscellaneous.
         *   
         */
-        async saveModel(modelName: string, miscellaneous: object): void;
+        saveModel(modelName: string, miscellaneous: object): void;
 
         /**
         * @async
@@ -324,7 +324,7 @@ declare module 'neurex' {
         * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
         * @returns {void}
         */
-        async loadSavedModel(model: string, showLog: Boolean): void;
+        loadSavedModel(model: string, showLog: Boolean): void;
 
         /**
         * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
@@ -383,7 +383,7 @@ declare module 'neurex' {
         * 
         * 
         */
-        async train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number, shuffle: boolean): void;
+        train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number, shuffle: boolean): void;
 
         /**
         * 
@@ -395,7 +395,7 @@ declare module 'neurex' {
 
         produces predictions based on the input data
         */
-        async predict(input: number[][]): number[];
+        predict(input: number[][]): number[];
         
         /**
         * @method `setParams` uploads all parameters in the global store. This method must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
@@ -422,7 +422,7 @@ declare module 'neurex' {
         * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
         * @returns {{accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}}
         */
-        backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}
+        backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[]}
         
         /**
         * @method `updateParams` is the method to update the parameters of your model. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
