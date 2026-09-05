@@ -246,7 +246,9 @@ declare module 'neurex' {
         /** current epoch  */
         current_epoch?: number
         /** training feature size  */
-        trainingFeatureSize?: number
+        trainingFeatureSize?: number,
+        /** optimizer to use. Once set, it by will use the optimizer you've set in this option rather on the `configure()` */
+        optimizer?: (params: any) => Function
 
 
     }

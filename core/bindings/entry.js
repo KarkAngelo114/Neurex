@@ -33,7 +33,7 @@ const init = () => {
         const {hasGPU, force_Use_Default_JS_Float32_Module, data} = BooleanAvailability();
 
         if (force_Use_Default_JS_Float32_Module) {
-            console.log(`${yellow}\n[INFO]${reset} Using Javascript-float32 modules`);
+            console.log(`${yellow}[INFO]${reset} Defaulting to pure JS implementation. To speed things up, consider using native C++ bindigs by enabling mode:"cpu" or mode:"auto".`);
             functions = float32_Modules;
             return;
         }
@@ -63,7 +63,7 @@ const init = () => {
         }
 
         if (!hasGPU && !force_Use_Default_JS_Float32_Module) {
-            console.log(`${yellow}[INFO]${reset} Neurex will use the optimized CPU functions`);
+            console.log(`${yellow}[INFO]${reset} Neurex will use native binaries optimized for CPU-based functions`);
             addon.setOnGPU(false);
             functions = addon;
             return;

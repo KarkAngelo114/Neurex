@@ -60,7 +60,7 @@ exports.modeConfiguration = (value) => {
 exports.onFloat32Module = (value) => {
 
     if (value) {
-        console.log(`${yellow}\n[WARN] Forcing to use default float32 module on JS${reset}`);
+        console.log(`${yellow}[INFO]${reset} Forcing to use default float32 module on JS.`);
         hasGPU = false;
     }
 

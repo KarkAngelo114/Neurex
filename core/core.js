@@ -74,6 +74,8 @@ class Neurex {
         this.miscellaneous = null;
 
         this.lastLayerObject = {};
+
+        this.hasInitializedNativeBindings = false;
         
     }
 
@@ -115,8 +117,12 @@ class Neurex {
 
         this.visualizers = configs.visualizerPlugins || [];
         
-
-        init();
+        
+        if (!this.hasInitializedNativeBindings) {
+            this.hasInitializedNativeBindings = true;
+            init();
+        }
+        
         this.isInit = true;
     }
 
@@ -640,6 +646,9 @@ class Neurex {
     */
 
     async train(inputs, trainY, loss, epoch, batch_size = 1, shuffle = true) {
+        if (!this.hasInitializedNativeBindings) {
+            init();
+        }
         this.shuffle = shuffle;
 
         if (!this.isInit) {
@@ -980,6 +989,9 @@ class Neurex {
      produces predictions based on the input data
     */
     async predict(input) {
+        if (!this.hasInitializedNativeBindings) {
+            init();
+        }
         if (!this.isInit) {
             init();
             this.isInit = true;
@@ -1031,6 +1043,10 @@ class Neurex {
      * @method `setParams` uploads all parameters in the global store. This must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
      */
     setParams() {
+        if (!this.hasInitializedNativeBindings) {
+            init();
+            this.hasInitializedNativeBindings = true;
+        }
         console.log(`${color.yellow}[INFO]${color.reset} Parameters for model ${color.yellow}${this.modelID}${color.reset} has been uploaded to global store.`);
 
         setGlobalParams(this.modelID, this.weights, this.biases);
@@ -1158,6 +1174,8 @@ class Neurex {
         let weightGrads = accumulatedWeightGrads;
         let biasGrads = accumulatedBiasGrads;
         let batchSize = options?.batchSize || 1;
+        let optimize = options?.optimizer || this.optimizer;
+
         let pointer = 0;
         for (let l = 0; l < this.num_layers; l++) {
             const layer_data_obj = this.layers[l];
@@ -1180,7 +1198,7 @@ class Neurex {
             biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
 
             // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
-            const res1 = this.optimizer({
+            const res1 = optimize({
                 params: this.weights[pointer],
                 grads: weightGrads[pointer],
                 state: this.optimizerStates.weights[pointer],
@@ -1201,7 +1219,7 @@ class Neurex {
             // Update bias only if the layer actually has a bias and has the property `useBias`
             if (layer_data_obj?.useBias) {
 
-                const res2 = this.optimizer({
+                const res2 = optimize({
                     params: this.biases[pointer],
                     grads: biasGrads[pointer],
                     state: this.optimizerStates.biases[pointer],
