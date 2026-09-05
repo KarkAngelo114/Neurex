@@ -318,6 +318,12 @@ declare module 'neurex' {
         *   
         */
         saveModel(modelName: string, miscellaneous: object): void;
+        
+        /**
+        * @method export_to_ONNX allows you to export neurex trained models to ONNX compatible format
+        * @param {String} filename model filename 
+        */
+        export_to_ONNX(filename: string): void;
 
         /**
         * @async

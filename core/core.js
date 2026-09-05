@@ -22,6 +22,7 @@ const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, gradientClipping, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
+const exportToOnnx = require('./exporters/onnx');
 const version = require('../package.json').version;
 
 class Neurex {
@@ -245,7 +246,7 @@ class Neurex {
      *   
      */
     saveModel(modelName = null, miscellaneous) {
-        console.log("\n[TASK]------- Saving model's architecture...");
+        console.log(`\n ${color.yellow}[TASK]${color.reset} Saving model's architecture`);
         let fileName = modelName;
         if (!modelName || modelName == null || modelName == undefined) {
             fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
@@ -301,6 +302,20 @@ class Neurex {
     }
 
     /**
+     * @method export_to_ONNX allows you to export models to ONNX
+     * @param {String} fileName model filename 
+     */
+    async export_to_ONNX(fileName) {
+
+        if (!fileName) {
+            fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        }
+
+        await exportToOnnx(fileName, this.layers, this.weights, this.biases);
+
+    }
+
+    /**
      * @async
      * @param {String} model path to your model
      * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`. 
@@ -308,19 +323,19 @@ class Neurex {
     async loadSavedModel(model, showLog = true) {
         try {
             if (!model) {
-                throw new Error(`${color.red}\n[ERROR]------- No model provided ${color.red}`);
+                throw new Error(`${color.red}\n[ERROR]${color.reset}} No model provided`);
             }
 
             if (this.layers.length > 0) {
                 this.isfailed = true;
-                throw new Error(`${color.red}[ERROR]------- Failed to load model.\nReason:\nThere's already a new network being built. ${color.reset}`);
+                throw new Error(`${color.red}[ERROR]${color.reset} Failed to load model.\nReason:\nThere's already a new network being built.`);
             }
 
             const dir = process.cwd();
             const model_file = path.join(dir, `${model}`);
 
             if (showLog) {
-                console.log(`${color.yellow}[INFO]------- Loading model from ${model_file}${color.reset}`)
+                console.log(`${color.yellow}[INFO]${color.reset} Loading model from ${model_file}`)
             }
             
 
@@ -493,7 +508,7 @@ class Neurex {
             }
             
             if (showLog) {
-                console.log(`${color.lime}[SUCCESS]------- Model ${model} successfully loaded\n${color.reset}`);
+                console.log(`${color.lime}[SUCCESS]${color.reset} Model ${model} successfully loaded\n`);
             }
 
             this.lastLayerObject = this.layers[this.layers.length - 1];
@@ -520,12 +535,12 @@ class Neurex {
         try {
 
             if (this.layers.length > 0) {
-                console.log(`\n${color.orange}[INFO]------- Skipping sequential build: \n\n reason:\n There/you might have loaded a model already. Please check if already load a model.\n${color.reset}`);
+                console.log(`\n${color.orange}[INFO]${color.reset} Skipping sequential build: \n\n reason:\n There/you might have loaded a model already. Please check if already load a model.\n`);
                 return;
             }
 
             if (!layer_data || layer_data.length < 1) {
-                throw new Error(`${color.red}[ERROR]------- No layers${color.reset} added.`);
+                throw new Error(`${color.red}[ERROR]${color.reset} No layers added.`);
             }
 
             layer_data.forEach(layer => {
@@ -702,12 +717,12 @@ class Neurex {
                 console.log(`Loss: ${loss ? "specified" : "not specified"}`);
                 console.log(`Epoch: ${epoch ? "specified" : "not specified"}`);
                 console.log(`Batch Size: ${batch_size ? "specified" : "not specified"}`);
-                throw new Error(`[FAILED]------- There is/are missing parameter/s. Failed to start training...`);
+                throw new Error(`${color.red}[ERROR]${color.reset} There is/are missing parameter/s. Failed to start training...`);
             }
 
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
-                throw new Error("[FAILED]------- Epoch or batch size cannot be zero or a negative number");
+                throw new Error("[FAILED] Epoch or batch size cannot be zero or a negative number");
             }
 
             if (this.visualizers.length > 0) {
@@ -1005,14 +1020,14 @@ class Neurex {
 
         try {
             if (!input) {
-                throw new Error("\n[ERROR]-------No inputs")
+                throw new Error("\n[ERROR] No inputs")
             }
 
             for (let i = 0; i < input.length; i++) {
                 if (input[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || input[i].length != this.input_size) {
                     this.isfailed = true;
-                    console.log(`${color.red}[ERROR]------- Input data must be the same shape set in the input layer${color.reset}\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${input[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
-                    throw new Error(`${color.red}Shape mismatch${color.reset}`);
+                    console.log(`${color.red}[ERROR]${color.reset} Input data must be the same shape set in the input layer\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${input[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
+                    throw new Error(`Shape mismatch`);
                 }
 
                 input[i] = input[i] instanceof Float32Array ? input[i] : new Float32Array(input[i].flat(Infinity));
@@ -1383,7 +1398,7 @@ class Neurex {
 
             fs.writeFileSync(nrxFilePath, finalBuffer);
 
-            console.log(`[SUCCESS]------- Model is saved as ${fileName}.nrx\n`);
+            console.log(`${color.green}[SUCCESS] ${color.reset}Model is saved as ${fileName}.nrx\n`);
         }
     }
 

@@ -19,7 +19,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
 
     if (!label_mode) {
         const error = `Label mode is "undefined"`;
-        console.error(`${red}[ERROR]------- ${error}${reset}`);
+        console.error(`${red}[ERROR]${reset} ${error}`);
         throw new Error('Label mode error');
     }
 
@@ -28,7 +28,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
 
     if (!allowedLabelModes.includes(label_mode.toLowerCase())) {
         const error = `Label mode "${label_mode}" is invaid. Please use "binary", "categorical", or "sparse".`;
-        console.error(`${red}[ERROR]------- ${error}${reset}`);
+        console.error(`${red}[ERROR]${reset} ${error}`);
         throw new Error('Label mode error');
     }
 
@@ -37,7 +37,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     const labels = []; // folder names where the image belongs to.
 
     try {
-        console.log(`\n${green}[Task]------- Loading datasets from "${targetDir}/" ${reset}`)
+        console.log(`\n${green}[Task]${reset} Loading datasets from "${targetDir}/"`)
         const items = await fs.readdir(targetDir);
 
         // Only collect subdirectories (class names)
@@ -90,7 +90,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
         }
 
 
-        console.log(`${green}[/]------- Successfully loaded datasets from "${targetDir}/"${reset}\n`);
+        console.log(`${green}[SUCCESS]${reset} Successfully loaded datasets from "${targetDir}/"\n`);
         console.log(`- Found ${subdirs.length} classes`);
         console.log(`- Found ${datasets.length} items in total`);
 
@@ -124,7 +124,7 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
     try {
         
         if (showLog) { 
-            console.log(`\n${green}[Task]------- Loading image "${file_path}" ${reset}`);
+            console.log(`\n${green}[Task]${reset} Loading image "${file_path}"`);
         }
 
         const filename = path.basename(file_path, path.extname(file_path));
@@ -152,7 +152,7 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
 
 
         if (showLog) {
-            console.log(`${green}[/]------- Successfully loaded image "${file_path}"${reset}\n`);
+            console.log(`${green}[SUCCESS]${reset} Successfully loaded image "${file_path}"\n`);
         }
     
         return {
@@ -183,7 +183,7 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
     const filenames = [];
 
     try {
-        console.log(`\n${green}[Task]------- Loading images from "${file_path}" ${reset}`);
+        console.log(`\n${green}[Task]${reset} Loading images from "${file_path}"`);
 
         const items = await fs.readdir(file_path);
 
@@ -212,7 +212,7 @@ const load_multiple_images = async (file_path, resize = [28, 28], pixelFormat = 
             datasets.push(new Float32Array(normalized));
         }
 
-        console.log(`\n${lime}[SUCCESS]------ Successfully loaded images from "${file_path}/"${reset}`)
+        console.log(`\n${lime}[SUCCESS]${reset} Successfully loaded images from "${file_path}/"`)
 
         return {
             datasets: datasets,
