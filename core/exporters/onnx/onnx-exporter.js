@@ -1,14 +1,25 @@
 const { green, reset } = require('../../../color-code')
 const fs = require('fs');
 const path = require('path');
-const { translateConnectedLayer } = require('./translators');
+const { translateConnectedLayer, translateReshape, translateLayerNorm } = require('./translators');
 
-const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer']);
+const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization']);
+
+// Maps a layer's layer_name to the translate* function that knows how to
+// turn it into ONNX node/initializer descriptors. Every entry here must
+// also be listed in SUPPORTED_LAYER_TYPES above.
+const LAYER_TRANSLATORS = {
+    'Connected Layer': translateConnectedLayer,
+    'Reshape': translateReshape,
+    'Layer Normalization': translateLayerNorm,
+};
 
 /**
- * Converts a Float32Array's underlying memory into a Uint8Array view
- * (zero-copy) suitable for TensorProto.rawData.
- * @param {Float32Array} arr
+ * Converts a TypedArray's underlying memory into a Uint8Array view
+ * (zero-copy) suitable for TensorProto.rawData. Works for Float32Array
+ * (weights/biases/gamma/beta) as well as BigInt64Array (e.g. Reshape's
+ * int64 shape initializer).
+ * @param {Float32Array|BigInt64Array} arr
  * @returns {Uint8Array}
  */
 const toRawData = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
@@ -42,6 +53,8 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
         TensorShapeProto_DimensionSchema,
         TensorProto_DataType,
         OperatorSetIdProtoSchema,
+        AttributeProtoSchema,
+        AttributeProto_AttributeType,
     } = await import('onnx-buf');
 
     const makeValueInfo = (name, dims) =>
@@ -64,13 +77,48 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
             }),
         });
 
-    const makeTensor = (name, dims, data) =>
-        create(TensorProtoSchema, {
+    // translate* functions default to float32 initializers (weights/biases/
+    // gamma/beta), but some (e.g. Reshape's shape tensor) need a different
+    // ONNX dtype - they flag this via an explicit `dataType` string on the
+    // initializer descriptor (e.g. 'INT64').
+    const makeTensor = (name, dims, data, dataType) => {
+        const onnxDataType = dataType ? TensorProto_DataType[dataType] : TensorProto_DataType.FLOAT;
+        if (onnxDataType === undefined) {
+            throw new Error(`makeTensor: unknown ONNX dataType "${dataType}" for initializer "${name}"`);
+        }
+
+        return create(TensorProtoSchema, {
             name,
             dims: dims.map((d) => BigInt(d)),
-            dataType: TensorProto_DataType.FLOAT,
+            dataType: onnxDataType,
             rawData: toRawData(data),
         });
+    };
+
+    const ATTRIBUTE_VALUE_FIELDS = {
+        FLOAT: 'f',
+        INT: 'i',
+        STRING: 's',
+        FLOATS: 'floats',
+        INTS: 'ints',
+        STRINGS: 'strings',
+    };
+
+    const makeAttribute = (attrDescriptor) => {
+        const { name, type, value } = attrDescriptor;
+        const onnxType = AttributeProto_AttributeType[type];
+        const field = ATTRIBUTE_VALUE_FIELDS[type];
+
+        if (onnxType === undefined || !field) {
+            throw new Error(`makeAttribute: unsupported attribute type "${type}" for attribute "${name}"`);
+        }
+
+        return create(AttributeProtoSchema, {
+            name,
+            type: onnxType,
+            [field]: value,
+        });
+    };
 
     const makeNode = (nodeDescriptor) =>
         create(NodeProtoSchema, {
@@ -78,26 +126,42 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
             opType: nodeDescriptor.opType,
             input: nodeDescriptor.inputs,
             output: nodeDescriptor.outputs,
+            attribute: (nodeDescriptor.attributes || []).map(makeAttribute),
         });
 
     const allNodes = [];
     const allInitializers = [];
 
+    // Graph-level input/output are modeled flat as [1, N] (batch of 1, N
+    // features) regardless of layer type, matching makeValueInfo's usage
+    // below. For Connected Layer this N is weightShape[0]/[1]; for
+    // shape-preserving/shape-changing layers (LayerNorm, Reshape) it's the
+    // product of inputShape/outputShape, since those can be multi-dim
+    // (e.g. Reshape's targetShape [28, 28, 3]).
+    const flatSize = (layer, shapeKey) => {
+        const shape = layer[shapeKey];
+        if (!shape || shape.length === 0) {
+            throw new Error(`exportToOnnx: layer "${layer.layer_name}" is missing a valid ${shapeKey} (needed to determine graph ${shapeKey === 'inputShape' ? 'input' : 'output'} size) ([${shape}])`);
+        }
+        return shape.reduce((acc, d) => acc * d, 1);
+    };
+
     const firstLayer = layers[0];
-    const [firstInputSize] = firstLayer.weightShape;
+    const firstInputSize = firstLayer.weightShape ? firstLayer.weightShape[0] : flatSize(firstLayer, 'inputShape');
     let currentInputName = 'input';
 
     layers.forEach((layer, layerIndex) => {
-        const { nodes, initializers, outputName } = translateConnectedLayer(layer, weights[layerIndex], biases[layerIndex], currentInputName, layerIndex);
+        const translate = LAYER_TRANSLATORS[layer.layer_name];
+        const { nodes, initializers, outputName } = translate(layer, weights[layerIndex], biases[layerIndex], currentInputName, layerIndex);
 
         nodes.forEach((n) => allNodes.push(makeNode(n)));
-        initializers.forEach((t) => allInitializers.push(makeTensor(t.name, t.dims, t.data)));
+        initializers.forEach((t) => allInitializers.push(makeTensor(t.name, t.dims, t.data, t.dataType)));
 
         currentInputName = outputName;
     });
 
     const lastLayer = layers[layers.length - 1];
-    const [, lastOutputSize] = lastLayer.weightShape;
+    const lastOutputSize = lastLayer.weightShape ? lastLayer.weightShape[1] : flatSize(lastLayer, 'outputShape');
 
     const graph = create(GraphProtoSchema, {
         name: filename,

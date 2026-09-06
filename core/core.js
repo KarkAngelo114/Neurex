@@ -246,7 +246,7 @@ class Neurex {
      *   
      */
     saveModel(modelName = null, miscellaneous) {
-        console.log(`\n ${color.yellow}[TASK]${color.reset} Saving model's architecture`);
+        console.log(`${color.yellow}[TASK]${color.reset} Saving model's architecture`);
         let fileName = modelName;
         if (!modelName || modelName == null || modelName == undefined) {
             fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
@@ -1399,7 +1399,7 @@ class Neurex {
 
             fs.writeFileSync(nrxFilePath, finalBuffer);
 
-            console.log(`${color.green}[SUCCESS] ${color.reset}Model is saved as ${fileName}.nrx\n`);
+            console.log(`${color.green}[SUCCESS] ${color.reset}Model is saved as ${fileName}.nrx`);
         }
     }
 

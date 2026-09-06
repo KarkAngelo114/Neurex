@@ -99,16 +99,139 @@ const translateConnectedLayer = (layer, weight, bias, inputName, layerIndex) => 
     };
 };
 
+/**
+ * Translates a "Reshape" layer into a single ONNX Reshape node.
+ *
+ * Reshape has no learned weights/biases - Neurex's `weight`/`bias` args are
+ * ignored here, but kept in the signature so all translate* functions share
+ * the same shape (onnx-exporter.js calls them uniformly).
+ *
+ * ONNX's Reshape op takes the target shape as a second *input* tensor
+ * (int64), not as an attribute, so we emit a small int64 initializer
+ * alongside the node:
+ *   Reshape(input, shape) -> layer output
+ *
+ * @param {Object} layer - one entry from Neurex's `this.layers` (must be layer_name === "Reshape")
+ * @param {Float32Array} weight - unused, present only for signature parity with other translate* fns
+ * @param {Float32Array} bias - unused, present only for signature parity with other translate* fns
+ * @param {String} inputName - the ONNX tensor name feeding into this layer
+ * @param {Number} layerIndex - this layer's position in the stack, used to build unique, stable tensor/node names
+ * @returns {{nodes: Array<Object>, initializers: Array<Object>, outputName: String}}
+ */
 const translateReshape = (layer, weight, bias, inputName, layerIndex) => {
+    if (layer.layer_name !== 'Reshape') {
+        throw new Error(`translateReshape received a layer of type "${layer.layer_name}", expected "Reshape"`);
+    }
 
-}
+    const targetShape = layer.targetShape;
+    if (!targetShape || targetShape.length === 0) {
+        throw new Error(`translateReshape: layer at index ${layerIndex} is missing a valid targetShape ([${targetShape}])`);
+    }
 
+    const namePrefix = `layer${layerIndex}`;
+    const shapeName = `${namePrefix}_shape`;
+    const outputName = `${namePrefix}_reshape_out`;
+
+    // ONNX shape inputs are int64. Batch dimension (-1) is prepended so a
+    // single Neurex example (e.g. targetShape [28, 28, 3]) maps to a
+    // dynamic-batch ONNX tensor shape [-1, 28, 28, 3], matching how
+    // makeValueInfo/graph input in onnx-exporter.js always models a
+    // leading batch dim of 1/dynamic for the whole graph.
+    const shapeData = new BigInt64Array([-1n, ...targetShape.map((d) => BigInt(d))]);
+
+    const initializers = [
+        { name: shapeName, dims: [shapeData.length], data: shapeData, dataType: 'INT64' },
+    ];
+
+    const nodes = [
+        {
+            name: `${namePrefix}_reshape`,
+            opType: 'Reshape',
+            inputs: [inputName, shapeName],
+            outputs: [outputName],
+        },
+    ];
+
+    return {
+        nodes,
+        initializers,
+        outputName,
+    };
+};
+
+/**
+ * Translates a "Layer Normalization" layer into ONNX's built-in
+ * LayerNormalization op (opset >= 17). Shape is preserved end to end -
+ * layer.weightShape (== [size]) gives the dims for gamma/beta, and the
+ * normalization is applied over the last axis (axis = -1), matching
+ * Neurex's per-sample, feature-wise normalization in layerNorm.js.
+ *
+ *   LayerNormalization(input, gamma, beta) -> layer output
+ *
+ * @param {Object} layer - one entry from Neurex's `this.layers` (must be layer_name === "Layer Normalization"). Uses layer.weightShape (== [size]) for gamma/beta dims - LayerNorm layers don't carry a separate paramShape field.
+ * @param {Float32Array} weight - this layer's gamma (scale) tensor, shape [size]
+ * @param {Float32Array} bias - this layer's beta (shift) tensor, shape [size]
+ * @param {String} inputName - the ONNX tensor name feeding into this layer
+ * @param {Number} layerIndex - this layer's position in the stack, used to build unique, stable tensor/node names
+ * @returns {{nodes: Array<Object>, initializers: Array<Object>, outputName: String}}
+ */
 const translateLayerNorm = (layer, weight, bias, inputName, layerIndex) => {
+    if (layer.layer_name !== 'Layer Normalization') {
+        throw new Error(`translateLayerNorm received a layer of type "${layer.layer_name}", expected "Layer Normalization"`);
+    }
 
-}
+    const paramShape = layer.weightShape;
 
+    if (!paramShape || paramShape.length === 0) {
+        throw new Error(`translateLayerNorm: layer at index ${layerIndex} is missing a valid weightShape ([${paramShape}])`);
+    }
+
+    // Guard against silently exporting a corrupted LayerNormalization node:
+    // gamma/beta must actually contain weightShape's element count, or the
+    // ONNX graph will carry mismatched dims vs rawData (wrong shape,
+    // wrong values, no error).
+    const expectedSize = paramShape.reduce((a, d) => a * d, 1);
+    if (weight.length !== expectedSize || bias.length !== expectedSize) {
+        throw new Error(
+            `translateLayerNorm: layer at index ${layerIndex} has weightShape [${paramShape}] (expects ${expectedSize} values) ` +
+            `but gamma has ${weight.length} and beta has ${bias.length} - refusing to export a mismatched LayerNormalization node`
+        );
+    }
+
+    const eps = layer.eps ?? 1e-5;
+    const namePrefix = `layer${layerIndex}`;
+    const gammaName = `${namePrefix}_gamma`;
+    const betaName = `${namePrefix}_beta`;
+    const outputName = `${namePrefix}_layernorm_out`;
+
+    const initializers = [
+        { name: gammaName, dims: paramShape, data: weight },
+        { name: betaName, dims: paramShape, data: bias },
+    ];
+
+    const nodes = [
+        {
+            name: `${namePrefix}_layernorm`,
+            opType: 'LayerNormalization',
+            inputs: [inputName, gammaName, betaName],
+            outputs: [outputName],
+            attributes: [
+                { name: 'axis', type: 'INT', value: -1n },
+                { name: 'epsilon', type: 'FLOAT', value: eps },
+            ],
+        },
+    ];
+
+    return {
+        nodes,
+        initializers,
+        outputName,
+    };
+};
 
 module.exports = {
     translateConnectedLayer,
+    translateReshape,
+    translateLayerNorm,
     ACTIVATION_TO_ONNX_OP,
 };
