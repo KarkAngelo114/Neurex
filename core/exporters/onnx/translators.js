@@ -51,8 +51,9 @@ const translateConnectedLayer = (layer, weight, bias, inputName, layerIndex) => 
     const namePrefix = `layer${layerIndex}`;
     const weightName = `${namePrefix}_weight`;
     const biasName = `${namePrefix}_bias`;
-
     const nodes = [];
+
+    
     const initializers = [
         { name: weightName, dims: [inputSize, outputSize], data: weight },
     ];
@@ -97,6 +98,15 @@ const translateConnectedLayer = (layer, weight, bias, inputName, layerIndex) => 
         outputName: lastOutput,
     };
 };
+
+const translateReshape = (layer, weight, bias, inputName, layerIndex) => {
+
+}
+
+const translateLayerNorm = (layer, weight, bias, inputName, layerIndex) => {
+
+}
+
 
 module.exports = {
     translateConnectedLayer,
