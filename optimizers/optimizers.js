@@ -59,9 +59,9 @@ module.exports = {
         };
     },
 
-    RMSProp: (decayRate = 0.9, epsilon = 1e-8) => {
+    RMSprop: (decayRate = 0.9, epsilon = 1e-8) => {
         
-        return function RMSProp(data) {
+        return function RMSprop(data) {
             const {params, grads, lr, state: state ={}} = data;
             
             if (params.length != grads.length) {

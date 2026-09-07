@@ -38,5 +38,5 @@ export const {
     modelVisualizer,
     Adam,
     SGD,
-    RMSProp
+    RMSprop
 } = pkg;
