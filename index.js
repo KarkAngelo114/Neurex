@@ -23,7 +23,7 @@ const { detectGPU } = require('./gpu/gpu_init');
 const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN } = require('./applications/templates');
 const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
-const { SGD, Adam } = require('./optimizers');
+const { SGD, Adam, RMSProp } = require('./optimizers');
 const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
 const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLandscapeVisualizer');
 const { modelVisualizer } = require('./applications/visualizer/modelVisualizer');
@@ -64,6 +64,7 @@ module.exports= {
     reduceOnPlateau,
     SGD,
     Adam,
+    RMSProp,
     lossVisualizer,
     lossLandscapeVisualizer,
     modelVisualizer,

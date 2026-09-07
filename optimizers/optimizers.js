@@ -1,5 +1,6 @@
 
-const { ApplySGD, ApplyAdam } = require('../core/bindings');
+const { red, reset } = require('../color-code');
+const { ApplySGD, ApplyAdam, ApplyRMSProp } = require('../core/bindings');
 
 
 module.exports = {
@@ -56,5 +57,29 @@ module.exports = {
                 state: state
             };
         };
+    },
+
+    RMSProp: (decayRate = 0.9, epsilon = 1e-8) => {
+        
+        return function RMSProp(data) {
+            const {params, grads, lr, state: state ={}} = data;
+            
+            if (params.length != grads.length) {
+                console.error(`${red}[ERROR]${reset} Parammeter and Gradient sizes does not match.`);
+                throw new Error("ERR_PARAM_GRAD_SIZE_MISMATCH");
+            }
+
+            if (!state.sqAvg) {
+                state.sqAvg = new Float32Array(params.length);
+            }
+
+            const res = ApplyRMSProp(params, grads, state.sqAvg, lr, epsilon, decayRate);
+            state.sqAvg = res.sqAvg;
+            
+            return {
+                params: res.params,
+                state: state
+            }
+        }
     }
 };

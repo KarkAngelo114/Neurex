@@ -37,5 +37,6 @@ export const {
     lossVisualizer,
     modelVisualizer,
     Adam,
-    SGD
+    SGD,
+    RMSProp
 } = pkg;

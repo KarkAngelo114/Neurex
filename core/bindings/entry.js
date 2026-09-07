@@ -372,6 +372,18 @@ const ApplySGD = (params, grads, velocity, lr, momentum = 0.9) => functions.SGD(
 const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
 
 /**
+ * "✅☑️"
+ * @param {Float32Array} params flattened array of parameters 
+ * @param {Float32Array} grads flattened array of grads
+ * @param {Float32Array} sqAvg flattened array of moving squared average
+ * @param {Number} lr learning rate value 
+ * @param {Number} epsilon epsilon value
+ * @param {Number} decayRate decay rate value
+ * @returns {{ params: Float32Array, sqAvg: Float32Array }}
+ */
+const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate);
+
+/**
  * 
  * "✅☑️"
  * @param {Float32Array>} activated_outputs 
@@ -671,7 +683,8 @@ const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.compu
     modelID
 );
 
-/**"✅☑️"
+/**
+ * "✅☑️"
  * @function accumulate_element_wise_mul performs an accumulating element-wise multiplication operation wherein the 3rd array input will be accumulated on. (Not to be confused with `element_wise_mul()`)
  * @param {Float32Array} flat_arr_1 input array
  * @param {Float32Array} flat_arr_2 input array
@@ -1046,6 +1059,7 @@ module.exports = {
     scale,
     ApplySGD,
     ApplyAdam,
+    ApplyRMSProp,
     element_wise_mul,
     element_wise_sub,
     accumulate_element_wise_mul,

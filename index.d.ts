@@ -977,6 +977,13 @@ declare module 'neurex' {
     export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
 
     /**
+     * @function RMSProp or (Root Mean Square Propagation) is an adaptive learning rate optimization algorithm designed to speed up and stabilize the training of deep neural networks.
+     * @param decayRate controls how fast the running average of past squared gradients forgets old information. Default value is `0.9`.
+     * @param epsilon A tiny positive constant added to the denominator. Default value is `1e-8`.
+     */
+    export function RMSProp(decayRate: number, epsilon: number): Function;
+
+    /**
      * @function lossVisualizer is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
      */
     export function lossVisualizer(): Object;

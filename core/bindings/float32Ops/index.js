@@ -266,7 +266,19 @@ const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
         v: output_V
         
     }
+}
 
+const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => {
+
+    for (let i = 0; i < params.length; i++) {
+        sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (grads[i] * grads[i]);
+        params[i] -= (lr / (Math.sqrt(sqAvg[i]) + epsilon)) * grads[i];
+    }
+
+    return {
+        params: params,
+        sqAvg: sqAvg
+    }
 }
 
 const ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
@@ -1112,6 +1124,7 @@ module.exports = {
     scale,
     SGD,
     Adam,
+    RMSProp,
     ApplyPadding,
     Convolve,
     ConvolveDelta,
