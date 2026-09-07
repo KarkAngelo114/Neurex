@@ -1,9 +1,9 @@
-const { green, reset } = require('../../../color-code')
+const { green, reset, red } = require('../../../color-code')
 const fs = require('fs');
 const path = require('path');
-const { translateConnectedLayer, translateReshape, translateLayerNorm } = require('./translators');
+const { translateConnectedLayer, translateReshape, translateLayerNorm, translateConvLayer, translateMaxPool } = require('./translators');
 
-const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization']);
+const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization', "Convolutional Layer", "Max Pooling"]);
 
 // Maps a layer's layer_name to the translate* function that knows how to
 // turn it into ONNX node/initializer descriptors. Every entry here must
@@ -12,6 +12,8 @@ const LAYER_TRANSLATORS = {
     'Connected Layer': translateConnectedLayer,
     'Reshape': translateReshape,
     'Layer Normalization': translateLayerNorm,
+    'Convolutional Layer': translateConvLayer,
+    'Max Pooling': translateMaxPool
 };
 
 /**
@@ -116,7 +118,7 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
         return create(AttributeProtoSchema, {
             name,
             type: onnxType,
-            [field]: value,
+            [field]: type === 'STRING' ? new TextEncoder().encode(value) : value,
         });
     };
 
@@ -147,28 +149,46 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
     };
 
     const firstLayer = layers[0];
-    const firstInputSize = firstLayer.weightShape ? firstLayer.weightShape[0] : flatSize(firstLayer, 'inputShape');
+    const firstInputSize = firstLayer.layer_name === 'Connected Layer'
+        ? firstLayer.weightShape[0]
+        : flatSize(firstLayer, 'inputShape');
+    const graphInputShape = firstLayer.inputShape && firstLayer.inputShape.length > 1
+        ? [1, ...firstLayer.inputShape]
+        : [1, firstInputSize];
     let currentInputName = 'input';
-
+    
+    let pointer = 0;
     layers.forEach((layer, layerIndex) => {
         const translate = LAYER_TRANSLATORS[layer.layer_name];
-        const { nodes, initializers, outputName } = translate(layer, weights[layerIndex], biases[layerIndex], currentInputName, layerIndex);
+
+        if (weights[pointer].some(n => isNaN(n))) {
+            console.log(`${red}[ERROR]${reset} Parameter of Layer ${layer.layer_name} ${layerIndex} has NaNs`);
+            throw new Error("ERR_PARAM_HAS_NAN");
+        }
+
+        const { nodes, initializers, outputName } = translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex);
 
         nodes.forEach((n) => allNodes.push(makeNode(n)));
         initializers.forEach((t) => allInitializers.push(makeTensor(t.name, t.dims, t.data, t.dataType)));
 
         currentInputName = outputName;
+
+        if (layer.isParametric) {
+            pointer++;
+        }
     });
 
     const lastLayer = layers[layers.length - 1];
-    const lastOutputSize = lastLayer.weightShape ? lastLayer.weightShape[1] : flatSize(lastLayer, 'outputShape');
+    const graphOutputShape = lastLayer.outputShape && lastLayer.outputShape.length > 1
+        ? [1, ...lastLayer.outputShape]
+        : [1, lastLayer.weightShape ? lastLayer.weightShape[1] : flatSize(lastLayer, 'outputShape')];
 
     const graph = create(GraphProtoSchema, {
         name: filename,
         node: allNodes,
         initializer: allInitializers,
-        input: [makeValueInfo('input', [1, firstInputSize])],
-        output: [makeValueInfo(currentInputName, [1, lastOutputSize])],
+        input: [makeValueInfo('input', graphInputShape)],
+        output: [makeValueInfo(currentInputName, graphOutputShape)],
     });
 
     const model = create(ModelProtoSchema, {

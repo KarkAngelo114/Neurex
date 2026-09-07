@@ -401,7 +401,7 @@ const { Neurex, Layers, templates } = require('neurex');
 
     nrx.sequentialBuild([
         layer.embeddingLayer(5000, 50, 10),
-        ...templates.vanillaRNN(18, 'reu'), // uses 3 recurrent cells, each has 3 units be default and tanh activation. All uses `return_sequences = true`
+        ...templates.vanillaRNN(18, 'relu'), // uses 3 recurrent cells, each has 3 units be default and tanh activation. All uses `return_sequences = true`
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();
