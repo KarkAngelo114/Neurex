@@ -64,17 +64,20 @@ exports.VGG16 = () => {
 
 exports.LiteNet = () => {
     return [
-        layer.convolutionalLayer(8, 1, [3, 3], 'relu', 'same'),
+        layer.convolutionalLayer(8, 1, [3, 3], 'relu', 'same', false),
+        layer.layerNorm(),
         layer.maxPooling([2, 2], 2, 'valid'),
 
-        layer.convolutionalLayer(16, 1, [3, 3], 'relu', 'same'),
+        layer.convolutionalLayer(16, 1, [3, 3], 'relu', 'same', false),
+        layer.layerNorm(),
         layer.maxPooling([2, 2], 2, 'valid'),
 
-        layer.convolutionalLayer(32, 1, [3, 3], 'relu', 'same'),
+        layer.convolutionalLayer(32, 1, [3, 3], 'relu', 'same', false),
+        layer.layerNorm(),
         layer.maxPooling([2, 2], 2, 'valid'),
 
-        layer.connectedLayer(128),
-
+        layer.connectedLayer(128, 'relu', false),
+        layer.layerNorm(),
     ];
 }
 
