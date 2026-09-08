@@ -43,3 +43,22 @@ __kernel void adam(
     params[i] -= learning_rate * mHat / (sqrt(vHat) + epsilon);
 
 }
+
+
+__kernel void rmsprop(
+    __global float* params,
+    __global const float* grads,
+    __global float* sqAvg,
+    const float lr,
+    const float epsilon,
+    const float decayRate,
+    const int size
+) {
+    int i = get_global_id(0);
+
+    if (i >= size) return;
+
+    sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (grads[i] * grads[i]);
+    params[i] -= (lr / (sqrt(sqAvg[i]) + epsilon)) * grads[i];
+
+}
