@@ -76,9 +76,10 @@ const init = () => {
     }
 }
 
-const shutdown = () => {
+const shutdown = (modelID) => {
     if (BooleanAvailability().hasGPU) {
         addon.shutdown();
+        addon.ReleaseParams(modelID);
     }
 }
 
@@ -346,14 +347,17 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
 /**
  * 
  * "✅☑️"
- * @param {Float32Array} params - flattened array of parameters 
- * @param {Float32Array} grads - flattened array of grads 
- * @param {Float32Array} velocity - array of calculated velocity
- * @param {Number} learning_rate - learning rate value
- * @param {Number} momentum - momentum value
+ * @param {Float32Array} params flattened array of parameters 
+ * @param {Float32Array} grads flattened array of grads 
+ * @param {Float32Array} velocity array of calculated velocity
+ * @param {Number} learning_rate learning rate value
+ * @param {Number} momentum momentum value
+ * @param {number} pointer pointer value to access corresponding parameters based on Model ID
+ * @param {String} paramType specify if it's a weights or biases parameter
+ * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @returns {{params: Float32Array, velocity: Float32Array}}
  */
-const ApplySGD = (params, grads, velocity, lr, momentum = 0.9) => functions.SGD(params, grads, velocity, lr, momentum = 0.9);
+const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramType, modelID) => functions.SGD(params, grads, velocity, lr, momentum = 0.9, pointer, paramType, modelID);
 
 /**
  * 
@@ -367,9 +371,12 @@ const ApplySGD = (params, grads, velocity, lr, momentum = 0.9) => functions.SGD(
  * @param {Number} epsilon - epsilon constant value
  * @param {Number} beta1 - beta1 value
  * @param {Number} beta2 - beta2 value
+ * @param {number} pointer pointer value to access corresponding parameters based on Model ID
+ * @param {String} paramType specify if it's a weights or biases parameter
+ * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @returns 
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon);
+const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, pointer, paramType, modelID) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, pointer, paramType, modelID);
 
 /**
  * "✅☑️"
@@ -379,9 +386,12 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2)
  * @param {Number} lr learning rate value 
  * @param {Number} epsilon epsilon value
  * @param {Number} decayRate decay rate value
+ * @param {number} pointer pointer value to access corresponding parameters based on Model ID
+ * @param {String} paramType specify if it's a weights or biases parameter
+ * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @returns {{ params: Float32Array, sqAvg: Float32Array }}
  */
-const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate);
+const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID);
 
 /**
  * 

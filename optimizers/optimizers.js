@@ -8,7 +8,7 @@ module.exports = {
         // Name the inner function sgd
         return function SGD(data) {
 
-            const {params, grads, lr, state: state = {}, previousEpochLoss, current_epoch, batchSize} = data;
+            const {params, grads, lr, state: state = {}, pointer, paramType, modelID} = data;
 
             if (params.length !== grads.length) {
                 console.log(grads, params);
@@ -19,7 +19,7 @@ module.exports = {
                 state.v = new Float32Array(params.length);
             }
 
-            const res = ApplySGD(params, grads, state.v, lr, momentum);
+            const res = ApplySGD(params, grads, state.v, lr, momentum, pointer, paramType, modelID);
             state.v = res.velocity;
 
             return {
@@ -33,7 +33,7 @@ module.exports = {
         // Name the inner function adam
         return function Adam(data) {
 
-            const {params, grads, lr, state: state = {}, previousEpochLoss, current_epoch, batchSize} = data;
+            const {params, grads, lr, state: state = {}, pointer, paramType, modelID} = data;
 
             if (params.length !== grads.length) {
                 console.log(grads, params);
@@ -48,7 +48,7 @@ module.exports = {
 
             state.t += 1;
 
-            const res = ApplyAdam(params, grads, lr, state.m, state.v, state.t, epsilon, beta1, beta2);
+            const res = ApplyAdam(params, grads, lr, state.m, state.v, state.t, epsilon, beta1, beta2, pointer, paramType, modelID);
             state.m = res.m;
             state.v = res.v;
 
@@ -62,7 +62,7 @@ module.exports = {
     RMSprop: (decayRate = 0.9, epsilon = 1e-8) => {
         
         return function RMSprop(data) {
-            const {params, grads, lr, state: state ={}} = data;
+            const {params, grads, lr, state: state = {},  pointer, paramType, modelID} = data;
             
             if (params.length != grads.length) {
                 console.error(`${red}[ERROR]${reset} Parammeter and Gradient sizes does not match.`);
@@ -73,7 +73,7 @@ module.exports = {
                 state.sqAvg = new Float32Array(params.length);
             }
 
-            const res = ApplyRMSProp(params, grads, state.sqAvg, lr, epsilon, decayRate);
+            const res = ApplyRMSProp(params, grads, state.sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID);
             state.sqAvg = res.sqAvg;
             
             return {

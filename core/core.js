@@ -1053,7 +1053,7 @@ class Neurex {
      * 
      * @method releaseMem is use to clear global store memory. This also calls a native function to clear compiled clKernels, clBuffers, clDevices, platforms, contexts, and queues
      */
-    releaseMem = () => shutdown();
+    releaseMem = () => shutdown(this.modelID);
 
     /**
      * @method `setParams` uploads all parameters in the global store. This must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
@@ -1223,7 +1223,10 @@ class Neurex {
                 current_epoch: options?.current_epoch || 1,
                 batchSize: options?.batchSize || 1,
                 totalEpoch: options?.totalEpoch || 1,
-                trainingFeatureSize: options?.trainingFeatureSize || 1
+                trainingFeatureSize: options?.trainingFeatureSize || 1,
+                pointer: pointer,
+                paramType: "weights",
+                modelID: this.modelID
             });
 
             // update weights corresponding a parametric layer using a pointer
@@ -1244,7 +1247,10 @@ class Neurex {
                     current_epoch: options?.current_epoch || 1,
                     batchSize: options?.batchSize || 1,
                     totalEpoch: options?.totalEpoch || 1,
-                    trainingFeatureSize: options?.trainingFeatureSize || 1
+                    trainingFeatureSize: options?.trainingFeatureSize || 1,
+                    pointer: pointer,
+                    paramType: "biases",
+                    modelID: this.modelID
                 });
 
                 this.biases[pointer] = res2.params;
