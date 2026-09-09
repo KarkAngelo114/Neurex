@@ -476,6 +476,142 @@ const translateTransConv = (layer, weight, bias, inputName, layerIndex) => {
     return { nodes, initializers, outputName };
 }
 
+/**
+ * Translates an "Embedding Layer" (token lookup table) into ONNX's Gather op:
+ *
+ *   Cast(input -> INT64)                        -> ids
+ *   Gather(weight [vocabSize, embeddingDim], ids, axis=0) -> gather_out  [seqLen, embeddingDim]
+ *   Unsqueeze(gather_out, axes=[0,1])            -> unsqueeze_out       [1, 1, seqLen, embeddingDim]
+ *   Transpose(unsqueeze_out, perm=[0,1,3,2])     -> layer output        [1, 1, embeddingDim, seqLen]
+ *
+ * Neurex looks up rows directly by token id (see index.js:getEmbeddings), so
+ * Gather(axis=0) is a straight translation of that lookup - no MatMul needed.
+ * The final transpose matches embeddingLayer.js's initParams, which declares
+ * this layer's outputShape as [1, 1, embeddingDim, maxSequenceLength].
+ *
+ * Cast's `to` attribute needs the raw ONNX TensorProto_DataType enum value
+ * for INT64 (7), passed in by the caller (onnx-exporter.js) since this file
+ * stays protobuf/onnx-buf-agnostic - see the file header comment.
+ *
+ * @param {Object} layer - one entry from Neurex's `this.layers` (must be layer_name === "Embedding Layer")
+ * @param {Float32Array} weight - this layer's lookup table, flat, shape [vocabSize, embeddingDim]
+ * @param {Float32Array} bias - unused (embedding layers have no bias), present only for signature parity
+ * @param {String} inputName - the ONNX tensor name feeding into this layer (token id sequence)
+ * @param {Number} layerIndex - this layer's position in the stack, used to build unique, stable tensor/node names
+ * @param {Number} int64DataType - the ONNX TensorProto_DataType enum value for INT64, used in Cast's `to` attribute
+ * @returns {{nodes: Array<Object>, initializers: Array<Object>, outputName: String}}
+ */
+/**
+ * Translates an "Embedding Layer" (token lookup table) into ONNX's Gather op:
+ *
+ *   Cast(input -> INT64)                        -> ids
+ *   Gather(weight [vocabSize, embeddingDim], ids, axis=0) -> gather_out  [seqLen, embeddingDim]
+ *   Reshape(gather_out, [1, seqLen*embeddingDim])         -> layer output
+ *
+ * Neurex looks up rows directly by token id (see index.js:getEmbeddings), so
+ * Gather(axis=0) is a straight translation of that lookup - no MatMul needed.
+ *
+ * Flatten order is load-bearing, not cosmetic: index.js's getEmbeddings does
+ * `output.set(row, i * embeddingDim)` for each token i, i.e. token 0's full
+ * embeddingDim-length vector occupies indices [0, embeddingDim), token 1's
+ * occupies [embeddingDim, 2*embeddingDim), etc. - a row-major flatten of
+ * [seqLen, embeddingDim] (token-major, dim-fastest). That flat buffer is
+ * handed straight into the next layer's MatMul with no reshape in between
+ * (see connectedLayer.js's feedforward), so the ONNX graph must flatten in
+ * that exact same order or predictions will be silently wrong (no crash -
+ * MatMul happily runs on misordered data). Gather(axis=0) already produces
+ * [seqLen, embeddingDim] row-major, matching getEmbeddings exactly, so this
+ * flattens straight off the Gather output with no transpose needed.
+ *
+ * embeddingLayer.js's initParams reports this layer's logical outputShape
+ * as [1, 1, embeddingDim, maxSequenceLength] (dim, then seq) for display/
+ * shape-bookkeeping purposes (see core.js's #recalculateShape), but that is
+ * NOT the flatten order actually used by getEmbeddings - it's tracking
+ * (D, S) dimensions independently, not a physical memory layout. Trust
+ * getEmbeddings' actual .set() indexing over the reported shape order.
+ *
+ * Cast's `to` attribute needs the raw ONNX TensorProto_DataType enum value
+ * for INT64 (7), passed in by the caller (onnx-exporter.js) since this file
+ * stays protobuf/onnx-buf-agnostic - see the file header comment.
+ *
+ * @param {Object} layer - one entry from Neurex's `this.layers` (must be layer_name === "Embedding Layer")
+ * @param {Float32Array} weight - this layer's lookup table, flat, shape [vocabSize, embeddingDim]
+ * @param {Float32Array} bias - unused (embedding layers have no bias), present only for signature parity
+ * @param {String} inputName - the ONNX tensor name feeding into this layer (token id sequence)
+ * @param {Number} layerIndex - this layer's position in the stack, used to build unique, stable tensor/node names
+ * @param {Number} int64DataType - the ONNX TensorProto_DataType enum value for INT64, used in Cast's `to` attribute
+ * @returns {{nodes: Array<Object>, initializers: Array<Object>, outputName: String}}
+ */
+const translateEmbedding = (layer, weight, bias, inputName, layerIndex, int64DataType) => {
+    if (layer.layer_name !== 'Embedding Layer') {
+        throw new Error(`translateEmbedding received a layer of type "${layer.layer_name}", expected "Embedding Layer"`);
+    }
+
+    const vocabSize = layer.vocabSize;
+    const embeddingDim = layer.embeddingDim;
+    const seqLen = layer.maxSequenceLength;
+
+    if (!Number.isInteger(vocabSize) || vocabSize <= 0 || !Number.isInteger(embeddingDim) || embeddingDim <= 0 || !Number.isInteger(seqLen) || seqLen <= 0) {
+        throw new Error(`translateEmbedding: layer at index ${layerIndex} must have valid vocabSize, embeddingDim, and maxSequenceLength ([${vocabSize}, ${embeddingDim}, ${seqLen}])`);
+    }
+
+    const expectedLength = vocabSize * embeddingDim;
+    if (!weight || weight.length !== expectedLength) {
+        throw new Error(`translateEmbedding: layer at index ${layerIndex} has ${weight ? weight.length : 0} weights; expected ${expectedLength} from [vocabSize, embeddingDim] = [${vocabSize}, ${embeddingDim}]`);
+    }
+
+    if (!Number.isInteger(int64DataType)) {
+        throw new Error(`translateEmbedding: layer at index ${layerIndex} was not given a valid int64DataType enum value for Cast`);
+    }
+
+    const namePrefix = `layer${layerIndex}`;
+    const weightName = `${namePrefix}_embedding_table`;
+    const idsName = `${namePrefix}_ids`;
+    const gatherOutput = `${namePrefix}_gather_out`;
+    const flattenShapeName = `${namePrefix}_flatten_shape`;
+    const outputName = `${namePrefix}_embedding_out`;
+
+    const flatSize = seqLen * embeddingDim;
+
+    const initializers = [
+        { name: weightName, dims: [vocabSize, embeddingDim], data: weight },
+        { name: flattenShapeName, dims: [2], data: new BigInt64Array([1n, BigInt(flatSize)]), dataType: 'INT64' },
+    ];
+
+    const nodes = [
+        // graph input is declared FLOAT (see makeValueInfo), so cast token ids to INT64 for Gather
+        {
+            name: `${namePrefix}_cast_ids`,
+            opType: 'Cast',
+            inputs: [inputName],
+            outputs: [idsName],
+            attributes: [{ name: 'to', type: 'INT', value: BigInt(int64DataType) }],
+        },
+        // row lookup: [vocabSize, embeddingDim] gathered by [seqLen] ids -> [seqLen, embeddingDim],
+        // row-major, matching getEmbeddings' output.set(row, i * embeddingDim) exactly
+        {
+            name: `${namePrefix}_gather`,
+            opType: 'Gather',
+            inputs: [weightName, idsName],
+            outputs: [gatherOutput],
+            attributes: [{ name: 'axis', type: 'INT', value: 0n }],
+        },
+        // flatten to [1, seqLen*embeddingDim] so the next Connected Layer's MatMul is dimension-compatible
+        {
+            name: `${namePrefix}_flatten`,
+            opType: 'Reshape',
+            inputs: [gatherOutput, flattenShapeName],
+            outputs: [outputName],
+        },
+    ];
+
+    return {
+        nodes,
+        initializers,
+        outputName,
+    };
+}
+
 module.exports = {
     translateConnectedLayer,
     translateReshape,
@@ -483,5 +619,6 @@ module.exports = {
     translateMaxPool,
     translateConvLayer,
     translateTransConv,
+    translateEmbedding,
     ACTIVATION_TO_ONNX_OP,
 };

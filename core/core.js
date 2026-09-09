@@ -311,7 +311,7 @@ class Neurex {
             fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
         }
 
-        await exportToOnnx(fileName, this.layers, this.weights, this.biases);
+        await exportToOnnx(fileName, this.layers, this.weights, this.biases, this.modelID);
 
     }
 

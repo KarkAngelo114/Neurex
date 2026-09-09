@@ -1,9 +1,9 @@
-const { green, reset, red } = require('../../../color-code')
+const { green, reset, red, yellow } = require('../../../color-code')
 const fs = require('fs');
 const path = require('path');
-const { translateConnectedLayer, translateReshape, translateLayerNorm, translateConvLayer, translateMaxPool, translateTransConv } = require('./translators');
+const { translateConnectedLayer, translateReshape, translateLayerNorm, translateConvLayer, translateMaxPool, translateTransConv, translateEmbedding } = require('./translators');
 
-const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization', "Convolutional Layer", "Max Pooling", "Trans Convolution"]);
+const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization', "Convolutional Layer", "Max Pooling", "Trans Convolution", "Embedding Layer"]);
 
 // Maps a layer's layer_name to the translate* function that knows how to
 // turn it into ONNX node/initializer descriptors. Every entry here must
@@ -15,6 +15,7 @@ const LAYER_TRANSLATORS = {
     'Convolutional Layer': translateConvLayer,
     'Max Pooling': translateMaxPool,
     'Trans Convolution': translateTransConv,
+    'Embedding Layer':translateEmbedding
 };
 
 /**
@@ -33,7 +34,7 @@ const toRawData = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLe
  * @param {Array<Float32Array>} weights  Neurex's this.weights
  * @param {Array<Float32Array>} biases   Neurex's this.biases
  */
-const exportToOnnx = async (filename, layers, weights, biases) => {
+const exportToOnnx = async (filename, layers, weights, biases, modelID) => {
     if (!layers || layers.length === 0) {
         throw new Error('exportToOnnx: no layers to export');
     }
@@ -42,6 +43,8 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
     if (unsupported) {
         throw new Error(`exportToOnnx: layer type "${unsupported.layer_name}" is not supported yet. Only ${[...SUPPORTED_LAYER_TYPES].join(', ')} can be exported to ONNX right now.`);
     }
+
+    console.log(`${yellow}[INFO]${reset} Saving model ${yellow}${modelID}${reset} ("${filename}")`);
     
     const { create, toBinary } = await import('@bufbuild/protobuf');
     const {
@@ -150,10 +153,17 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
     };
 
     const firstLayer = layers[0];
+    // Embedding Layer's graph input is a [1, 1, maxSequenceLength] sequence
+    // of token ids (see embeddingLayer.js's initParams -> overrides.input_shape),
+    // not the [1, N] feature vector every other layer type expects.
     const firstInputSize = firstLayer.layer_name === 'Connected Layer'
         ? firstLayer.weightShape[0]
+        : firstLayer.layer_name === 'Embedding Layer'
+        ? firstLayer.maxSequenceLength
         : flatSize(firstLayer, 'inputShape');
-    const graphInputShape = firstLayer.inputShape && firstLayer.inputShape.length > 1
+    const graphInputShape = firstLayer.layer_name === 'Embedding Layer'
+        ? [1, 1, firstInputSize]
+        : firstLayer.inputShape && firstLayer.inputShape.length > 1
         ? [1, ...firstLayer.inputShape]
         : [1, firstInputSize];
     let currentInputName = 'input';
@@ -162,12 +172,16 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
     layers.forEach((layer, layerIndex) => {
         const translate = LAYER_TRANSLATORS[layer.layer_name];
 
+        console.log(`${yellow}[INfo]${reset} translating ${layer.layer_name}. Input size: [${layer.inputShape}] | Output size: [${layer.outputShape}]`);
+
         if (weights[pointer].some(n => isNaN(n))) {
             console.log(`${red}[ERROR]${reset} Parameter of Layer ${layer.layer_name} ${layerIndex} has NaNs`);
             throw new Error("ERR_PARAM_HAS_NAN");
         }
 
-        const { nodes, initializers, outputName } = translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex);
+        const { nodes, initializers, outputName } = layer.layer_name === 'Embedding Layer'
+            ? translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex, TensorProto_DataType.INT64)
+            : translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex);
 
         nodes.forEach((n) => allNodes.push(makeNode(n)));
         initializers.forEach((t) => allInitializers.push(makeTensor(t.name, t.dims, t.data, t.dataType)));
@@ -184,6 +198,7 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
         ? [1, ...lastLayer.outputShape]
         : [1, lastLayer.weightShape ? lastLayer.weightShape[1] : flatSize(lastLayer, 'outputShape')];
 
+    console.log(`${yellow}[INFO]${reset} Constructing ONNX computational graph`);
     const graph = create(GraphProtoSchema, {
         name: filename,
         node: allNodes,
@@ -199,8 +214,10 @@ const exportToOnnx = async (filename, layers, weights, biases) => {
         opsetImport: [create(OperatorSetIdProtoSchema, { domain: '', version: BigInt(21) })],
     });
 
+    
     const bytes = toBinary(ModelProtoSchema, model);
     const outputPath = path.join(process.cwd(), `${filename}.onnx`);
+    console.log(`${yellow}[INFO]${reset} Saving to ${yellow}${outputPath}${reset}`);
     fs.writeFileSync(outputPath, bytes);
 
     console.log(`${green}[SUCCESS]${reset} Model ${filename}.onnx has been saved`)
