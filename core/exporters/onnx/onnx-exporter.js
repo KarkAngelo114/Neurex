@@ -1,9 +1,9 @@
 const { green, reset, red } = require('../../../color-code')
 const fs = require('fs');
 const path = require('path');
-const { translateConnectedLayer, translateReshape, translateLayerNorm, translateConvLayer, translateMaxPool } = require('./translators');
+const { translateConnectedLayer, translateReshape, translateLayerNorm, translateConvLayer, translateMaxPool, translateTransConv } = require('./translators');
 
-const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization', "Convolutional Layer", "Max Pooling"]);
+const SUPPORTED_LAYER_TYPES = new Set(['Connected Layer', 'Reshape', 'Layer Normalization', "Convolutional Layer", "Max Pooling", "Trans Convolution"]);
 
 // Maps a layer's layer_name to the translate* function that knows how to
 // turn it into ONNX node/initializer descriptors. Every entry here must
@@ -13,7 +13,8 @@ const LAYER_TRANSLATORS = {
     'Reshape': translateReshape,
     'Layer Normalization': translateLayerNorm,
     'Convolutional Layer': translateConvLayer,
-    'Max Pooling': translateMaxPool
+    'Max Pooling': translateMaxPool,
+    'Trans Convolution': translateTransConv,
 };
 
 /**

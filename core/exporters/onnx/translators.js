@@ -52,6 +52,29 @@ const toOnnxConvWeights = (weight, [filters, kernelHeight, kernelWidth, inputCha
     return onnxWeight;
 };
 
+// Neurex stores kernels as [filter, kernelHeight, kernelWidth, inputChannel].
+// ONNX ConvTranspose initializers use [inputChannel, filter, kernelHeight, kernelWidth].
+const toOnnxConvTransposeWeights = (weight, [filters, kernelHeight, kernelWidth, inputChannels], layerIndex) => {
+    const expectedLength = filters * kernelHeight * kernelWidth * inputChannels;
+    if (!weight || weight.length !== expectedLength) {
+        throw new Error(`translateTransConv: layer at index ${layerIndex} has ${weight ? weight.length : 0} weights; expected ${expectedLength} from weightShape [${filters}, ${kernelHeight}, ${kernelWidth}, ${inputChannels}]`);
+    }
+
+    const onnxWeight = new Float32Array(expectedLength);
+    for (let filter = 0; filter < filters; filter++) {
+        for (let channel = 0; channel < inputChannels; channel++) {
+            for (let y = 0; y < kernelHeight; y++) {
+                for (let x = 0; x < kernelWidth; x++) {
+                    const neurexIndex = ((filter * kernelHeight + y) * kernelWidth + x) * inputChannels + channel;
+                    const onnxIndex = ((channel * filters + filter) * kernelHeight + y) * kernelWidth + x;
+                    onnxWeight[onnxIndex] = weight[neurexIndex];
+                }
+            }
+        }
+    }
+    return onnxWeight;
+};
+
 /**
  * Translates a single "Connected Layer" (dense/fully-connected layer) into
  * the ONNX node + initializer descriptors that represent it:
@@ -367,11 +390,98 @@ const translateConvLayer = (layer, weight, bias, inputName, layerIndex) => {
     return { nodes, initializers, outputName };
 };
 
+
+const translateTransConv = (layer, weight, bias, inputName, layerIndex) => {
+    const weightShape = layer.weightShape;
+    const [filters, kernelHeight, kernelWidth, inputChannels] = weightShape;
+    const stride = layer.strides || 1;
+    const padding = (layer.padding || 'same').toLowerCase();
+    const useBias = layer.useBias ?? true;
+
+    if (layer.layer_name !== 'Trans Convolution') {
+        throw new Error(`translateTransConv received a layer of type "${layer.layer_name}", expected "Trans Convolution"`);
+    }
+
+    if (!weightShape || weightShape.length !== 4 || weightShape.some((value) => !Number.isInteger(value) || value <= 0)) {
+        throw new Error(`translateTransConv: layer at index ${layerIndex} is missing a valid weightShape [filters, kernelHeight, kernelWidth, inputChannels]`);
+    }
+    
+    const [configuredKernelHeight, configuredKernelWidth] = normalizeSpatialValue(layer.kernel_size, 'kernel_size', layerIndex);
+    if (configuredKernelHeight !== kernelHeight || configuredKernelWidth !== kernelWidth) {
+        throw new Error(`translateTransConv: kernel_size [${layer.kernel_size}] does not match weightShape [${weightShape}] at layer index ${layerIndex}`);
+    }
+
+    
+    if (!Number.isInteger(stride) || stride <= 0) {
+        throw new Error(`translateTransConv: layer at index ${layerIndex} must have a positive integer stride`);
+    }
+    
+    if (padding !== 'same' && padding !== 'valid') {
+        throw new Error(`translateTransConv: unsupported padding "${layer.padding}" at layer index ${layerIndex}`);
+    }
+
+    if (useBias && (!bias || bias.length !== filters)) {
+        throw new Error(`translateTransConv: layer at index ${layerIndex} has ${bias ? bias.length : 0} biases; expected ${filters}`);
+    }
+
+    const namePrefix = `layer${layerIndex}`;
+    const weightName = `${namePrefix}_conv_weight`;
+    const biasName = `${namePrefix}_conv_bias`;
+    const nchwInput = `${namePrefix}_nchw_input`;
+    const nchwOutput = `${namePrefix}_nchw_out`;
+    const nhwcOutput = `${namePrefix}_conv_out`;
+
+    const initializers = [
+        { name: weightName, dims: [inputChannels, filters, kernelHeight, kernelWidth], data: toOnnxConvTransposeWeights(weight, weightShape, layerIndex) },
+    ];
+
+    const convInputs = [nchwInput, weightName];
+    if (useBias) {
+        initializers.push({ name: biasName, dims: [filters], data: bias });
+        convInputs.push(biasName);
+    }
+
+    const nodes = [
+        spatialTranspose(`${namePrefix}_to_nchw`, inputName, nchwInput, [0, 3, 1, 2]),
+        {
+            name: `${namePrefix}_conv`,
+            opType: 'ConvTranspose',
+            inputs: convInputs,
+            outputs: [nchwOutput],
+            attributes: [
+                { name: 'kernel_shape', type: 'INTS', value: [BigInt(kernelHeight), BigInt(kernelWidth)] },
+                { name: 'strides', type: 'INTS', value: [BigInt(stride), BigInt(stride)] },
+                { name: 'auto_pad', type: 'STRING', value: padding === 'same' ? 'SAME_UPPER' : 'VALID' },
+            ],
+        },
+        spatialTranspose(`${namePrefix}_to_nhwc`, nchwOutput, nhwcOutput, [0, 2, 3, 1]),
+    ];
+
+    const activationName = layer.activation_function ? layer.activation_function.name : 'linear';
+    const activationOp = ACTIVATION_TO_ONNX_OP[activationName];
+    if (activationOp === undefined) {
+        throw new Error(`translateTransConv: activation "${activationName}" (layer index ${layerIndex}) has no ONNX equivalent registered in ACTIVATION_TO_ONNX_OP`);
+    }
+    let outputName = nhwcOutput;
+    if (activationOp !== null) {
+        outputName = `${namePrefix}_activation_out`;
+        nodes.push({
+            name: `${namePrefix}_${activationName}`,
+            opType: activationOp,
+            inputs: [nhwcOutput],
+            outputs: [outputName],
+        });
+    }
+
+    return { nodes, initializers, outputName };
+}
+
 module.exports = {
     translateConnectedLayer,
     translateReshape,
     translateLayerNorm,
     translateMaxPool,
     translateConvLayer,
+    translateTransConv,
     ACTIVATION_TO_ONNX_OP,
 };

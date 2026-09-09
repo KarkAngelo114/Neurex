@@ -37,7 +37,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     const labels = []; // folder names where the image belongs to.
 
     try {
-        console.log(`\n${green}[Task]${reset} Loading datasets from "${targetDir}/"`)
+        console.log(`\n${green}[TASK]${reset} Loading datasets from "${targetDir}/"`)
         const items = await fs.readdir(targetDir);
 
         // Only collect subdirectories (class names)
