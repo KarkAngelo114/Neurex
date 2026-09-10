@@ -22,7 +22,7 @@ npm install neurex
 Checkout the documentation for full API reference, live demos, and some starter examples [here](https://neurex-documentation.vercel.app/).
 
 # Neurex
-Neurex is a Javascript-based, GPU-Accelerated, deep learning library for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
+Neurex is a Javascript-based, deep learning for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
 
 1. 🧠 Easy model building through sequential stacking ✅
 2. 🛠️ Both CommonJS and ES module importing ✅
@@ -133,7 +133,7 @@ For more info about layers, check the official [documentation](https://neurex-do
 Here's an example on how you can use `Neurex` to train on XOR problem.
 
 ```Javascript
-const {Neurex, Layers, Adam, SGD, stepDecay, modelVisualizer, lossVisualizer, lossLandscapeVisualizer} = require('neurex');
+const {Neurex, Layers, optimizers, schedulers, gradientNormalizers, modelVisualizer, lossVisualizer, lossLandscapeVisualizer} = require('neurex');
 
 const nrx = new Neurex();
 const layer = new Layers();
@@ -154,9 +154,9 @@ const layer = new Layers();
         [0]
     ];
 
-    // configurations
+    // configurations.  (Note: most of these options are just optional. This is to show the full option object only)
     nrx.configure({
-        optimizer: Adam(), // use built-in optimizers or plug your own optimizer function here!
+        optimizer: optimizers.Adam(), // use built-in optimizers or plug your own optimizer function here!
         learning_rate: 0.001, // learning rate value
         mode: "cpu", // "gpu" or "auto"
         onFLoat32Module: true, // if set to true, the underlying core engine will use pure JS ops and no need to use "mode"
@@ -168,12 +168,16 @@ const layer = new Layers();
         ],
 
         onChange_optimizer: { // on change optimizer mechanism
-            optimizer: SGD(), // optimizer to use. Use built-in optimizers or plug your own optimizer function here!
+            optimizer: optimizers.SGD(), // optimizer to use. Use built-in optimizers or plug your own optimizer function here!
             targetEpoch: 50 // target epoch
         },
 
-        lr_scheduler: stepDecay(), // built-in learning rate schedulers or plug your own schedulers
-        clip_norm_value: 5.0 // clip normalization value for gradient clipping
+        lr_scheduler: schedulers.stepDecay(), // built-in learning rate schedulers or plug your own schedulers
+
+        // gradient normalizers
+        gradient_normalizers: [
+            gradientNormalizers.clipGradient()
+        ]
     });
 
 
@@ -211,11 +215,11 @@ const layer = new Layers();
 ```
 
 ## Write your own training loop (For Advance Users)
-While `train()` existed as a high-level API for convenience, `Neurex` still exposed low-level primitive APIs that you can use for writing custom training loops, offering full control of how you will train your model. By using `feedforward()`, `getOutputlayerDelta()`, `backpropagation()`, and `updateParams()`, you can create your own training loop and own training rules.
+While `train()` existed as a high-level API for convenience, `Neurex` exposes low-level primitive APIs that you can be use for writing custom training loops, offering full control of how you will train your model. By using `feedforward()`, `getOutputlayerDelta()`, `backpropagation()`, and `updateParams()`, you can create your own training loop and own training rules.
 
 ```JavaScript
 
-const {Neurex, Layers, Adam} = require('neurex');
+const {Neurex, Layers} = require('neurex');
 
 const nrx = new Neurex();
 const layer = new Layers();

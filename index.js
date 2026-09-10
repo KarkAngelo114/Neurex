@@ -20,13 +20,14 @@ const { load_images_from_directory, load_single_image, load_multiple_images } = 
 const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, element_wise_sub, scaleDiff  } = require('./core/bindings/float32Ops');
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
-const { simpleNeuralNetwork, simpleCNN, VGG16, LiteNet, AutoEncoder, vanillaRNN } = require('./applications/templates');
+const { simpleNeuralNetwork, simpleCNN, vanillaRNN } = require('./applications/templates');
 const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam, RMSprop } = require('./optimizers');
 const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
 const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLandscapeVisualizer');
 const { modelVisualizer } = require('./applications/visualizer/modelVisualizer');
+const { clipGradient } = require('./normalizers');
 
 
 
@@ -36,44 +37,54 @@ module.exports= {
     MinMaxScaler,
     Annotator,
     Layers,
-    OneHotEncoded,
-    IntegerLabeling,
-    BinaryLabeling,
-    split_dataset,
-    RegressionMetrics,
-    ClassificationMetrics,
-    load_images_from_directory,
-    element_wise_mul,
-    element_wise_sub,
-    scaleDiff,
-    load_single_image,
-    load_multiple_images,
-    relu,
-    sigmoid,
-    tanh,
-    softmax,
-    linear,
     detectGPU,
-    tokenize,
-    buildWord2Id,
-    buildVocab,
-    Encode,
-    stepDecay,
-    exponentialDecay,
-    cosineAnnealing,
-    reduceOnPlateau,
-    SGD,
-    Adam,
-    RMSprop,
     lossVisualizer,
     lossLandscapeVisualizer,
     modelVisualizer,
     templates: {
         simpleNeuralNetwork,
         simpleCNN,
-        VGG16,
-        LiteNet,
         vanillaRNN,
-        AutoEncoder
+    },
+    gradientNormalizers: {
+        clipGradient
+    },
+    optimizers: {
+        SGD,
+        Adam,
+        RMSprop,
+    },
+    schedulers: {
+        stepDecay,
+        exponentialDecay,
+        cosineAnnealing,
+        reduceOnPlateau,
+    },
+    metrics: {
+        RegressionMetrics,
+        ClassificationMetrics,
+    },
+    preprocesors: {
+        OneHotEncoded,
+        IntegerLabeling,
+        BinaryLabeling,
+        split_dataset,
+        load_images_from_directory,
+        load_single_image,
+        load_multiple_images,
+        tokenize,
+        buildWord2Id,
+        buildVocab,
+        Encode,
+    },
+    math: {
+        element_wise_mul,
+        element_wise_sub,
+        scaleDiff,
+        relu,
+        sigmoid,
+        tanh,
+        softmax,
+        linear,
     }
 }

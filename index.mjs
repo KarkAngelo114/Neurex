@@ -1,42 +1,20 @@
 import pkg from './index.js';
 
 export const {
-    Neurex,
-    CsvDataHandler,
-    MinMaxScaler,
-    Annotator,
-    Layers,
-    OneHotEncoded,
-    IntegerLabeling,
-    BinaryLabeling,
-    split_dataset,
-    RegressionMetrics,
-    ClassificationMetrics,
-    load_images_from_directory,
-    load_single_image,
-    load_multiple_images,
-    element_wise_mul,
-    element_wise_sub,
-    scaleDiff,
-    relu,
-    sigmoid,
-    tanh,
-    softmax,
-    linear,
+    Neurex, // neurex class
+    CsvDataHandler, // csv data loader class
+    MinMaxScaler, // min-max scaler class
+    Annotator, // annotator class
+    Layers,  // layer class
+    metrics, // metrics namespace
     detectGPU,
-    templates,
-    tokenize,
-    buildWord2Id,
-    buildVocab,
-    Encode,
-    stepDecay,
-    exponentialDecay,
-    cosineAnnealing,
-    reduceOnPlateau,
+    templates, // templates namespace
+    gradientNormalizers, // gradient normalizers namespace
+    schedulers, // schedulers namespace
     lossLandscapeVisualizer,
     lossVisualizer,
     modelVisualizer,
-    Adam,
-    SGD,
-    RMSprop
+    optimizers, // optimizers namespace
+    preprocesors, // preprocessors namespace
+    math, // math namespace
 } = pkg;

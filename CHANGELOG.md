@@ -20,6 +20,18 @@
 - arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it's now `connectedLayer(layer_size, activation_func)`. See the updated the documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 - when using `load_images_from_directory()`, you can pass a string value in the `label_mode` argument. The label mode to use depends on the loss function you will going to use for training. See the updated documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#load_images_from_directory).
 - in the `optimizer` property when setting config, it can only now accepts factory functions rather than string name of an optimizer allowing you to plug your own custom optimizer.
+- functions exported are now grouped based on their purpose under specific namespaces. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+
+| <p style = "text-align: center">Namespace</p> | <p style = "text-align: center">Contains</p> |
+| :--- | :--- |
+| `templates` | `simpleNeuralNetwork`, `simpleCNN`, and `vanillaRNN` |
+|`gradientNormalizers`|`clipGradient`|
+|`optimizers`|`Adam`, `SGD`, and `RMSprop` |
+|`schedulers`|`stepDecay`, `exponentialDecay`, `cosineAnnealing`, and `reduceOnPlateau`|
+|`metrics`|`RegressionMetrics` and  `ClassificationMetrics`|
+|`preprocesors`|`OneHotEncoded`, `IntegerLabeling`, `BinaryLabeling`, `split_dataset`, `load_images_from_directory`, `load_single_image`, `load_multiple_images`, `tokenize`, `buildWord2Id`, `buildVocab`, and  `Encode`|
+|`math`|`element_wise_mul`, `element_wise_sub`, `scaleDiff`, `relu`, `sigmoid`, `tanh`, `softmax`, and `linear`|
+
 
 ### Breaking Changes
 - because the `optimizer` property when setting config can only now accepts factory functions rather than string name of an optimizer, any training scripts that uses the same config will break.

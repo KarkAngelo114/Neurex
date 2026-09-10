@@ -228,12 +228,17 @@ declare module 'neurex' {
         mode?: "cpu" | "gpu" | "auto";
         /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
         lr_scheduler?: (params: any) => Function;
-        /** A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `1.0`*/
-        clip_norm_value?: Number;
         /** on change config to automate changing of optimizer mid-training.*/
         onChange_optimizer?: onChangeConfig;
         /** visualizer plugin array. Accepts plugin factory functions */
         visualizerPlugins?: pluginFactoryObject[];
+        /** array of gradient normalizer functions. You can import built-in ones like `clipGradient()` from `gradientNormalizers` namespace.
+         * @example
+         * const { gradientNormalizers } = require("neurex");
+         *
+         *
+         */
+        gradient_normalizers?: Function[]
     }
 
     export interface updateParamsOptions {
@@ -251,6 +256,23 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function
 
 
+    }
+
+    /**
+     * 
+     * Automate annotations with `Annotator` module
+     *
+     * @class Annotator
+     */
+    export interface AnnotatorConfig {
+        /** Model file to be loaded */
+        model_path?: String;
+        /** Target directory of images */
+        target_directory_path?: String;
+        /** Array of class names */
+        classes?: Array<String>;
+        /** Load a CSV file */
+        CSV_file_name?: String;
     }
 
     /**
@@ -382,9 +404,9 @@ declare module 'neurex' {
         *
         * model.sequentialBuild([
         *    layer.inputShape({features: 4}),
-        *    layer.connectedLayer("relu", 3),
-        *    layer.connectedLayer("relu", 3),
-        *    layer.connectedLayer("softmax", 2)
+        *    layer.connectedLayer(3), //  layer size of 3, uses "relu" activation function as default
+        *    layer.connectedLayer(3),
+        *    layer.connectedLayer(2, "softmax")
         * ]);
         *
         * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
@@ -450,139 +472,6 @@ declare module 'neurex' {
         */
         getOutputLayerDelta(predictions: Float32Array, actuals: Number[], zs: Float32Array[], loss: string): {loss: number, outputLayerDelta: Float32Array};
     }
-
-    /**
-    * Splits a dataset into training and testing sets.
-    * @async
-    * @function split_dataset
-    * @param {Array<Array<number>>} X - array of features (input data)
-    * @param {Array<number>} Y - array of labels (target data)
-    * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
-    * @returns {object} {X_train, Y_train, X_test, Y_test}
-    */
-    export function split_dataset(X: number[][], Y: number[], split_ratio: number): {
-        X_train: any[][], 
-        Y_train: any[][], 
-        X_test: any[][], 
-        Y_test: any[][]
-    };
-
-    /**
-    * Computes evaluation metrics for regression tasks given test features and labels.
-    *
-    * @function RegressionMetrics
-    * @param {Array<Array<number>>} predictions The input features for the test set.
-    * @param {Array<number>} actuals The true target values for the test set.
-    * @param {Boolean} showOutputs shows the outputs. You can disable it by passing a boolean value. Default is `true`
-    * @throws {Error} when textX and testY are not provided
-    */
-    export function RegressionMetrics(predictions: number[][], actuals: number[], showOutputs: Boolean): void;
-
-    /**
-    *
-    * Computes evaluation metrics for classification tasks given predicted values and true labels.
-    *
-    * @function ClassificationMetrics
-    * @param {Array<Array<number>>} predictions The predicted class labels or probabilities for the test set.
-    * @param {Array<Array<number>>} actuals The true target class labels for the test set.
-    * @param {string} classificationType binary, categorical, or sparse_categorical
-    * @param {Array<any>} labels add labels that represents a class
-    * @param {Boolean} showOutputs shows the misclassified outputs. You can disable it by passing a boolean value. Default is `true`
-    */
-    export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[], showOutputs: Boolean): void;
-
-    /**
-    * Converts a column of categorical labels into one-hot encoded vectors.
-    * @async
-    * @function OneHotEncoded
-    * @param {Array<Array<any>>} data - An array where each inner array represents a row and contains a single categorical label.
-    * @returns {Array<Array<Number>>} Returns One-hot encoded labels, suitable for categorical classification.
-    * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
-    */
-    export function OneHotEncoded(data: any[][]): number[][];
-
-    /**
-    * Converts labels that cannot be converted to interger labels (example: words). If your labels already integer-labeled (ex: 0, 1, 2, 3, ...), no need to use this function
-    * @async
-    * @function IntegerLabeling
-    * @param {Array<Array<any>>} data - column of your dataset that can be use as categorical labeling 
-    * @returns {Array<Array<Number>>} returns Intger-encoded labels. Which can be use for categorical classification, particularly when calculating sparse_categorical_cross_entropy
-    * @throws {Error} - when no data is provided
-    */
-    export function IntegerLabeling(data: any[][]): number[][];
-
-    /**
-    * Converts labels that cannot be converted to binary labels (example: words). If your labels already 0s and 1s, no need to use this function
-    * @async
-    * @function BinaryLabeling
-    * @param {Array<Array<any>>} data - column of your dataset that can be use as binary labeling (0 or 1)
-    * @returns {Array<Array<Number>>} returns labels which contains 1 vector labels of 1s and 0s. Can be use for Binary classifcation
-    * @throws {Error} - when no data is provided or there are more than two classes
-    */
-    export function BinaryLabeling(data: any[][]): number[][];
-
-    /**
-    * @async
-    * @function load_images_from_directory
-    * @param {String} targetDir target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
-    * @param {Array<Number>} resize an array containing the values for resizing [H, W].
-    * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
-    * @param {String} label_mode specifies how the target labels are encoded and shaped. It lets you match your label format directly to your loss function. Mode: `binary`, `categorical`, `sparse`
-    * @param {Number} limit_per_class limit the number of items per class
-    * @returns {Object}
-    */
-    export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, label_mode: String, limit_per_class: number): { datasets: Array<Float32Array>, targetY: Array<Array<Number>>, labels: Array<Array<String>>, classes: Array<String>};
-
-    /**
-    * @async
-    * @function load_single_image This function allows you to load a single image by specifying it's path
-    * @param {String} file_path path to the image file (can be nested anywhere)
-    * @param {Array<Number>} resize resize the image to [H, W]
-    * @param {String} pixelFormat grayscale, rgb, or rgba.
-    * @param {Boolean} showLog when set to `true`, it will show the output logs after an image is loaded. Default value is `false`
-    * @returns {{datasets: Array<Float32Array>, shape: Array<Number>, filename: filename}}
-    */
-    export function load_single_image(file_path: String, resize: Number[], pixelFormat: String, showLog: Boolean): {datasets: Array<Float32Array>, shape: Array<Number>, filename: String};
-
-    /**
-    * @async
-    * @function load_multiple_images allows you to load a multiple images at once by specifying the folder that contains images
-    * @param {String} file_path path to the image file (can be nested anywhere)
-    * @param {Array<Number>} resize resize the image to [H, W]
-    * @param {String} pixelFormat grayscale, rgb, or rgba.
-    * @returns {{datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>}}
-    */
-    export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
-
-    /**
-     * @function tokenize allows you to tokenize a sentence
-     * @param {String} sentence input sentence
-     * @returns {Array<String>} array of tokenized words 
-     */
-    export function tokenize(sentence: String): String[];
-
-    /**
-     * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
-     * @param sentences an array of sentences or large corpus
-     * @returns {Array<String>} an array of tokenized words
-     */
-    export function buildVocab(sentences: Array<String>): Array<String>;
-
-    /**
-     * @function buildWord2Id - this function assign unique token IDs to tokenized words. These token IDs will be use to `Encode` input tokenized words.
-     * @param {Array<String>} vocab tokenized words
-     * @returns {Object} an object containing key value pairs. Each key (words) has corresponding value (token ID)
-     */
-    export function buildWord2Id(vocab: String[]): Object;
-
-    /**
-     * @function Encode tokenize a sentence and assign token IDs returning an array of token IDs.
-     * @param {String} sentence input sentence or prompt
-     * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on the words in `buildWord2Id_output`
-     * @param {Number} max_length The length of the encoded token containing token IDs.
-     * @returns {Array<Number>} an array of token IDs to be use for token embeddings in the embedding layer 
-     */
-    export function Encode(sentence: String, buildWord2Id_output: Object, max_length: Number): Array<Number>;
 
     /**
      * The `Layers` class acts as a factory for generating neural network layer configurations.
@@ -723,24 +612,6 @@ declare module 'neurex' {
         layerNorm(epsilon: number): object;
     }
 
-    /**
-     * 
-     * Automate annotations with `Annotator` module
-     *
-     * @class Annotator
-     */
-
-    export interface AnnotatorConfig {
-        /** Model file to be loaded */
-        model_path?: String;
-        /** Target directory of images */
-        target_directory_path?: String;
-        /** Array of class names */
-        classes?: Array<String>;
-        /** Load a CSV file */
-        CSV_file_name?: String;
-    }
-
     export class Annotator {
         /**
          * @method configure()
@@ -766,82 +637,228 @@ declare module 'neurex' {
         image_classify(): void;
     }
 
-    // ================ Math Ops ======================= //
-
     /**
-    * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
-    * @param {Array<Number>} flat_arr_1 a flat array input
-    * @param {Array<Number>} flat_arr_2  a flat array input
-    * @returns {Float32Array} A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
-    * @throws an error will occured if both array are not equal in length
-    */
-    export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
-
-
-    /**
-    * @function element_wise_sub use to subtract elements inside both arrays. Requires both arrays has same length;
-    * @param {Array<Number>} flat_arr_1 a flat array input
-    * @param {Array<Number>} flat_arr_2 a flat array input
-    * @returns {Float32Array} A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
-    * @throws an error will occured if both array are not equal in length
-    */
-    export function element_wise_sub(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
-
-    /**
-     * @function scaleDiff a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
-     * @param arr1 a flat array input
-     * @param arr2 a flat array input
-     * @param arr3 a flat array input
-     * @returns {Float32Array} A flat array output after performing `(arr1[i] - arr2[i]) * arr3[i]`
-     * @throws an error will occured if both array are not equal in length
+     * built-in metric functions under `metrics` namespace. Consists of built-functions used for model evaluation like the `RegressionMetrics` and `ClassificationMetrics`
      */
-    export function scaleDiff(arr1: Number[], arr2: Number[], arr3: Number[]): Float32Array;
+    export namespace metrics {
+        /**
+        * Computes evaluation metrics for regression tasks given test features and labels.
+        *
+        * @function RegressionMetrics
+        * @param {Array<Array<number>>} predictions The input features for the test set.
+        * @param {Array<number>} actuals The true target values for the test set.
+        * @param {Boolean} showOutputs shows the outputs. You can disable it by passing a boolean value. Default is `true`
+        * @throws {Error} when textX and testY are not provided
+        */
+        export function RegressionMetrics(predictions: number[][], actuals: number[], showOutputs: Boolean): void;
+
+        /**
+        *
+        * Computes evaluation metrics for classification tasks given predicted values and true labels.
+        *
+        * @function ClassificationMetrics
+        * @param {Array<Array<number>>} predictions The predicted class labels or probabilities for the test set.
+        * @param {Array<Array<number>>} actuals The true target class labels for the test set.
+        * @param {string} classificationType binary, categorical, or sparse_categorical
+        * @param {Array<any>} labels add labels that represents a class
+        * @param {Boolean} showOutputs shows the misclassified outputs. You can disable it by passing a boolean value. Default is `true`
+        */
+        export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[], showOutputs: Boolean): void;
+    }
 
     /**
-     * @function relu
-     * @param {Float32Array} arr Float32Array values
-     * @returns {Float32Array} relu output
-     *
-     * ReLu (Rectified Linear Unit) is an activation function where all the values are passed the same and zeroed out negative values
+     * preprocessor functions namespace. Consists of built-in functions used for preprocessing data like `split_dataset`, `OneHotEncoded`, `IntegerLabeling`
+     *  `BinaryLabeling`, `load_images_from_directory`, `load_single_image`, `load_multiple_images`, `tokenize`, `buildVocab`, `buildWord2Id`, and `Encode`
      */
-    export function relu(arr: Float32Array): Float32Array;
+    export namespace preprocesors {
+        /**
+        * Splits a dataset into training and testing sets.
+        * @async
+        * @function split_dataset
+        * @param {Array<Array<number>>} X - array of features (input data)
+        * @param {Array<number>} Y - array of labels (target data)
+        * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
+        * @returns {object} {X_train, Y_train, X_test, Y_test}
+        */
+        export function split_dataset(X: number[][], Y: number[], split_ratio: number): {
+            X_train: any[][], 
+            Y_train: any[][], 
+            X_test: any[][], 
+            Y_test: any[][]
+        };
+
+        /**
+        * Converts a column of categorical labels into one-hot encoded vectors.
+        * @async
+        * @function OneHotEncoded
+        * @param {Array<Array<any>>} data - An array where each inner array represents a row and contains a single categorical label.
+        * @returns {Array<Array<Number>>} Returns One-hot encoded labels, suitable for categorical classification.
+        * @throws {Error} - Throws an error if no data is provided, or if any row is not a single-element array.
+        */
+        export function OneHotEncoded(data: any[][]): number[][];
+
+        /**
+        * Converts labels that cannot be converted to interger labels (example: words). If your labels already integer-labeled (ex: 0, 1, 2, 3, ...), no need to use this function
+        * @async
+        * @function IntegerLabeling
+        * @param {Array<Array<any>>} data - column of your dataset that can be use as categorical labeling 
+        * @returns {Array<Array<Number>>} returns Intger-encoded labels. Which can be use for categorical classification, particularly when calculating sparse_categorical_cross_entropy
+        * @throws {Error} - when no data is provided
+        */
+        export function IntegerLabeling(data: any[][]): number[][];
+
+        /**
+        * Converts labels that cannot be converted to binary labels (example: words). If your labels already 0s and 1s, no need to use this function
+        * @async
+        * @function BinaryLabeling
+        * @param {Array<Array<any>>} data - column of your dataset that can be use as binary labeling (0 or 1)
+        * @returns {Array<Array<Number>>} returns labels which contains 1 vector labels of 1s and 0s. Can be use for Binary classifcation
+        * @throws {Error} - when no data is provided or there are more than two classes
+        */
+        export function BinaryLabeling(data: any[][]): number[][];
+
+        /**
+        * @async
+        * @function load_images_from_directory
+        * @param {String} targetDir target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+        * @param {Array<Number>} resize an array containing the values for resizing [H, W].
+        * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
+        * @param {String} label_mode specifies how the target labels are encoded and shaped. It lets you match your label format directly to your loss function. Mode: `binary`, `categorical`, `sparse`
+        * @param {Number} limit_per_class limit the number of items per class
+        * @returns {Object}
+        */
+        export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, label_mode: String, limit_per_class: number): { datasets: Array<Float32Array>, targetY: Array<Array<Number>>, labels: Array<Array<String>>, classes: Array<String>};
+
+        /**
+        * @async
+        * @function load_single_image This function allows you to load a single image by specifying it's path
+        * @param {String} file_path path to the image file (can be nested anywhere)
+        * @param {Array<Number>} resize resize the image to [H, W]
+        * @param {String} pixelFormat grayscale, rgb, or rgba.
+        * @param {Boolean} showLog when set to `true`, it will show the output logs after an image is loaded. Default value is `false`
+        * @returns {{datasets: Array<Float32Array>, shape: Array<Number>, filename: filename}}
+        */
+        export function load_single_image(file_path: String, resize: Number[], pixelFormat: String, showLog: Boolean): {datasets: Array<Float32Array>, shape: Array<Number>, filename: String};
+
+        /**
+        * @async
+        * @function load_multiple_images allows you to load a multiple images at once by specifying the folder that contains images
+        * @param {String} file_path path to the image file (can be nested anywhere)
+        * @param {Array<Number>} resize resize the image to [H, W]
+        * @param {String} pixelFormat grayscale, rgb, or rgba.
+        * @returns {{datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>}}
+        */
+        export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
+
+        /**
+        * @function tokenize allows you to tokenize a sentence
+        * @param {String} sentence input sentence
+        * @returns {Array<String>} array of tokenized words 
+        */
+        export function tokenize(sentence: String): String[];
+
+        /**
+        * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
+        * @param sentences an array of sentences or large corpus
+        * @returns {Array<String>} an array of tokenized words
+        */
+        export function buildVocab(sentences: Array<String>): Array<String>;
+
+        /**
+        * @function buildWord2Id - this function assign unique token IDs to tokenized words. These token IDs will be use to `Encode` input tokenized words.
+        * @param {Array<String>} vocab tokenized words
+        * @returns {Object} an object containing key value pairs. Each key (words) has corresponding value (token ID)
+        */
+        export function buildWord2Id(vocab: String[]): Object;
+
+        /**
+        * @function Encode tokenize a sentence and assign token IDs returning an array of token IDs.
+        * @param {String} sentence input sentence or prompt
+        * @param {Object} buildWord2Id_output the output after calling `buildWord2Id()` function. This key-value object will be use to encode the input sentence and assign corresponding token IDs based on the words in `buildWord2Id_output`
+        * @param {Number} max_length The length of the encoded token containing token IDs.
+        * @returns {Array<Number>} an array of token IDs to be use for token embeddings in the embedding layer 
+        */
+        export function Encode(sentence: String, buildWord2Id_output: Object, max_length: Number): Array<Number>;
+    }
 
     /**
-     * @function sigmoid
-     * @param {Float32Array} arr Float32Array values
-     * @returns {Float32Array} sigmoid output
-     *
-     * Sigmoid is an activation function that squashes all values between 0 to 1. Ideal for binary classificaton tasks
+     * basic math functions namespace.
      */
-    export function sigmoid(arr: Float32Array): Float32Array;
+    export namespace math {
+        /**
+        * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
+        * @param {Array<Number>} flat_arr_1 a flat array input
+        * @param {Array<Number>} flat_arr_2  a flat array input
+        * @returns {Float32Array} A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
+        * @throws an error will occured if both array are not equal in length
+        */
+        export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
 
-    /**
-     * @function tanh
-     * @param {Float32Array} arr Float32Array values
-     * @returns {Float32Array} tanh output
-     *
-     * Tanh (hyperbolic tangent) is an activation function that squashes all values between -1 to 1. Ideal for binary classificaton tasks
-     */
-    export function tanh(arr: Float32Array): Float32Array;
+        /**
+        * @function element_wise_sub use to subtract elements inside both arrays. Requires both arrays has same length;
+        * @param {Array<Number>} flat_arr_1 a flat array input
+        * @param {Array<Number>} flat_arr_2 a flat array input
+        * @returns {Float32Array} A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
+        * @throws an error will occured if both array are not equal in length
+        */
+        export function element_wise_sub(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
 
-    /**
-     * @function softmax
-     * @param {Float32Array} arr Float32Array values
-     * @returns {Float32Array} softmax output
-     *
-     * The softmax function is a mathematical tool that converts a vector of raw, real-numbered scores (logits) into a probability distribution, with values between 0 and 1 that sum up to exactly 1.
-     * This activation function is primarily use in output layer.
-     */
-    export function softmax(arr: Float32Array): Float32Array;
+        /**
+        * @function scaleDiff a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
+        * @param arr1 a flat array input
+        * @param arr2 a flat array input
+        * @param arr3 a flat array input
+        * @returns {Float32Array} A flat array output after performing `(arr1[i] - arr2[i]) * arr3[i]`
+        * @throws an error will occured if both array are not equal in length
+        */
+        export function scaleDiff(arr1: Number[], arr2: Number[], arr3: Number[]): Float32Array;
 
-    /**
-     * @function linear
-     * @param {Float32Array} arr Float32Array values
-     * @returns {Float32Array} linear output
-     *
-     * The linear activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
-     */
-    export function linear(arr: Float32Array): Float32Array;
+        /**
+        * @function relu
+        * @param {Float32Array} arr Float32Array values
+        * @returns {Float32Array} relu output
+        *
+        * ReLu (Rectified Linear Unit) is an activation function where all the values are passed the same and zeroed out negative values
+        */
+        export function relu(arr: Float32Array): Float32Array;
+
+        /**
+        * @function sigmoid
+        * @param {Float32Array} arr Float32Array values
+        * @returns {Float32Array} sigmoid output
+        *
+        * Sigmoid is an activation function that squashes all values between 0 to 1. Ideal for binary classificaton tasks
+        */
+        export function sigmoid(arr: Float32Array): Float32Array;
+
+        /**
+        * @function tanh
+        * @param {Float32Array} arr Float32Array values
+        * @returns {Float32Array} tanh output
+        *
+        * Tanh (hyperbolic tangent) is an activation function that squashes all values between -1 to 1. Ideal for binary classificaton tasks
+        */
+        export function tanh(arr: Float32Array): Float32Array;
+
+        /**
+        * @function softmax
+        * @param {Float32Array} arr Float32Array values
+        * @returns {Float32Array} softmax output
+        *
+        * The softmax function is a mathematical tool that converts a vector of raw, real-numbered scores (logits) into a probability distribution, with values between 0 and 1 that sum up to exactly 1.
+        * This activation function is primarily use in output layer.
+        */
+        export function softmax(arr: Float32Array): Float32Array;
+
+        /**
+        * @function linear
+        * @param {Float32Array} arr Float32Array values
+        * @returns {Float32Array} linear output
+        *
+        * The linear activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
+        */
+        export function linear(arr: Float32Array): Float32Array;
+    }
 
     /**
      * @function detectGPU() 
@@ -928,25 +945,15 @@ declare module 'neurex' {
     }
 
     /**
-     * @function stepDecay Reduces the learning rate by a fixed factor after a set number of epochs.
-     * @param {Number} dropFactor A drop factor in a learning rate scheduler is the multiplier used to reduce the learning rate. Default is `0.5`
-     * @param {Number} dropEvery dropEvery (or drop_every) is a custom parameter used in step-decay learning rate schedulers to define the number of epochs or steps that pass before the learning rate drops by a specific multi-factor value. Default is `10`.
+     * `gradientNormalizer` namespace composes of built-in gradient normalizers
      */
-    export function stepDecay(dropFactor: Number, dropEvery: Number): Number;
-
-    /**
-     * @function exponentialDecay Multiplies the learning rate by a decay constant raised to the power of the epoch or step.
-     * @param {Number} decayRate is a multiplier factor that scales down the learning rate at each step or epoch. Default is `0.96`
-     */
-    export function exponentialDecay(decayRate: Number): Number;
-
-    /**
-     * @function cosineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
-     * @param {Number} totalEpochs The total number of epochs or steps over which the learning rate should decay following a cosine schedule.
-     * @param {Number} minLR The minimum learning rate to decay toward.
-     */
-    export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
-
+    export namespace gradientNormalizers {
+        /**
+         * @function `clipGradient`Gradient is a training technique that caps the magnitude of gradients during backpropagation to prevent exploding gradients and stabilize deep learning models.
+         * @param {Number} clip_norm_value_threshold  A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `5.0`
+         */
+        export function clipGradient(clip_norm_value_threshold: number): Function;
+    }
 
     export interface ReduceOnPlateauConfig {
         /** Reduces the learning rate by multiplying it by this value. Default value is 0.5 */
@@ -956,32 +963,63 @@ declare module 'neurex' {
         /** Sets a lower bound on the learning rate so it does not drop below this specific value. Default value is `1e-6`*/
         minLR?: Number;
     }
-    /**
-     * @function reduceOnPlateau Monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
-     * @param {ReduceOnPlateauConfig} config 
-     */
-    export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
 
     /**
-     * @function SGD or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
-     * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
+     * scheduler functions namespace. Consists of built-in learning rate schedulers like `stepDecay`, `exponentialDecay`, `cosineAnnealing`, and `reduceOnPlateau` 
      */
-    export function SGD(momentum: Number): Function;
+    export namespace schedulers {
+        /**
+        * @function stepDecay Reduces the learning rate by a fixed factor after a set number of epochs.
+        * @param {Number} dropFactor A drop factor in a learning rate scheduler is the multiplier used to reduce the learning rate. Default is `0.5`
+        * @param {Number} dropEvery dropEvery (or drop_every) is a custom parameter used in step-decay learning rate schedulers to define the number of epochs or steps that pass before the learning rate drops by a specific multi-factor value. Default is `10`.
+        */
+        export function stepDecay(dropFactor: Number, dropEvery: Number): Number;
+
+        /**
+        * @function exponentialDecay Multiplies the learning rate by a decay constant raised to the power of the epoch or step.
+        * @param {Number} decayRate is a multiplier factor that scales down the learning rate at each step or epoch. Default is `0.96`
+        */
+        export function exponentialDecay(decayRate: Number): Number;
+
+        /**
+        * @function cosineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
+        * @param {Number} totalEpochs The total number of epochs or steps over which the learning rate should decay following a cosine schedule.
+        * @param {Number} minLR The minimum learning rate to decay toward.
+        */
+        export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
+    
+        /**
+        * @function reduceOnPlateau Monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
+        * @param {ReduceOnPlateauConfig} config 
+        */
+        export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
+    }
 
     /**
-     * @function Adam or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
-     * @param {Number} beta1 The exponential decay rate for the moving average of past gradients (the first moment or mean). Default value is `0.9`.
-     * @param {Number} beta2 The exponential decay rate for the moving average of squared past gradients (the second moment or uncentered variance). Default value is `0.999`.
-     * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
+     * optimizer functions namespace. Consists of built-in optimizers like `Adam`, `SGD`, and `RMSprop`
      */
-    export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
+    export namespace optimizers {
+        /**
+        * @function SGD or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
+        * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
+        */
+        export function SGD(momentum: Number): Function;
 
-    /**
-     * @function RMSprop or (Root Mean Square Propagation) is an adaptive learning rate optimization algorithm designed to speed up and stabilize the training of deep neural networks.
-     * @param decayRate controls how fast the running average of past squared gradients forgets old information. Default value is `0.9`.
-     * @param epsilon A tiny positive constant added to the denominator. Default value is `1e-8`.
-     */
-    export function RMSprop(decayRate: number, epsilon: number): Function;
+        /**
+        * @function Adam or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
+        * @param {Number} beta1 The exponential decay rate for the moving average of past gradients (the first moment or mean). Default value is `0.9`.
+        * @param {Number} beta2 The exponential decay rate for the moving average of squared past gradients (the second moment or uncentered variance). Default value is `0.999`.
+        * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
+        */
+        export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
+
+        /**
+        * @function RMSprop or (Root Mean Square Propagation) is an adaptive learning rate optimization algorithm designed to speed up and stabilize the training of deep neural networks.
+        * @param decayRate controls how fast the running average of past squared gradients forgets old information. Default value is `0.9`.
+        * @param epsilon A tiny positive constant added to the denominator. Default value is `1e-8`.
+        */
+        export function RMSprop(decayRate: number, epsilon: number): Function;
+    }
 
     /**
      * @function lossVisualizer is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
@@ -999,7 +1037,6 @@ declare module 'neurex' {
      * @param {Object} options config object
      */
     export function lossLandscapeVisualizer(options: lossLandscapeOption): Object;
-    
 
     /**
      * a visualizer tool that visualize model architecture and parameters

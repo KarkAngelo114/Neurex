@@ -77,6 +77,8 @@ class Neurex {
         this.lastLayerObject = {};
 
         this.hasInitializedNativeBindings = false;
+
+        this.gradient_normalizers = [];
         
     }
 
@@ -86,37 +88,38 @@ class Neurex {
      */
     configure(configs) {
         
-        if (configs.learning_rate !== undefined) {
-            this.learning_rate = configs.learning_rate;
-            this.initial_learning_rate = configs.learning_rate;
+        if (configs?.learning_rate !== undefined) {
+            this.learning_rate = configs?.learning_rate || 0.001;
+            this.initial_learning_rate = configs?.learning_rate || 0.001;
         }
-        if (configs.lr_scheduler !== undefined) this.lr_scheduler = configs.lr_scheduler || null;
+        if (configs?.lr_scheduler !== undefined) this.lr_scheduler = configs?.lr_scheduler || null;
 
-        if (configs.checkpoint_per_epoch < 0) {
+        if (configs?.checkpoint_per_epoch < 0) {
             this.isfailed = true;
             throw new Error(`${color.red}[Error]------- checkpoint cannot be less than 0. ${color.reset}`)
         }
 
-        if (configs.checkpoint_per_epoch !== undefined) this.checkpoint = configs.checkpoint_per_epoch;
+        if (configs?.checkpoint_per_epoch !== undefined) this.checkpoint = configs?.checkpoint_per_epoch;
 
         if (configs.clip_norm_value !== undefined) this.clip_norm_value = configs.clip_norm_value || 1.0;
 
         // mode: gpu | cpu | auto
         // onFLoat32Module: true | false
 
-        modeConfiguration(configs.mode || "cpu");
-        onFloat32Module(configs.onFLoat32Module || false);
+        modeConfiguration(configs?.mode || "cpu");
+        onFloat32Module(configs?.onFLoat32Module || false);
 
-        this.optimizer = configs.optimizer || optimizers.SGD();
+        this.optimizer = configs?.optimizer || optimizers.SGD();
         
         if (configs.onChange_optimizer !== undefined) {
             this.onChange_optimizer = {
-                targetEpoch: configs.onChange_optimizer.targetEpoch,
-                optimizer: configs.onChange_optimizer.optimizer
+                targetEpoch: configs?.onChange_optimizer.targetEpoch,
+                optimizer: configs?.onChange_optimizer.optimizer
             }
         }
 
-        this.visualizers = configs.visualizerPlugins || [];
+        this.visualizers = configs?.visualizerPlugins || [];
+        this.gradient_normalizers = configs?.gradient_normalizers || [];
         
         
         if (!this.hasInitializedNativeBindings) {
@@ -1206,12 +1209,14 @@ class Neurex {
 
             // scale bias gradients
             biasGrads[pointer] = scale(biasGrads[pointer], batchSize);
-                        
-            // clip accumulated weight gradients using a threshold
-            weightGrads[pointer] = gradientClipping(weightGrads[pointer], this.clip_norm_value);
 
-            // clip accumulated bias gradients using a threshold
-            biasGrads[pointer] = gradientClipping(biasGrads[pointer], this.clip_norm_value);
+            
+            if (this.gradient_normalizers.length > 0) {
+                for (const normalizer of this.gradient_normalizers) {
+                    weightGrads[pointer] = normalizer(weightGrads[pointer]);
+                    biasGrads[pointer] = normalizer(biasGrads[pointer]);
+                }
+            }
 
             // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
             const res1 = optimize({
