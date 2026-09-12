@@ -36,9 +36,7 @@ class Neurex {
         this.currentShape = null;
         this.currentSize = null;
         this.accuracy = '';
-        this.loss_function = "";
         this.output_size = 0;
-        this.task = null;
         this.epoch_count = 0;
         this.batch_size = 0;
         this.depth = 0;
@@ -52,7 +50,6 @@ class Neurex {
         this.learning_rate = 0.001;
         this.initial_learning_rate = 0.001;
         this.lr_scheduler = null;
-        this.clip_norm_value = 1.0;
         this.onChange_optimizer = null;
         this.visualizers = [];
         this.shuffle = true;
@@ -79,6 +76,7 @@ class Neurex {
         this.hasInitializedNativeBindings = false;
 
         this.gradient_normalizers = [];
+        this.losses = ["mae", "mse", "categorical_cross_entropy", "sparse_categorical_cross_entropy", "binary_cross_entropy"]
         
     }
 
@@ -101,8 +99,6 @@ class Neurex {
 
         if (configs?.checkpoint_per_epoch !== undefined) this.checkpoint = configs?.checkpoint_per_epoch;
 
-        if (configs.clip_norm_value !== undefined) this.clip_norm_value = configs.clip_norm_value || 1.0;
-
         // mode: gpu | cpu | auto
         // onFLoat32Module: true | false
 
@@ -111,7 +107,7 @@ class Neurex {
 
         this.optimizer = configs?.optimizer || optimizers.SGD();
         
-        if (configs.onChange_optimizer !== undefined) {
+        if (configs?.onChange_optimizer !== undefined) {
             this.onChange_optimizer = {
                 targetEpoch: configs?.onChange_optimizer.targetEpoch,
                 optimizer: configs?.onChange_optimizer.optimizer
@@ -142,8 +138,8 @@ class Neurex {
     modelSummary() {
 
         if (!this.layers || this.layers.length === 0) {
-            console.error(`${color.red}[ERROR]------- An error occurred${color.reset}`);
-            throw new Error('No layers to show details');
+            console.error(`${color.red}[ERROR]${color.reset} No model to show. Ensure you have built or loaded an existing model`);
+            throw new Error('ERR_NO_MODEL_TO_SHOW');
         }
 
         const COLS = [
@@ -257,17 +253,12 @@ class Neurex {
 
 
         const data = {
-            "task":this.task,
-            "loss_function":this.loss_function,
-            "epoch":this.epoch_count,
             "modelID": this.modelID || UUID.randomUUID(),
-            "batch_size":this.batch_size,
             "learning_rate":this.learning_rate,
             "input_size":this.input_size,
             "input_shape":this.input_shape,
             "output_size":this.output_size,
             "num_layers":this.num_layers,
-            "clip_norm_value": this.clip_norm_value,
             "layers": this.layers.map(layer => ({
                 layer_name: layer.layer_name,
                 activation_function_name: layer.activation_function ? layer.activation_function.name : null,
@@ -399,10 +390,6 @@ class Neurex {
             this.miscellaneous = modelData?.miscellaneous;
             this.modelID = modelData?.modelID || UUID.randomUUID();
             this.initial_learning_rate = modelData?.learning_rate || 0.001;
-            this.task = modelData?.task || null;
-            this.loss_function = modelData?.loss_function;
-            this.epoch_count = modelData?.epoch;
-            this.batch_size = modelData?.batch_size;
             this.learning_rate = modelData?.learning_rate;
             this.input_size = modelData?.input_size;
             this.output_size = modelData?.output_size;
@@ -410,7 +397,6 @@ class Neurex {
             this.weights = loadedWeights;
             this.biases = loadedBiases;
             this.input_shape = modelData?.input_shape;
-            this.clip_norm_value = modelData?.clip_norm_value || 1.0;
             const layerBuilder = new Layers();
             this.layers = modelData?.layers.map(layerData => {
 
@@ -665,6 +651,12 @@ class Neurex {
     */
 
     async train(inputs, trainY, loss, epoch, batch_size = 1, shuffle = true) {
+
+        if (!this.losses.includes(loss.toLowerCase())) {
+            console.error(`${color.red}[ERROR]${color.reset} "${loss}" is not a loss function or isn't available loss function.`);
+            throw new Error("ERR_UNKNOWN_LOSS_FUNC");
+        }
+
         if (!this.hasInitializedNativeBindings) {
             init();
         }
@@ -681,7 +673,10 @@ class Neurex {
             this.biases, 
         );
 
-        if (this.layers.length == 0) throw new Error(`${color.red}[ERROR]------- No layers constructed ${color.reset}`);
+        if (this.layers.length == 0) {
+            console.error(`${color.red}[ERROR]${color.reset} No layers constructed. Have you created your model or loaded an existing one?`);
+            throw new Error("ERR_NO_MODEL_BUILT_OR_LOADED");
+        };
 
         let trainX = [];
 
@@ -690,16 +685,13 @@ class Neurex {
 
             if (inputs[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || inputs[i].length != this.input_size) {
                 this.isfailed = true;
-                console.log(`${color.red}[ERROR]------- Input data must be the same shape set in the input layer${color.reset}\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${inputs[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
-                throw new Error(`${color.red}Shape mismatch${color.reset}`);
+                console.log(`${color.red}[ERROR]${color.reset} Input data must be the same shape set in the input layer\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${inputs[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
+                throw new Error(`ERR_SHAPE_MISMATCH`);
             }
 
             trainX.push(inputs[i] instanceof Float32Array ? inputs[i] : new Float32Array(inputs[i].flat(Infinity)));
         }
 
-        this.loss_function = loss.toLowerCase();
-        this.epoch_count = epoch;
-        this.batch_size = batch_size;
         const batchSize = batch_size;
         const totalBatches = Math.ceil(trainX.length / batchSize);
         let logMessage;
@@ -707,10 +699,6 @@ class Neurex {
         let startTime;
             
         const lossLower = loss.toLowerCase();
-
-        // in order to support any layer to be an output layer, each layer type has their own way of determining inference type
-        const taskType = this.lastLayerObject.determineInferenceType(this.lastLayerObject, lossLower, trainY);
-        this.task = taskType;
 
         try {
             if (!trainX || trainX.length == 0 || !trainY || trainY.length == 0 || !loss) {
@@ -721,7 +709,8 @@ class Neurex {
                 console.log(`Loss: ${loss ? "specified" : "not specified"}`);
                 console.log(`Epoch: ${epoch ? "specified" : "not specified"}`);
                 console.log(`Batch Size: ${batch_size ? "specified" : "not specified"}`);
-                throw new Error(`${color.red}[ERROR]${color.reset} There is/are missing parameter/s. Failed to start training...`);
+                console.log(`${color.red}[ERROR]${color.reset} There is/are missing parameter/s. Failed to start training...`);
+                throw new Error("ERR_MISSING_PARAMETERS");
             }
 
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
@@ -790,7 +779,7 @@ class Neurex {
                     
             }
         
-            console.log(`${color.orange}\n[TASK]------- Training session is starting${color.reset}\n`);
+            console.log(`${color.orange}[TASK]------- Training session is starting${color.reset}\n`);
       
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
@@ -898,7 +887,7 @@ class Neurex {
                 
                 logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
-                if (this.task === 'regression') {
+                if (lossLower === "mse" || lossLower === "mae") {
                     let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
                     logMessage += duration;
                 }
@@ -906,13 +895,13 @@ class Neurex {
                 let accuracy = 0;
                 let duration = "";
 
-                if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
+                if (lossLower === "categorical_cross_entropy" || lossLower === "sparse_categorical_cross_entropy" || lossLower === "binary_cross_entropy") {
                     let epochPredictions = [];
                     for (let i = 0; i < trainX.length; i++) {
                         epochPredictions.push(this.feedforward(trainX[i]).predictions);
                     }
 
-                    accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, this.task);
+                    accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, lossLower);
 
                     let accuracyColor = accuracy > 90 ? color.green :
                                     accuracy > 85 ? color.lime :
@@ -1010,9 +999,7 @@ class Neurex {
     async predict(input) {
         if (!this.hasInitializedNativeBindings) {
             init();
-        }
-        if (!this.isInit) {
-            init();
+            this.hasInitializedNativeBindings = true;
             this.isInit = true;
         }
 
@@ -1414,36 +1401,31 @@ class Neurex {
         }
     }
 
-    #calculateClassificationAccuracy(predictions, actuals, taskType) {
+    #calculateClassificationAccuracy(predictions, actuals, lossType) {
         let correctPredictions = 0;
+
         for (let i = 0; i < predictions.length; i++) {
             let predictedLabel;
             let actualLabel;
 
-            if (taskType === 'binary_classification') {
+            if (lossType === 'binary_cross_entropy') {
                 predictedLabel = predictions[i][0] >= 0.5 ? 1 : 0;
-                actualLabel = actuals[i][0]; // Assuming actuals are also arrays like [[0], [1]]
-            } else if (taskType === 'multi_class_classification') {
-                // Find the index of the maximum value in predictions for the predicted class
+                actualLabel = actuals[i][0];
+            } else if (lossType === 'sparse_categorical_cross_entropy') {
                 predictedLabel = predictions[i].indexOf(Math.max(...predictions[i]));
-                
-                // If actuals[i] is an array with a single element (e.g., [0], [1]), it's integer-encoded.
-                if (Array.isArray(actuals[i]) && actuals[i].length === 1) {
-                    actualLabel = actuals[i][0]; // Directly take the integer label
-                } else if (Array.isArray(actuals[i]) && actuals[i].length > 1) {
-                    // Otherwise, assume one-hot encoded if it's an array with multiple elements (e.g., [1,0,0])
-                    actualLabel = actuals[i].indexOf(1); 
-                } else {
-                    // Fallback for direct integer label if actuals[i] is not an array (e.g., 0, 1, 2 directly)
-                    // This case might not be hit if Y_train is always provided as arrays of arrays.
-                    actualLabel = actuals[i]; 
-                }
+                actualLabel = actuals[i][0];
+            } else if (lossType === 'categorical_cross_entropy') {
+                predictedLabel = predictions[i].indexOf(Math.max(...predictions[i]));
+                actualLabel = actuals[i].indexOf(1);
+            } else {
+                throw new Error(`Unsupported classification loss: ${lossType}`);
             }
 
             if (predictedLabel === actualLabel) {
                 correctPredictions++;
             }
         }
+
         return (correctPredictions / predictions.length) * 100;
     }
 
