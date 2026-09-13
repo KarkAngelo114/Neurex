@@ -860,10 +860,10 @@ declare module 'neurex' {
         export function linear(arr: Float32Array): Float32Array;
 
         /**
-         * The `jaccard` function is the original implementation of the Jaccard Similarity operation. It takes two input arrays to find the similarity score by checking for similar elements on both arrays.
+         * The `jaccard` function is the actual implementation of the Jaccard Similarity operation. It takes two input arrays to find the similarity score by checking for similar elements on both arrays.
          * @param {Array<Any>} arr1 input array
          * @param {Array<Any>} arr2 input array
-         * @returns {Number} the similarity score
+         * @returns {Number} calculated similarity score
          */
         export function jaccard(arr1: any[], arr2: any[]): Number;
     }
