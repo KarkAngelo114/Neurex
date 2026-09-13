@@ -17,7 +17,7 @@ const split_dataset = require('./preprocessor/split');
 const RegressionMetrics = require('./metrics/regression_metrics');
 const ClassificationMetrics = require('./metrics/classification_metrics');
 const { load_images_from_directory, load_single_image, load_multiple_images } = require('./preprocessor/imagery');
-const { element_wise_mul, relu, sigmoid, tanh, softmax, linear, element_wise_sub, scaleDiff  } = require('./core/bindings/float32Ops');
+const { element_wise_mul, element_wise_sub, scaleDiff, jaccard, Relu, Sigmoid, Tanh, Softmax, Linear  } = require('./core/bindings/float32Ops');
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
 const { simpleNeuralNetwork, simpleCNN, vanillaRNN } = require('./applications/templates');
@@ -81,10 +81,11 @@ module.exports= {
         element_wise_mul,
         element_wise_sub,
         scaleDiff,
-        relu,
-        sigmoid,
-        tanh,
-        softmax,
-        linear,
+        relu: Relu,
+        sigmoid: Sigmoid,
+        tanh: Tanh,
+        softmax: Softmax,
+        linear: Linear,
+        jaccard
     }
 }

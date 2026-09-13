@@ -1,11 +1,21 @@
 
 /**
- * Neurex - a Trainable Neural Network Library for NodeJS | Author: Kark Angelo V. Pada
+ * `Neurex` a Trainable Neural Network Library for NodeJS | Author: Kark Angelo V. Pada
  * 
  * Copyright (c) all rights reserved
  * 
  * Licensed under the MIT License.
  * See LICENSE file in the project root for full license information.
+ *
+ * Top level module of `Neurex`.
+ * @example
+ * // ES module
+ * import * as nrx from 'neurex'
+ * 
+ * // CommonJS
+ * const nrx = require('neurex');
+ *
+ *
  * @module neurex
  * 
  */
@@ -285,21 +295,15 @@ declare module 'neurex' {
      */
     export class Neurex {
         /**
-        * Allows configuration of your neural network's parameters.
-        * @method configure
+        * Allows configuration of your neural network's parameters. You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
         * @param {NeurexConfig} configs - Configuration options for the neural network.
-        *
-        * You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
-        *
         */
         
         configure(configs: NeurexConfig): void;
 
         /**
         * 
-        @method modelSummary()
-
-        Shows the model architecture
+        * Shows the model architecture
         */
         modelSummary(): void;
 
@@ -334,7 +338,6 @@ declare module 'neurex' {
         * `saveModel()` allows you to save your model's architecture, weights, and biases, as well as other parameters. The model will be exported
         *  as a .nrx (neurex) model
         * @async
-        * @method saveModel()
         * @param {string} modelName the filename of your model
         * @param {Object} miscellaneous data that can be included to be saved in the model. Note: This may increase the model file size when adding miscellaneous.
         *   
@@ -342,28 +345,28 @@ declare module 'neurex' {
         saveModel(modelName: string, miscellaneous: object): void;
         
         /**
-        * @method export_to_ONNX allows you to export neurex trained models to ONNX compatible format
+        * The `export_to_ONNX` allows you to export neurex trained models to ONNX compatible format
+        * @async
         * @param {String} filename model filename 
         */
         export_to_ONNX(filename: string): void;
 
         /**
+        * The `loadSavedModel` method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
         * @async
-        * @method loadSavedModel() method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
         * @param {String} model the trained model file name
         * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
-        * @returns {void}
         */
         loadSavedModel(model: string, showLog: Boolean): void;
 
         /**
-        * @method pop - Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
+        * Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning
         * @throws {Error} - if there are no layers
         */
         pop(): void;
 
         /**
-        * @method add_layer - Appends a new layer to an existing model architecture. Upon appending a new layer will initiates untrained parameters.
+        * Appends a new layer to an existing model architecture. Upon appending a new layer will initiates untrained parameters.
         * @param {Object} layer_data - layer data returned from Layers class
         *
         * @example
@@ -374,12 +377,22 @@ declare module 'neurex' {
 
         /**
         * 
-        * @method sequentialBuild
-        * 
-        * interface to stack layer types. No weights and biases initialization here
-        * @param {Object} layer_data
+        * The `sequentialBuild` is the high level API that groups a linear stack of layers into a `Model`.
+        * @param {Array<Object>} model your model's structure in an array.
+        * @example
+        * import * as nrx from 'neurex';
+        *
+        * let model = new nrx.Neurex();
+        * let layer = new nrx.Layers();
+        *
+        * model.sequentialBuild([
+        *    layer.inputShape({features: 4}),
+        *    layer.connectedLayer(3), //  layer size of 3, uses "relu" activation function as default
+        *    layer.connectedLayer(3),
+        *    layer.connectedLayer(2, "softmax")
+        * ]);
         */
-        sequentialBuild(layer_data: any[]): void;
+        sequentialBuild(model: object[]): void;
 
         /**
         * Trains the neural network using the provided training data, target values, number of epochs, and learning rate.
@@ -416,37 +429,35 @@ declare module 'neurex' {
         train(trainX: number[][], trainY: number[], loss: string, epoch: number, batch_size: number, shuffle: boolean): void;
 
         /**
-        * 
+        * Runs a forward pass to produce predictions
         * @async
         * @method predict
         * @param {Array} input - input data 
         * @returns Array of predictions
         * @throws Error when there's shape mismatch and no input data
-
-        produces predictions based on the input data
         */
         predict(input: number[][]): number[];
         
         /**
-        * @method `setParams` uploads all parameters in the global store. This method must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
+        * The `setParams` uploads all parameters in the global store. This method must be called first before executing `forward()`, `backpropagation()`, and `updateParams()` when writing custom training loop.
         */
         setParams(): void;
 
         /**
          * 
-         * @method `releaseMem` is use to clear global store memory. This also calls a native function to clear compiled clKernels, clBuffers, clDevices, platforms, contexts, and queues. 
+         * The `releaseMem` is use to clear global store memory manually. This also calls a native function to clear compiled clKernels, clBuffers, clDevices, platforms, contexts, and queues. 
         */
         releaseMem(): void;
 
         /**
-        * @method `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
+        * The `feedforward` moves input data throughout layers, transforming the initial input to be fed to the next layer until it reaches the last layer
         * @param {Float32Array} input input vector
         * @returns {{ predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]}}
         */
         feedforward(input: Float32Array): {predictions: Float32Array, activations: Float32Array[], zs: Float32Array[]};
 
         /**
-        * @method `backpropagation` performs the backpropagation loop, traversing the delta backward. Note: In order to properly accumulate gradients when writing custom training loop, you must implement mini-batch training to properly accumulate gradients across batches, otherwise the optimizer will update per sample.
+        * The `backpropagation` performs the backpropagation loop, traversing the delta backward. Note: In order to properly accumulate gradients when writing custom training loop, you must implement mini-batch training to properly accumulate gradients across batches, otherwise the optimizer will update per sample.
         * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
         * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
@@ -455,7 +466,7 @@ declare module 'neurex' {
         backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[]}
         
         /**
-        * @method `updateParams` is the method to update the parameters of your model. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
+        * The `updateParams` is the actual method to update the parameters of your model. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
         * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
         * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
         * @param {updateParamsOptions} options update params options
@@ -463,7 +474,7 @@ declare module 'neurex' {
         updateParams(accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[], options: updateParamsOptions): void;
     
         /**
-        * @method `getOutputLayerDelta` calculates the error of the output layer predictions towards the actuals or target outputs.
+        * The `getOutputLayerDelta` calculates the error of the output layer predictions towards the actuals or target outputs.
         * @param {Float32Array} predictions output layer prediction of a sample 
         * @param {Array<Number>} actuals target values to approximate
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
@@ -485,28 +496,26 @@ declare module 'neurex' {
      */
     export class Layers {
         /**
-        * @method inputShape
-        * @param {Object} shapeConfig - specify the number of features
-        *
         * The inputShape() method allows you to get the shape of your input
+        * @param {Object} shapeConfig - specify the number of features
         * @example
         * model.sequentialBuild([
             layer.inputShape({features: 4}),
-            layer.connectedLayer("relu", 5),
-            layer.connectedLayer("softmax", 3);
+            layer.connectedLayer(5),
+            layer.connectedLayer(3, 'softmax');
         ]);
         */
         inputShape(shapeConfig: Object): Object;
 
         /**
-         * @method reshape changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `connector` to bridge data from different layers (e.g: from connected layer to convolutional layer). 
+         * The `reshape` changes the dimensions (shape) of the data passing through it without changing the data values. This acts as the `connector` to bridge data from different layers (e.g: from connected layer to convolutional layer). 
          * @param targetShape specify the target shape for the data to be reshape. Default is `[28, 28, 3]`
          * @returns {Object} The reshape layer object configuration
          */
         reshape(targetShape: number[]): object;
 
         /**
-        * @method embeddingLayer Creates an embedding layer for token encoding.
+        * The `embeddingLayer` creates a lookup table for token encoding.
         * @param {Number} vocabSize The size of the vocabulary.
         * @param {Number} embeddingDim The size of the dense vector used to represent each token.
         * @param {Number} maxSequenceLength The length of the encoded token containing token IDs.
@@ -515,7 +524,7 @@ declare module 'neurex' {
         embeddingLayer(vocabSize: Number, embeddingDim: Number, maxSequenceLength: Number): Object;
 
         /**
-        * @method connectedLayer Allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
+        * The `connectedLayer` allows you to build a layer with number of neurons and the activation function to use in a layer. Stacking more layers will build connected layers or multilayer perceptron
         * @param {Number} layer_size specify the number of neuron for this layer. Default is `5`
         * @param {String} activation specify the activation function for this layer (Available: sigmoid, relu, tanh, linear, softmax). Default is `relu`.
         * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`.
@@ -525,7 +534,7 @@ declare module 'neurex' {
 
         /**
         * 
-        * @method convolutionalLayer Allows you to add convolutional layers in your model architecture in sequential building.
+        * The `convolutionalLayer` allows you to add convolutional layers in your model architecture in sequential building. They perform feature extraction on a spatial data using a small patch or a `kernel`.
         * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
         * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
         * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
@@ -538,7 +547,7 @@ declare module 'neurex' {
         convolutionalLayer(filters: Number, strides: Number, kernel_size: Number[], activation_function: String, padding: string, useBias: boolean): Object;
 
         /**
-        * @method maxPooling is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
+        * The `maxPooling` is use for downsampling operation that reduces the spatial dimensions of an input tensor by taking the maximum value over a defined sliding window
         * @param {Array<Number>} poolSize determines the pool size window
         * @param {Number} strides It determines how much the pool window slides across the input tensor. Default is `1`
         * @param {String} padding `same` or `valid`. Default is `same`
@@ -548,7 +557,7 @@ declare module 'neurex' {
         maxPooling(poolSize: Number[], strides: Number, padding: String): Object;
 
         /**
-         * @method `recurrentCell` is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
+         * The `recurrentCell` is the fundamental building block of a Recurrent Neural Network (RNN) designed to process sequential data. It maintains an internal `memory` by taking its output from the previous time step and feeding it back into itself alongside the new input.
          * @param {Number} units This is the number of hidden units (neurons) in the layer. It dictates the dimensionality of the layer's output space and its internal memory state. 
          * @param {String} activation_function The activation function applied to the internal hidden state. Default value is `tanh`.
          * @param {Boolean} return_sequence default value is `false`. If `false`, Outputs only the final hidden state vector at the very last time step. If set to `true`, Outputs the hidden state vector for every single time step in the sequence. Must be set to `true` if another RNN layer follows.
@@ -560,7 +569,7 @@ declare module 'neurex' {
 
         /**
         * 
-        * @method transConvLayer `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
+        * The `transConv` (or transpose convolution) is a specialized convolutional layer that upsamples incoming tensor map, which does the opposite of the normal convolution
         * @param {Number} filters the number of filters for this convolutional layer. Produces the same number of output features
         * @param {Number} strides It determines how much the filter overlaps with the input as it slides across.
         * @param {Array<Number>} kernel_size the size of the kernel (or filter) that will slide and extracts input features
@@ -573,7 +582,7 @@ declare module 'neurex' {
         transConvLayer(filters: Number, strides:Number, kernel_size: Number[], activation_function: String,  padding: String, useBias: boolean): Object;
         
         /**
-        * @method `simpleAttention` is the implementation of an attention layer in its simpliest and basic form. This layer creates a single-head Scaled Dot-Product Self-Attention layer inspired/based on the attention mechanism introduced by Vaswani et al. (2017).
+        * The `simpleAttention` is the implementation of an attention layer in its simpliest and basic form. This layer creates a single-head Scaled Dot-Product Self-Attention layer inspired/based on the attention mechanism introduced by Vaswani et al. (2017).
         *
         * This layer projects an input sequence matrix X of shape `[1, 1, embedDim, seqLen]`
         * into Query (Q), Key (K), and Value (V) representations via learnable linear transformations. 
@@ -597,7 +606,7 @@ declare module 'neurex' {
         simpleAttention(useBias: boolean): object;
 
         /**
-        * @method `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
+        * The `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
         * @param {number} numHeads Total number of attention heads. Default is `8.`
         * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @returns {object} multiHeadAttention config
@@ -605,7 +614,7 @@ declare module 'neurex' {
         multiHeadAttention(numHeads: number, useBias: boolean): object;
 
         /**
-        * @method layerNorm normalizes the activations of the previous layer for each individual sample independently.
+        *  The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.
         * @param {Number} epsilon Small epsilon constant to prevent division by zero. Default is 1e-5.
         * @returns {Object} LayerNorm configuration object
         */
@@ -674,7 +683,6 @@ declare module 'neurex' {
         /**
         * Splits a dataset into training and testing sets.
         * @async
-        * @function split_dataset
         * @param {Array<Array<number>>} X - array of features (input data)
         * @param {Array<number>} Y - array of labels (target data)
         * @param {number} split_ratio - the ratio for the test set (e.g., 0.2 for 20%)
@@ -718,37 +726,37 @@ declare module 'neurex' {
         export function BinaryLabeling(data: any[][]): number[][];
 
         /**
+        * The `load_images_from_directory` function is used to load images from the directory. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
         * @async
-        * @function load_images_from_directory
-        * @param {String} targetDir target directory of your image datasets. The folders inside the target directory will represents as class names for the images inside. The first class being read will be the first class among all classes. Therefore, assign your data to it's correct class.
+        * @param {String} targetDir target directory of your image datasets. 
         * @param {Array<Number>} resize an array containing the values for resizing [H, W].
         * @param {String} pixelFormat grayscale, rgb, or rgba. "grayscale" - 1 channel, "rgb" - 3 channel, and "rgba" - 4 channels.
         * @param {String} label_mode specifies how the target labels are encoded and shaped. It lets you match your label format directly to your loss function. Mode: `binary`, `categorical`, `sparse`
         * @param {Number} limit_per_class limit the number of items per class
-        * @returns {Object}
+        * @returns {{ datasets: Float32Array[], targetY: number[][], labels: labels[][], classes: String[] }}
         */
-        export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, label_mode: String, limit_per_class: number): { datasets: Array<Float32Array>, targetY: Array<Array<Number>>, labels: Array<Array<String>>, classes: Array<String>};
+        export function load_images_from_directory(targetDir: String, resize: number[], pixelFormat: String, label_mode: String, limit_per_class: number): { datasets: Float32Array[], targetY: number[][], labels: labels[][], classes: String[]};
 
         /**
+        * The `load_single_image` function allows you to load a single image by specifying it's path
         * @async
-        * @function load_single_image This function allows you to load a single image by specifying it's path
-        * @param {String} file_path path to the image file (can be nested anywhere)
+        * @param {String} file_path path to the image file
         * @param {Array<Number>} resize resize the image to [H, W]
         * @param {String} pixelFormat grayscale, rgb, or rgba.
         * @param {Boolean} showLog when set to `true`, it will show the output logs after an image is loaded. Default value is `false`
         * @returns {{datasets: Array<Float32Array>, shape: Array<Number>, filename: filename}}
         */
-        export function load_single_image(file_path: String, resize: Number[], pixelFormat: String, showLog: Boolean): {datasets: Array<Float32Array>, shape: Array<Number>, filename: String};
+        export function load_single_image(file_path: String, resize: Number[], pixelFormat: String, showLog: Boolean): {datasets: Float32Array[], shape: number[], filename: string};
 
         /**
+        * The `load_multiple_images` allows you to load a multiple images at once by specifying the folder that contains images
         * @async
-        * @function load_multiple_images allows you to load a multiple images at once by specifying the folder that contains images
         * @param {String} file_path path to the image file (can be nested anywhere)
         * @param {Array<Number>} resize resize the image to [H, W]
         * @param {String} pixelFormat grayscale, rgb, or rgba.
         * @returns {{datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>}}
         */
-        export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Array<Float32Array>, paths: Array<String>, filenames: Array<String>};
+        export function load_multiple_images(file_path: String, resize: Number[], pixelFormat: String): {datasets: Float32Arrayp[], paths: string[], filenames: string[]};
 
         /**
         * @function tokenize allows you to tokenize a sentence
@@ -782,11 +790,11 @@ declare module 'neurex' {
     }
 
     /**
-     * basic math functions namespace.
+     * basic math functions namespace. Consists of `element_wise_mul`, `element_wise_sub`, `scaleDiff`, `relu`, `sigmoid`, `tanh`, `softmax`, `linear`, and `jaccard`.
      */
     export namespace math {
         /**
-        * @function element_wise_mul use to multiply elements inside both arrays. Requires both arrays has same length;
+        * `element_wise_mul` is use to multiply elements inside both arrays. Requires both arrays has same length;
         * @param {Array<Number>} flat_arr_1 a flat array input
         * @param {Array<Number>} flat_arr_2  a flat array input
         * @returns {Float32Array} A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
@@ -795,7 +803,7 @@ declare module 'neurex' {
         export function element_wise_mul(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
 
         /**
-        * @function element_wise_sub use to subtract elements inside both arrays. Requires both arrays has same length;
+        * `element_wise_sub` is use to subtract elements inside both arrays. Requires both arrays has same length;
         * @param {Array<Number>} flat_arr_1 a flat array input
         * @param {Array<Number>} flat_arr_2 a flat array input
         * @returns {Float32Array} A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
@@ -804,7 +812,7 @@ declare module 'neurex' {
         export function element_wise_sub(flat_arr_1: Number[], flat_arr_2: Number[]): Float32Array;
 
         /**
-        * @function scaleDiff a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
+        * scaleDiff` is a function that takes 3 input arrays and perform subtraction of values from `arr1[i]` to `arr2[i]` then multiply to `arr3[i]`
         * @param arr1 a flat array input
         * @param arr2 a flat array input
         * @param arr3 a flat array input
@@ -814,50 +822,50 @@ declare module 'neurex' {
         export function scaleDiff(arr1: Number[], arr2: Number[], arr3: Number[]): Float32Array;
 
         /**
-        * @function relu
+        * `ReLu` (Rectified Linear Unit) is an activation function where all the values are passed the same and zeroed out negative values
         * @param {Float32Array} arr Float32Array values
         * @returns {Float32Array} relu output
         *
-        * ReLu (Rectified Linear Unit) is an activation function where all the values are passed the same and zeroed out negative values
         */
         export function relu(arr: Float32Array): Float32Array;
 
         /**
-        * @function sigmoid
+        * `Sigmoid` is an activation function that squashes all values between 0 to 1. Ideal for binary classificaton tasks
         * @param {Float32Array} arr Float32Array values
         * @returns {Float32Array} sigmoid output
-        *
-        * Sigmoid is an activation function that squashes all values between 0 to 1. Ideal for binary classificaton tasks
         */
         export function sigmoid(arr: Float32Array): Float32Array;
 
         /**
-        * @function tanh
+        * `Tanh` (hyperbolic tangent) is an activation function that squashes all values between -1 to 1. Ideal for binary classificaton tasks
         * @param {Float32Array} arr Float32Array values
         * @returns {Float32Array} tanh output
         *
-        * Tanh (hyperbolic tangent) is an activation function that squashes all values between -1 to 1. Ideal for binary classificaton tasks
         */
         export function tanh(arr: Float32Array): Float32Array;
 
         /**
-        * @function softmax
+        * The `softmax` function is a mathematical tool that converts a vector of raw, real-numbered scores (logits) into a probability distribution, with values between 0 and 1 that sum up to exactly 1. This activation function is primarily use in output layer.
         * @param {Float32Array} arr Float32Array values
         * @returns {Float32Array} softmax output
         *
-        * The softmax function is a mathematical tool that converts a vector of raw, real-numbered scores (logits) into a probability distribution, with values between 0 and 1 that sum up to exactly 1.
-        * This activation function is primarily use in output layer.
         */
         export function softmax(arr: Float32Array): Float32Array;
 
         /**
-        * @function linear
+        * The `linear` activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
         * @param {Float32Array} arr Float32Array values
         * @returns {Float32Array} linear output
-        *
-        * The linear activation function outputs the same inputs directly without non-linear transformation. This means that whateveer being passed here, the same will be the output.
         */
         export function linear(arr: Float32Array): Float32Array;
+
+        /**
+         * The `jaccard` function is the original implementation of the Jaccard Similarity operation. It takes two input arrays to find the similarity score by checking for similar elements on both arrays.
+         * @param {Array<Any>} arr1 input array
+         * @param {Array<Any>} arr2 input array
+         * @returns {Number} the similarity score
+         */
+        export function jaccard(arr1: any[], arr2: any[]): Number;
     }
 
     /**
@@ -949,7 +957,7 @@ declare module 'neurex' {
      */
     export namespace gradientNormalizers {
         /**
-         * @function `clipGradient`Gradient is a training technique that caps the magnitude of gradients during backpropagation to prevent exploding gradients and stabilize deep learning models.
+         * The `clipGradient` is a training technique that caps the magnitude of gradients during backpropagation to prevent exploding gradients and stabilize deep learning models.
          * @param {Number} clip_norm_value_threshold  A clip norm value is a maximum threshold limit used in machine learning to prevent exploding gradients by scaling down oversized gradient vectors. Default is `5.0`
          */
         export function clipGradient(clip_norm_value_threshold: number): Function;
@@ -969,27 +977,27 @@ declare module 'neurex' {
      */
     export namespace schedulers {
         /**
-        * @function stepDecay Reduces the learning rate by a fixed factor after a set number of epochs.
+        * The `stepDecay` reduces the learning rate by a fixed factor after a set number of epochs.
         * @param {Number} dropFactor A drop factor in a learning rate scheduler is the multiplier used to reduce the learning rate. Default is `0.5`
         * @param {Number} dropEvery dropEvery (or drop_every) is a custom parameter used in step-decay learning rate schedulers to define the number of epochs or steps that pass before the learning rate drops by a specific multi-factor value. Default is `10`.
         */
         export function stepDecay(dropFactor: Number, dropEvery: Number): Number;
 
         /**
-        * @function exponentialDecay Multiplies the learning rate by a decay constant raised to the power of the epoch or step.
+        * The `exponentialDecay`multiplies the learning rate by a decay constant raised to the power of the epoch or step.
         * @param {Number} decayRate is a multiplier factor that scales down the learning rate at each step or epoch. Default is `0.96`
         */
         export function exponentialDecay(decayRate: Number): Number;
 
         /**
-        * @function cosineAnnealing Follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
+        * The `cosineAnnealing` follows the shape of a cosine function to lower the learning rate smoothly to a minimum value.
         * @param {Number} totalEpochs The total number of epochs or steps over which the learning rate should decay following a cosine schedule.
         * @param {Number} minLR The minimum learning rate to decay toward.
         */
         export function cosineAnnealing(totalEpochs: Number, minLR: Number): Number;
     
         /**
-        * @function reduceOnPlateau Monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
+        * The `reduceOnPlateau` monitors a validation metric (like loss) and lowers the learning rate only when progress stops.
         * @param {ReduceOnPlateauConfig} config 
         */
         export function reduceOnPlateau(config: ReduceOnPlateauConfig): Number;
@@ -1000,13 +1008,13 @@ declare module 'neurex' {
      */
     export namespace optimizers {
         /**
-        * @function SGD or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
+        * The `SGD` or `Stochastic Gradient Descent` a core machine learning algorithm that updates model weights using small data batches or single samples, controlled by a learning rate and optional momentum.
         * @param {Number} momentum This hyperparameter dictates how much of the past gradient step is carried over to the current update. Default value is `0.9`.
         */
-        export function SGD(momentum: Number): Function;
+        export function SGD(momentum: number): Function;
 
         /**
-        * @function Adam or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
+        * The `Adam` or `Adaptive Moment Estimation` optimizer is a popular algorithm used to train deep learning models. Note: tweaking this can heavily skew training behavior. 
         * @param {Number} beta1 The exponential decay rate for the moving average of past gradients (the first moment or mean). Default value is `0.9`.
         * @param {Number} beta2 The exponential decay rate for the moving average of squared past gradients (the second moment or uncentered variance). Default value is `0.999`.
         * @param {Number} epsilon  A tiny positive constant added to the denominator. Default value is `1e-8`.
@@ -1014,7 +1022,7 @@ declare module 'neurex' {
         export function Adam(beta1: Number, beta2: Number, epsilon: Number): Function;
 
         /**
-        * @function RMSprop or (Root Mean Square Propagation) is an adaptive learning rate optimization algorithm designed to speed up and stabilize the training of deep neural networks.
+        * The `RMSprop` or (Root Mean Square Propagation) is an adaptive learning rate optimization algorithm designed to speed up and stabilize the training of deep neural networks.
         * @param decayRate controls how fast the running average of past squared gradients forgets old information. Default value is `0.9`.
         * @param epsilon A tiny positive constant added to the denominator. Default value is `1e-8`.
         */
@@ -1022,7 +1030,7 @@ declare module 'neurex' {
     }
 
     /**
-     * @function lossVisualizer is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
+     * The `lossVisualizer` is built in application for visualizing training progress. Keep track of loss and accuracy (if present) in a moving graph.
      */
     export function lossVisualizer(): Object;
 

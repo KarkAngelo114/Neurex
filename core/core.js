@@ -516,11 +516,9 @@ class Neurex {
     /**
      * 
      * @method sequentialBuild
-     * 
-     * interface to stack layer types. No weights and biases initialization here
-     * @param {Object} layer_data
+     * @param {Array<Object>} model
      */
-    sequentialBuild(layer_data) {
+    sequentialBuild(model) {
 
         try {
 
@@ -529,11 +527,12 @@ class Neurex {
                 return;
             }
 
-            if (!layer_data || layer_data.length < 1) {
-                throw new Error(`${color.red}[ERROR]${color.reset} No layers added.`);
+            if (!model || model.length < 1) {
+                console.log(`${color.red}[ERROR]${color.reset} No layers added. Have you add layers from the "Layers" class here?`);
+                throw new Error("ERR_NO_LAYERS_TO_BUILD");
             }
 
-            layer_data.forEach(layer => {
+            model.forEach(layer => {
                 // extract input size
                 if (layer.layer_name === "Input Layer") {
                     this.input_size = layer.layer_size;
@@ -557,14 +556,11 @@ class Neurex {
             this.lastLayerObject = this.layers[this.layers.length - 1];
 
             this.modelID = UUID.randomUUID();
-
-            return layer_data; 
         }
 
         
         catch(err) {
-            console.error(err);
-            process.exit(1);
+            throw new Error(err);
         }
     }
 
@@ -779,7 +775,7 @@ class Neurex {
                     
             }
         
-            console.log(`${color.orange}[TASK]------- Training session is starting${color.reset}\n`);
+            console.log(`${color.orange}[TASK]${color.reset} Training session is starting\n`);
       
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {
