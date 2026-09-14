@@ -1,3 +1,5 @@
+const { unpackQKVO, transpose2D } = require("../../../utils/utils");
+
 const Relu = (arr) => {
     const output = new Float32Array(arr);
     for (let i = 0; i < output.length; i++) {
@@ -1099,10 +1101,298 @@ const projectToQKV = (
         K: K,
         V: V
     }
-
-
 }
 
+const CoreAttention = (input, weights, biases, embedDim, seqLen, dkRoot) => {
+    const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKVO(weights, biases, null, null, embedDim);
+
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+
+    const transpose_K = transpose2D(K, seqLen, embedDim);
+
+    const scores = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const Qrow = Q.subarray(t * embedDim, (t + 1) * embedDim);
+        const rowScores = dotProduct(Qrow, transpose_K, embedDim, seqLen); // inputSize=embedDim, outputSize=seqLen
+        scores.set(rowScores, t * seqLen);
+    }
+
+    const scaledvals = scale(scores, dkRoot);
+
+    const softmaxOutput = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const row = scaledvals.subarray(t * seqLen, (t + 1) * seqLen);
+        softmaxOutput.set(Softmax(row), t * seqLen);
+    }
+
+    const output = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const srow = softmaxOutput.subarray(t * seqLen, (t + 1) * seqLen);
+        const orow = dotProduct(srow, V, seqLen, embedDim); // inputSize=seqLen, outputSize=embedDim
+        output.set(orow, t * embedDim);
+    }
+
+    const output_object = {
+        X: input,
+        Q: Q, 
+        K: K, 
+        V: V,
+        S: softmaxOutput,
+        output: output
+    };
+
+    return output_object;
+}
+
+const CoreAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, embedDim, seqLen, dkRoot) => {
+    // just like in feedforward, we unpack the weights, but we pass "null" to the 2nd - 4th argument of the function because we only want the weights for QKV
+    const {Q_weights, K_weights, V_weights} = unpackQKVO(weights, null, null, null, embedDim);
+
+    const transpose_V = transpose2D(V, seqLen, embedDim); 
+    const dS = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const deltaRow = incomingDelta.subarray(t * embedDim, (t + 1) * embedDim);
+        dS.set(dotProduct(deltaRow, transpose_V, embedDim, seqLen), t * seqLen);
+    }
+
+    const transpose_S = transpose2D(storedS, seqLen, seqLen); // Sᵀ
+    const dV = new Float32Array(seqLen * embedDim);
+    for (let k = 0; k < seqLen; k++) {
+        const sCol = transpose_S.subarray(k * seqLen, (k + 1) * seqLen);
+        dV.set(dotProduct(sCol, incomingDelta, seqLen, embedDim), k * embedDim);
+    }
+
+    // apply the softmax derivative (Jacobian matrix)
+    const dScaled = new Float32Array(seqLen * seqLen);
+    for (let t = 0; t < seqLen; t++) {
+        const sRow = storedS.subarray(t * seqLen, (t + 1) * seqLen);
+        const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
+        
+        // we pass the sRow (storedS during feedfoward) and dSRow
+        dScaled.set(DSoftmax(sRow, dSRow), t * seqLen);
+    }
+
+    const dScores = scale(dScaled, dkRoot);
+
+    const dQ = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const dScoreRow = dScores.subarray(t * seqLen, (t + 1) * seqLen);
+        dQ.set(dotProduct(dScoreRow, K, seqLen, embedDim), t * embedDim);
+    }
+
+    const transpose_dScores = transpose2D(dScores, seqLen, seqLen);
+    const dK = new Float32Array(seqLen * embedDim);
+    for (let k = 0; k < seqLen; k++) {
+        const col = transpose_dScores.subarray(k * seqLen, (k + 1) * seqLen);
+        dK.set(dotProduct(col, Q, seqLen, embedDim), k * embedDim);
+    }
+
+    const transpose_Qw = transpose2D(Q_weights, embedDim, embedDim);
+    const transpose_Kw = transpose2D(K_weights, embedDim, embedDim);
+    const transpose_Vw = transpose2D(V_weights, embedDim, embedDim);
+
+    const dX = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+
+        const fromQ = dotProduct(dQrow, transpose_Qw, embedDim, embedDim);
+        const fromK = dotProduct(dKrow, transpose_Kw, embedDim, embedDim);
+        const fromV = dotProduct(dVrow, transpose_Vw, embedDim, embedDim);
+
+        for (let d = 0; d < embedDim; d++) {
+            dX[t * embedDim + d] = fromQ[d] + fromK[d] + fromV[d];
+        }
+    }
+
+
+    const data_object = {
+        dQ: dQ,
+        dK: dK,
+        dV: dV,
+        dX: dX
+    }
+
+    return data_object;
+}
+
+const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot) => {
+    // 1. Unpack Q, K, V, and O
+    const { Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, O_weights, O_bias } = unpackQKVO(weights, biases, null, null, embedDim, true);
+
+    // 2. Project Input to Q, K, V [seqLen, embedDim]
+    const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
+
+    const mhaOutput = new Float32Array(seqLen * embedDim);
+
+    const scoresPerHead = seqLen * seqLen;
+    const S_per_head = new Float32Array(numHeads * scoresPerHead);
+
+    // 3. Process Each Head Independently
+    for (let h = 0; h < numHeads; h++) {
+        const headOffset = h * headDim;
+
+        // Extract Head-specific Q, K, V slices [seqLen, headDim]
+        const Q_h = new Float32Array(seqLen * headDim);
+        const K_h = new Float32Array(seqLen * headDim);
+        const V_h = new Float32Array(seqLen * headDim);
+
+        for (let t = 0; t < seqLen; t++) {
+            Q_h.set(Q.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            K_h.set(K.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            V_h.set(V.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+        }
+
+        // just like in simple attention, we ran dot product each Q * (K^T)
+        const transpose_K_h = transpose2D(K_h, seqLen, headDim);
+        const scores = new Float32Array(seqLen * seqLen);
+        for (let t = 0; t < seqLen; t++) {
+            const Qrow = Q_h.subarray(t * headDim, (t + 1) * headDim);
+            const rowScores = dotProduct(Qrow, transpose_K_h, headDim, seqLen);
+            scores.set(rowScores, t * seqLen);
+        }
+
+        // scale scores
+        const scaledVals = scale(scores, dkRoot);
+
+        // apply softmax to scaled scores
+        const softmaxOutput = new Float32Array(seqLen * seqLen);
+        for (let t = 0; t < seqLen; t++) {
+            const row = scaledVals.subarray(t * seqLen, (t + 1) * seqLen);
+            const softmaxRow = Softmax(row);
+            softmaxOutput.set(softmaxRow, t * seqLen);
+        }
+        S_per_head.set(softmaxOutput, h * scoresPerHead);
+
+        // Multiply Softmax Scores with V_h & Write Back to Concatenated Array
+        for (let t = 0; t < seqLen; t++) {
+            const srow = softmaxOutput.subarray(t * seqLen, (t + 1) * seqLen);
+            const headOutRow = dotProduct(srow, V_h, seqLen, headDim);
+            
+            // Insert back into the target head position in mhaOutput
+            const targetIdx = t * embedDim + headOffset;
+            mhaOutput.set(headOutRow, targetIdx);
+        }
+    }
+
+    // Step 4. Final Linear Projection (W_O) [seqLen, embedDim]
+    let finalOutput = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        finalOutput.set(MatMul(mhaRow, embedDim, embedDim, O_weights, O_bias), t * embedDim);
+    }
+
+    const output_object = {
+        X: input,
+        Q: Q, 
+        K: K, 
+        V: V,
+        mhaOutput: mhaOutput,
+        S_perHead: S_per_head,
+        finalOutput: finalOutput
+    };
+
+    return output_object;
+}
+
+const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot) => {
+    const {Q_weights, K_weights, V_weights, O_weights} = unpackQKVO(weights, null, null, null, embedDim, true);
+
+    // first we get the dMHAoutput by projecting the incoming delta to transposed O_weights
+    const transposed_O = transpose2D(O_weights, embedDim, embedDim);
+    const dMhaOutput = new Float32Array(embedDim * seqLen);
+    for (let i = 0; i < seqLen; i++) {
+        const incomingDeltaRow = incomingDelta.subarray(i * embedDim, (i + 1) * embedDim);
+        dMhaOutput.set(dotProduct(incomingDeltaRow, transposed_O, embedDim, embedDim), i * embedDim);
+    }
+
+    // Per head
+    const dQ = new Float32Array(seqLen * embedDim);
+    const dK = new Float32Array(seqLen * embedDim);
+    const dV = new Float32Array(seqLen * embedDim);
+
+    for (let h = 0; h < numHeads; h++) {
+        const headOffset = h * headDim;
+
+        const S = S_perHead.subarray(h * seqLen * seqLen, (h + 1) * seqLen * seqLen);
+
+        // slice this head's Q_h, K_h, V_h, and its share of dMhaOutput
+        const Q_h = new Float32Array(seqLen * headDim);
+        const K_h = new Float32Array(seqLen * headDim);
+        const V_h = new Float32Array(seqLen * headDim);
+        const dHeadOut = new Float32Array(seqLen * headDim);
+        for (let t = 0; t < seqLen; t++) {
+            Q_h.set(Q.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            K_h.set(K.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            V_h.set(V.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            dHeadOut.set(dMhaOutput.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+        }
+
+        const transpose_Vh = transpose2D(V_h, seqLen, headDim);
+        const dS = new Float32Array(seqLen * seqLen);
+        for (let t = 0; t < seqLen; t++) {
+            dS.set(dotProduct(dHeadOut.subarray(t * headDim, (t + 1) * headDim), transpose_Vh, headDim, seqLen), t * seqLen);
+        }
+
+        const transpose_S = transpose2D(S, seqLen, seqLen);
+        const dV_h = new Float32Array(seqLen * headDim);
+        for (let k = 0; k < seqLen; k++) {
+            dV_h.set(dotProduct(transpose_S.subarray(k * seqLen, (k + 1) * seqLen), dHeadOut, seqLen, headDim), k * headDim);
+        }
+
+        const dScaled = new Float32Array(seqLen * seqLen);
+        for (let t = 0; t < seqLen; t++) {
+            const sRow = S.subarray(t * seqLen, (t + 1) * seqLen);
+            const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
+            dScaled.set(DSoftmax(sRow, dSRow), t * seqLen);
+        }
+
+        const dScores = scale(dScaled, dkRoot);
+
+        const dQ_h = new Float32Array(seqLen * headDim);
+        for (let t = 0; t < seqLen; t++) {
+            dQ_h.set(dotProduct(dScores.subarray(t * seqLen, (t + 1) * seqLen), K_h, seqLen, headDim), t * headDim);
+        }
+        
+        const transpose_dScores = transpose2D(dScores, seqLen, seqLen);
+        const dK_h = new Float32Array(seqLen * headDim);
+        for (let k = 0; k < seqLen; k++) {
+            dK_h.set(dotProduct(transpose_dScores.subarray(k * seqLen, (k + 1) * seqLen), Q_h, seqLen, headDim), k * headDim);
+        }
+
+        // write this head's contribution back into the FULL embedDim-wide buffers
+        for (let t = 0; t < seqLen; t++) {
+            dQ.set(dQ_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+            dK.set(dK_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+            dV.set(dV_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+        }
+    }
+
+    const transpose_Qw = transpose2D(Q_weights, embedDim, embedDim);
+    const transpose_Kw = transpose2D(K_weights, embedDim, embedDim);
+    const transpose_Vw = transpose2D(V_weights, embedDim, embedDim);
+    const dX = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const fromQ = dotProduct(dQ.subarray(t * embedDim, (t + 1) * embedDim), transpose_Qw, embedDim, embedDim);
+        const fromK = dotProduct(dK.subarray(t * embedDim, (t + 1) * embedDim), transpose_Kw, embedDim, embedDim);
+        const fromV = dotProduct(dV.subarray(t * embedDim, (t + 1) * embedDim), transpose_Vw, embedDim, embedDim);
+        for (let d = 0; d < embedDim; d++) {
+            dX[t * embedDim + d] = fromQ[d] + fromK[d] + fromV[d]
+        };
+    }
+
+
+    const data = {
+        dQ: dQ,
+        dK: dK,
+        dV: dV,
+        dMhaOutput: dMhaOutput,
+        dX: dX
+    }
+
+    return data;
+}
 
 const jaccard = (arr1, arr2) => {
     const set1 = new Set(arr1);
@@ -1163,8 +1453,10 @@ module.exports = {
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
     gradientClipping,
-    dotProduct,
     computelayerNorm,
-    projectToQKV,
-    jaccard
+    jaccard,
+    CoreAttention,
+    CoreAttentionBackward,
+    CoreMultiHeadAttention,
+    CoreMultiHeadAttentionBackward
 }
