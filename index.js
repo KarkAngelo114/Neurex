@@ -1,13 +1,3 @@
-/**
- * 
-
- Centralized imports to tbe main script. 
-
- Example Usage:
- const {Neurex, MinMaxScaler, ...} = require('neurex');
-
- */
-
 const Neurex = require('./core');
 const CsvDataHandler = require('./preprocessor/CsvDataHandler');
 const {MinMaxScaler} = require('./preprocessor/normalizer');
@@ -28,6 +18,7 @@ const { lossVisualizer } = require('./applications/visualizer/lossVisualizer');
 const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLandscapeVisualizer');
 const { modelVisualizer } = require('./applications/visualizer/modelVisualizer');
 const { clipGradient } = require('./normalizers');
+const { mnist_digits } = require('./applications/datasets');
 
 
 
@@ -87,5 +78,8 @@ module.exports= {
         softmax: Softmax,
         linear: Linear,
         jaccard
+    },
+    datasets: {
+        mnist_digits
     }
 }

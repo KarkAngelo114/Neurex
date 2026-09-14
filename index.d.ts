@@ -1050,4 +1050,16 @@ declare module 'neurex' {
      * a visualizer tool that visualize model architecture and parameters
      */
     export function modelVisualizer(): Object;
+
+    /**
+     * The `datasets` namespace allows you to use functions that fetches dataset from an external source.
+     */
+    export namespace datasets {
+        /**
+         * Fetches the MNIST digits datasets. The training data is already formatted to `Float32Array` and labels to `one hot encoded`
+         * @async
+         * @returns {{ dataset: Float32Array[], labels: number[][] }}
+         */
+        export function mnist_digits(): { dataset: Float32Array[], labels: number[][]};
+    }
 }

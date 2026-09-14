@@ -17,4 +17,5 @@ export const {
     optimizers, // optimizers namespace
     preprocesors, // preprocessors namespace
     math, // math namespace
+    datasets, // datasets namespace
 } = pkg;
