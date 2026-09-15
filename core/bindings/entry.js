@@ -710,7 +710,7 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{ X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, S: Float32Array, output: Float32Array}}
  */
-const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => float32_Modules.CoreAttention(
+const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => functions.CoreAttention(
     input, 
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
@@ -735,7 +735,7 @@ const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => flo
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dX: Float32Array}}
  */
-const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID) => float32_Modules.CoreAttentionBackward(
+const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID) => functions.CoreAttentionBackward(
     delta, 
     Q, 
     K,

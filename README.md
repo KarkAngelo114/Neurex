@@ -30,10 +30,10 @@ Neurex is a Javascript-based, deep learning for Node.js. It supports training on
 4. ⚡ GPU acceleration for faster training ✅
 
 ## Why use Neurex
-1. Easy implementation - intuitive API calls. No need to fight with the API design
-2. Abstracted complexities - Intuitive API that handles the heavy lifting of backpropagation and weight initialization, allowing you to focus on architecture.
-3. Educational - Good for experimenting or learning how to build Neural networks
-4. Use vs See - Others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
+1. **Modular** - Built with a modular structure so you can easily extend.
+2. **Simple To Use** - Has intuitive, organized high-level APIs for beginners to use without needing to learn low-level machinery of the library.
+3. **Educational** - Good for experimenting or learning how to build Neural networks.
+4. **Production-Ready** - Stable for production use and easy model loading and inferencing.
 
 
 ## Build your model sequentially
