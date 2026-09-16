@@ -112,10 +112,10 @@ simpleAttention(`useBias: boolean`)
 layer.simpleAttention()
 ```
 
-multiHeadAttention(`numHeads: number, useBias: boolean`)
+multiHeadAttention(`numHeads: number, useCasualMasking: boolean, useBias: boolean`)
 - `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
 ```JavaScript
-layer.multiHeadAttention(8, true)
+layer.multiHeadAttention(8, true, true)
 ```
 
 layerNorm(`epsilon: number`)

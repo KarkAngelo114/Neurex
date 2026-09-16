@@ -392,10 +392,11 @@ class Layers {
     /**
      * @method `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Q, K, and V into different parts called `heads`
      * @param {number} numHeads Total number of attention heads. Default is `8.`
+     * @param {Boolean} useCasualMasking A boolean indicating whether to apply a causal mask to prevent tokens from attending to future tokens . Default is `false`
      * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
      * @returns {object} multiHeadAttention config
      */
-    multiHeadAttention(numHeads = 8, useBias = true) {
+    multiHeadAttention(numHeads = 8, useCasualMasking = false, useBias = true) {
         try {
             if (numHeads <= 0 || !numHeads) {
                 throw new Error("Num heads cannot be 0, null, or a negative number")
@@ -411,6 +412,7 @@ class Layers {
                 isParametric: true,
                 useBias: useBias,
                 numHeads: numHeads,
+                useCasualMasking: useCasualMasking,
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => mha.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => mha.determineInferenceType(layerObject, lossFunc, trainY),

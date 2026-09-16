@@ -701,7 +701,7 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
 };
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input the input tensor
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
@@ -722,7 +722,7 @@ const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => fun
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} delta incoming delta
  * @param {Float32Array} Q cached Q
  * @param {Float32Array} K cached K
@@ -757,11 +757,12 @@ const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, poin
  * @param {Number} numHeads number of heads that process scaled dot product in parallel
  * @param {Number} headDim head dim value
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
+ * @param {Boolean} useCasualMasking casual masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, mhaOutput: Float32Array, S_perHead: Float32Array, finalOutput: Float32Array}}
  */
-const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, pointer, modelID) => float32_Modules.CoreMultiHeadAttention(
+const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttention(
     input,
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
@@ -770,6 +771,7 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
     numHeads,
     headDim, 
     dkRoot,
+    useCasualMasking,
     pointer,
     modelID
 );
@@ -786,11 +788,12 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
  * @param {Number} numHeads number of heads that process scaled dot product in parallel
  * @param {Number} headDim head dim value
  * @param {Number} dkRoot dkRoot value. Used for scaling attention delta scores
+ * @param {Boolean} useCasualMasking casual masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dMhaOutput: Float32Array, dX: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, pointer, modelID) => float32_Modules.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttentionBackward(
     delta,
     getGlobalParams(modelID).globalWeights[pointer],
     Q,
@@ -802,6 +805,7 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     numHeads,
     headDim,
     dkRoot,
+    useCasualMasking,
     pointer,
     modelID
 );

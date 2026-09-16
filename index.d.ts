@@ -608,10 +608,11 @@ declare module 'neurex' {
         /**
         * The `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
         * @param {number} numHeads Total number of attention heads. Default is `8.`
+        * @param {Boolean} useCasualMasking A boolean indicating whether to apply a causal mask to prevent tokens from attending to future tokens . Default is `false`
         * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @returns {object} multiHeadAttention config
         */
-        multiHeadAttention(numHeads: number, useBias: boolean): object;
+        multiHeadAttention(numHeads: number, useCasualMasking: boolean, useBias: boolean): object;
 
         /**
         *  The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.

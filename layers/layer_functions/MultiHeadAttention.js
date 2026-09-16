@@ -89,9 +89,9 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  */
 const feedforward = (input, current_layer, pointer, modelID) => {
 
-    const {embedDim, seqLen, numHeads, headDim, dkRoot} = current_layer;
+    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking} = current_layer;
 
-    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, pointer, modelID);
+    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking, pointer, modelID);
 
     current_layer.cache = {
         X: input,
@@ -135,9 +135,9 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
 
-    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot} = layer_data;
+    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking} = layer_data;
     const { Q, K, V, S_perHead } = cache;
-    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, pointer, modelID);
+    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking, pointer, modelID);
 
     layer_data.cache = {
         ...cache,

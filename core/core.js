@@ -286,7 +286,8 @@ class Neurex {
                 headDim: layer.headDim || 1,
                 numHeads: layer.numHeads || 8,
                 shapeType: layer.shapeType || null,
-                eps: layer.eps
+                eps: layer.eps,
+                useCasualMasking: layer.useCasualMasking || false
             })),
             "miscellaneous": miscellaneous
         };
@@ -466,7 +467,7 @@ class Neurex {
                     newLayer.seqLen = layerData.maxSequenceLength;
                 }
                 else if (layerData.layer_name === "Multi Head Attention") {
-                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads ,layerData.useBias);
+                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads, layerData.useCasualMasking, layerData.useBias);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
@@ -475,6 +476,7 @@ class Neurex {
                     newLayer.seqLen = layerData.maxSequenceLength;
                     newLayer.numHeads = layerData.numHeads;
                     newLayer.headDim = layerData.headDim;
+                    newLayer.useCasualMasking = layerData.useCasualMasking;
                 }
                 else if (layerData.layer_name === "Layer Normalization") {
                     newLayer = layerBuilder.layerNorm(layerData.eps);

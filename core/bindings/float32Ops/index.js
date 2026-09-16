@@ -1217,7 +1217,7 @@ const CoreAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, embedDi
     return data_object;
 }
 
-const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot) => {
+const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking) => {
     // 1. Unpack Q, K, V, and O
     const { Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, O_weights, O_bias } = unpackQKVO(weights, biases, null, null, embedDim, true);
 
@@ -1253,6 +1253,14 @@ const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHea
             scores.set(rowScores, t * seqLen);
         }
 
+        if (useCasualMasking) {
+            for (let i = 0; i < seqLen; i++) {
+                for (let j = i + 1; j < seqLen; j++) {
+                    scores[i * seqLen + j] = -1e9;
+                }
+            }
+        }
+    
         // scale scores
         const scaledVals = scale(scores, dkRoot);
 
@@ -1296,7 +1304,7 @@ const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHea
     return output_object;
 }
 
-const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot) => {
+const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking) => {
     const {Q_weights, K_weights, V_weights, O_weights} = unpackQKVO(weights, null, null, null, embedDim, true);
 
     // first we get the dMHAoutput by projecting the incoming delta to transposed O_weights
@@ -1349,6 +1357,14 @@ const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHe
         }
 
         const dScores = scale(dScaled, dkRoot);
+
+        if (useCasualMasking) {
+            for (let i = 0; i < seqLen; i++) {
+                for (let j = i + 1; j < seqLen; j++) {
+                    dScores[i * seqLen + j] = 0;
+                }
+            }
+        }
 
         const dQ_h = new Float32Array(seqLen * headDim);
         for (let t = 0; t < seqLen; t++) {
