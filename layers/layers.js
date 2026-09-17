@@ -30,6 +30,8 @@ const reshaper = require('./layer_functions/reshape');
 const simple_attention = require("./layer_functions/simpleAttention");
 const mha = require("./layer_functions/MultiHeadAttention");
 const normModule = require('./layer_functions/layerNorm');
+const residual_start = require('./layer_functions/residual_start');
+const residual_end = require('./layer_functions/residual_end');
 
 class Layers {
     constructor () {
@@ -451,6 +453,47 @@ class Layers {
             applyOwnDerivative: (delta, z, layer_data) => normModule.applyOwnDerivative(delta, z, layer_data),
             accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => normModule.accumulateGammaGrads(activation_outputs, deltas, weightGrads, layer_data),
             accumulateBiasGradients: (biasgrads, deltas, layer_data) => normModule.accumulateBetaGrads(biasgrads, deltas, layer_data),
+        }
+    }
+
+    
+    /**
+     * this layer will cache the incoming input to be used by the `residualEnd`.
+     */ 
+    residualStart() {
+        return {
+            layer_name: "Residual Start",
+            isParametric: false,
+            shapeType: null,
+            endConnection: false,
+            initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
+            determineInferenceType: () => {},
+            feedforward: (input, current_layer, pointer, modelID) => residual_start.feedforward(input, modelID),
+            getOutputLayerDelta: () => {},
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => residual_start.projectDeltaBackward(delta, modelID),
+            applyOwnDerivative: (delta, z, layer_data) => delta,
+            accumulateWeightGradients: () => {},
+            accumulateBiasGradients: () => {}
+        }
+    }
+
+    /**
+     * this layer will use the cached original input by the `residualStart` and add the input to the transformed output
+      */
+    residualEnd() {
+        return {
+            layer_name: "Residual End",
+            isParametric: false,
+            shapeType: null,
+            endConnection: true,
+            initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
+            determineInferenceType: () => {},
+            feedforward: (input, current_layer, pointer, modelID) => residual_end.feedforward(input, modelID),
+            getOutputLayerDelta: () => {},
+            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => residual_end.projectDeltaBackward(delta, modelID),
+            applyOwnDerivative: (delta, z, layer_data) => delta,
+            accumulateWeightGradients: () => {},
+            accumulateBiasGradients: () => {}
         }
     }
 

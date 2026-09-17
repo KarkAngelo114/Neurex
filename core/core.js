@@ -20,7 +20,7 @@ const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
 const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
-const { init, gradientClipping, scale, shutdown } = require('./bindings');
+const { init, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
 const version = require('../package.json').version;
@@ -74,6 +74,7 @@ class Neurex {
         this.lastLayerObject = {};
 
         this.hasInitializedNativeBindings = false;
+        this.insideResidual = false;
 
         this.gradient_normalizers = [];
         this.losses = ["mae", "mse", "categorical_cross_entropy", "sparse_categorical_cross_entropy", "binary_cross_entropy"]
@@ -143,7 +144,7 @@ class Neurex {
         }
 
         const COLS = [
-            { title: 'Layer (type)', width: 24 },
+            { title: 'Layer (type)', width: 30 },
             { title: 'Output Shape', width: 26 },
             { title: 'Activation',   width: 14 },
             { title: 'Parameters',   width: 20 },
@@ -171,29 +172,54 @@ class Neurex {
         console.log(hr('='));
 
         let pointer = 0;
+        let insideResidual = false;
+
         this.layers.forEach((layer) => {
             const layerType = layer.layer_name;
-            const activationName = layer.activation_function ? layer.activation_function.name : 'None';
+            const activationName = layer.activation_function
+                ? layer.activation_function.name
+                : 'None';
 
             const isParametric = this.parametric_layers.includes(layerType);
 
             let paramCount = 0;
             if (isParametric) {
                 const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = (this.biases[pointer] && layer.useBias) ? this.biases[pointer].length : 0;
+                const b = (this.biases[pointer] && layer.useBias)
+                    ? this.biases[pointer].length
+                    : 0;
+
                 paramCount = w + b;
                 pointer++;
             }
 
-            let displayName, outputShape, activation, params, padding;
+            const isResidualStart = layerType === "Residual Start";
+            const isResidualEnd = layerType === "Residual End";
 
-            displayName = layerType;
-            outputShape = `(${layer.outputShape.join(' x ')})`;
-            activation  = activationName || 'None';
-            params = `${paramCount.toLocaleString()} ${paramCount == 0 ? "(non-param)":""}`;
-            padding = layer.padding || 'None';
+            const indentation = insideResidual && !isResidualStart && !isResidualEnd ? "  |__": "";
 
-            console.log(row([displayName, outputShape, activation, params, padding]));
+            const displayName = indentation + layerType;
+            const outputShape = `(${layer.outputShape.join(' x ')})`;
+            const activation = activationName || 'None';
+            const params = `${paramCount.toLocaleString()} ${
+                paramCount === 0 ? "(non-param)" : ""
+            }`;
+            const padding = layer.padding || 'None';
+
+            console.log(row([
+                displayName,
+                outputShape,
+                activation,
+                params,
+                padding
+            ]));
+
+            // Boundaries are displayed at the outer level.
+            if (isResidualStart) {
+                insideResidual = true;
+            } else if (isResidualEnd) {
+                insideResidual = false;
+            }
         });
 
         // 5) Footer block.
@@ -261,33 +287,33 @@ class Neurex {
             "num_layers":this.num_layers,
             "layers": this.layers.map(layer => ({
                 layer_name: layer.layer_name,
-                activation_function_name: layer.activation_function ? layer.activation_function.name : null,
-                derivative_activation_function_name: layer.derivative_activation_function ? layer.derivative_activation_function.name : null,
-                layer_size: layer.layer_size || null,
-                feedforward: layer.feedforward,
-                backpropagate: layer.backpropagate,
-                padding: layer.padding || '',
-                filters: layer.filters || 0,
-                strides: layer.strides || 0,
-                kernel_size: layer.kernel_size || [0, 0],
-                weightShape: layer.weightShape || [],
-                inputShape: layer.inputShape || [],
-                targetShape: layer.targetShape || [],
-                outputShape: layer.outputShape || [],
-                poolSize: layer.poolSize || [],
-                embeddingDim: layer.embeddingDim || layer.embedDim || 1,
+                activation_function_name: layer?.activation_function ? layer?.activation_function?.name : null,
+                derivative_activation_function_name: layer?.derivative_activation_function ? layer?.derivative_activation_function?.name : null,
+                layer_size: layer?.layer_size || null,
+                feedforward: layer?.feedforward,
+                backpropagate: layer?.backpropagate,
+                padding: layer?.padding || '',
+                filters: layer?.filters || 0,
+                strides: layer?.strides || 0,
+                kernel_size: layer?.kernel_size || [0, 0],
+                weightShape: layer?.weightShape || [],
+                inputShape: layer?.inputShape || [],
+                targetShape: layer?.targetShape || [],
+                outputShape: layer?.outputShape || [],
+                poolSize: layer?.poolSize || [],
+                embeddingDim: layer?.embeddingDim || layer?.embedDim || 1,
                 vocabSize: layer.vocabSize || 1,
-                maxSequenceLength: layer.maxSequenceLength || layer.seqLen || 1,
-                units: layer.units || 1,
-                return_sequence: layer.return_sequence || false,
-                isParametric: layer.isParametric,
-                dkRoot: layer.dkRoot || 0,
-                useBias: layer.useBias ?? true,
-                headDim: layer.headDim || 1,
-                numHeads: layer.numHeads || 8,
-                shapeType: layer.shapeType || null,
-                eps: layer.eps,
-                useCasualMasking: layer.useCasualMasking || false
+                maxSequenceLength: layer?.maxSequenceLength || layer?.seqLen || 1,
+                units: layer?.units || 1,
+                return_sequence: layer?.return_sequence || false,
+                isParametric: layer?.isParametric,
+                dkRoot: layer?.dkRoot || 0,
+                useBias: layer?.useBias ?? true,
+                headDim: layer?.headDim || 1,
+                numHeads: layer?.numHeads || 8,
+                shapeType: layer?.shapeType || null,
+                eps: layer?.eps || 0,
+                useCasualMasking: layer?.useCasualMasking || false,
             })),
             "miscellaneous": miscellaneous
         };
@@ -480,6 +506,18 @@ class Neurex {
                 }
                 else if (layerData.layer_name === "Layer Normalization") {
                     newLayer = layerBuilder.layerNorm(layerData.eps);
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.weightShape = layerData.weightShape;
+                }
+                else if (layerData.layer_name === "Residual Start") {
+                    newLayer = layerBuilder.residualStart();
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.weightShape = layerData.weightShape;
+                }
+                else if (layerData.layer_name === "Residual End") {
+                    newLayer = layerBuilder.residualEnd();
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.weightShape = layerData.weightShape;
@@ -1269,6 +1307,21 @@ class Neurex {
             this.currentSize = H * W * D;
             let prevlayer = null;
             this.layers.forEach((layer_data) => {
+                
+                if (layer_data.layer_name === "Residual Start") {
+                    if (this.insideResidual) {
+                        console.warn(`${color.yellow}[WARN]${color.reset} Nested "residualStart()" detected before a matching "residualEnd()". Nested residual connections aren't supported — this will overwrite the previously cached input and likely cause shape mismatches or garbage gradients downstream.`);
+                    }
+                    this.insideResidual = true;
+                }
+
+                if (layer_data.layer_name === "Residual End") {
+                    if (!this.insideResidual) {
+                        console.warn(`${color.yellow}[WARN]${color.reset} "residualEnd()" found with no matching "residualStart()" before it. This will throw ERR_NO_RESIDUAL_CACHED at runtime.`);
+                    }
+                    this.insideResidual = false;
+                }
+
                 this.#validateShapeTransition(prevlayer, layer_data);
                 const {
                     updatedSize, 
@@ -1302,6 +1355,10 @@ class Neurex {
                 prevlayer = layer_data
             });
 
+            if (this.insideResidual) {
+                console.warn(`${color.yellow}[WARN]${color.reset} Model ends with an unclosed "residualStart()" — no matching "residualEnd()" was found.`);
+            }
+
             this.hasBuilt = true;
         } catch (error) {
             console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
@@ -1314,6 +1371,20 @@ class Neurex {
     // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
         let prevLayer = this.layers[this.layers.length -1]; // get the last layer from the stack
+
+        if (layer_data.layer_name === "Residual Start") {
+            if (this.insideResidual) {
+                console.warn(`${color.yellow}[WARN]${color.reset} Nested "residualStart()" detected before a matching "residualEnd()". Nested residual connections aren't supported — this will overwrite the previously cached input and likely cause shape mismatches or garbage gradients downstream.`);
+            }
+            this.insideResidual = true;
+        }
+
+        if (layer_data.layer_name === "Residual End") {
+            if (!this.insideResidual) {
+                console.warn(`${color.yellow}[WARN]${color.reset} "residualEnd()" found with no matching "residualStart()" before it. This will throw ERR_NO_RESIDUAL_CACHED at runtime.`);
+            }
+            this.insideResidual = false;
+        }
 
         this.#validateShapeTransition(prevLayer, layer_data);
         const {
@@ -1527,7 +1598,12 @@ class Neurex {
         const prevType = prevLayer.shapeType;
         const currType = currentLayer.shapeType;
 
-        if (prevLayer.layer_name === "Layer Normalization" || currentLayer.layer_name === "Layer Normalization") {
+        if (
+            prevLayer.layer_name === "Layer Normalization" || 
+            currentLayer.layer_name === "Layer Normalization" || 
+            prevLayer.layer_name === "Residual Start" || 
+            currentLayer.layer_name === "Residual End"
+        ) {
             return;
         }
 

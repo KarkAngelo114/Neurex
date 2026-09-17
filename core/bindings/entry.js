@@ -472,6 +472,12 @@ const element_wise_sub = (flat_arr_1, flat_arr_2) => {
     return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2));
 }
 
+const element_wise_add = (arr1, arr2) => {
+    if (arr1.length != arr2.length) throw new Error(`[ERROR] Error: Both arrays are not equal in length. array1: ${arr1.length} | array2:${arr2.length}`);
+
+    return float32_Modules.element_wise_add(arr1, arr2);
+}
+
 /**
  * "✅☑️"
  * @param {Foat32Array} arr1 a flat array input
@@ -837,6 +843,7 @@ module.exports = {
     ApplyRMSProp,
     element_wise_mul,
     element_wise_sub,
+    element_wise_add,
     accumulate_element_wise_mul,
     MaxPool,
     MaxPoolDelta,

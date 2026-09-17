@@ -1421,6 +1421,16 @@ const jaccard = (arr1, arr2) => {
     return Math.abs(union.size === 0 ? 0 : intersection.length / union.size);
 }
 
+const element_wise_add = (arr1, arr2) => {
+    const output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < arr1.length; i++) {
+        output[i] = arr1[i] + arr2[i];
+    }
+
+    return output;
+}
+
 
 module.exports = {
     Relu,
@@ -1474,5 +1484,6 @@ module.exports = {
     CoreAttention,
     CoreAttentionBackward,
     CoreMultiHeadAttention,
-    CoreMultiHeadAttentionBackward
+    CoreMultiHeadAttentionBackward,
+    element_wise_add
 }

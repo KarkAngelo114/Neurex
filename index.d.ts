@@ -615,11 +615,22 @@ declare module 'neurex' {
         multiHeadAttention(numHeads: number, useCasualMasking: boolean, useBias: boolean): object;
 
         /**
-        *  The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.
+        * The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.
         * @param {Number} epsilon Small epsilon constant to prevent division by zero. Default is 1e-5.
         * @returns {Object} LayerNorm configuration object
         */
         layerNorm(epsilon: number): object;
+        
+        /**
+        * The `residualStart` allows you to start the residual connection. It will cache the input to be use by the `residualEnd`
+        */
+        residualStart(): object;
+
+        /**
+         * The `residualEnd` marks the end of the residual connection. It will add the cached input set by the `residualStart` with the output projected by earlier layers. Error will occur if the residual connection hasn't been started yet.
+         * @throws Size mismatch between the stored input and the projected output of the previous layers.
+        */
+        residualEnd(): object;
     }
 
     export class Annotator {
