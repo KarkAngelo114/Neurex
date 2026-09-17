@@ -1,4 +1,3 @@
-const activation = require('../../core/bindings');
 const { CoreAttention, CoreAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings');
 const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('../../utils');
 
@@ -73,7 +72,17 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
 const feedforward = (input, current_layer, pointer, modelID) => {
-    const output = CoreAttention(input, current_layer, pointer, modelID);
+    const { embedDim, dkRoot, seqLen } = current_layer;
+
+    const {X, Q, K, V, S, output} = CoreAttention(input, embedDim, seqLen, dkRoot, pointer, modelID);
+
+    current_layer.cache = {
+        X: X,
+        Q: Q, 
+        K: K, 
+        V: V,
+        S: S
+    };
 
     if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during feed forward)");
 
@@ -107,10 +116,19 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
+    const {cache, embedDim, seqLen, dkRoot} = layer_data;
+    const {Q, K, V, S } = cache;
+    const { dQ, dK, dV, dX} = CoreAttentionBackward(delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID);
 
-    const output = CoreAttentionBackward(delta, layer_data, pointer, modelID);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
-    return output;
+    layer_data.cache = {
+        ...cache,
+        dQ,
+        dK, 
+        dV
+    };
+
+    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
+    return dX;
 }
 
 /**

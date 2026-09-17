@@ -608,17 +608,29 @@ declare module 'neurex' {
         /**
         * The `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
         * @param {number} numHeads Total number of attention heads. Default is `8.`
+        * @param {Boolean} useCausalMasking A boolean indicating whether to apply a causal mask to prevent tokens from attending to future tokens . Default is `false`
         * @param {boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
         * @returns {object} multiHeadAttention config
         */
-        multiHeadAttention(numHeads: number, useBias: boolean): object;
+        multiHeadAttention(numHeads: number, useCausalMasking: boolean, useBias: boolean): object;
 
         /**
-        *  The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.
+        * The `layerNorm` normalizes the activations of the previous layer for each individual sample independently.
         * @param {Number} epsilon Small epsilon constant to prevent division by zero. Default is 1e-5.
         * @returns {Object} LayerNorm configuration object
         */
         layerNorm(epsilon: number): object;
+        
+        /**
+        * The `residualStart` allows you to start the residual connection. It will cache the input to be use by the `residualEnd`
+        */
+        residualStart(): object;
+
+        /**
+         * The `residualEnd` marks the end of the residual connection. It will add the cached input set by the `residualStart` with the output projected by earlier layers. Error will occur if the residual connection hasn't been started yet.
+         * @throws Size mismatch between the stored input and the projected output of the previous layers.
+        */
+        residualEnd(): object;
     }
 
     export class Annotator {
@@ -900,13 +912,15 @@ declare module 'neurex' {
 
     /**
      * provides some predefined network templates which can be drop in the `sequentialBuild()`. The templates doesn't have input layer nor a predefined output layer so that you can add your own.
-     * The templates returns an array of layer configuration objects. To add them in the `sequentialBuild()`, you must use a spread operator (`...`)
+     * The templates returns an array of layer configuration objects.
      *
      * @example
+     * const nrx = require('neurex');
+     * const model = new nrx.Neurex();
      * 
-     * nrx.sequentialBuild([
+     * model.sequentialBuild([
      *      layer.inputShape({features: 4}),
-     *      ...templates.simpleNeuralNetwork(),
+     *      nrx.templates.simpleNeuralNetwork(),
      *      layer.connectedLayer('linear', 1),
      * ]);
      * 
@@ -915,7 +929,7 @@ declare module 'neurex' {
         /**
          * A simple neural network having 3 hidden connected layers, having 5 neurons each layer. All uses `relu` activation function
          */
-        export function simpleNeuralNetwork(): Array<Object>;
+        export function simpleNeuralNetwork(): object[];
     
         /**
          *  A simple CNN having a two convolutional layers each having different number of filters, same strides and kernel sizes. Both uses `same` padding and `relu` activation functions.
@@ -924,18 +938,18 @@ declare module 'neurex' {
          *
          * @param {Boolean} isHeadless if set to `true`, it will only return the extractor layers (convolution and max pooling layers). Default value is `false`
          */
-        export function simpleCNN(isHeadless: Boolean): Array<Object>;
+        export function simpleCNN(isHeadless: Boolean): object[];
 
         /**
          * 
          * A deep convolutional neural network model consisting of 16 layers. This template allows to train VGG16 without manually placing the layers piece by piece in the `sequentialBuild()`
          */
-        export function VGG16(): Array<Object>; 
+        export function VGG16(): object[];
 
         /**
          * A lightweight, deep convolutional neural network model. This template allows you to use `LiteNet` architecture where you can drop in the `sequentialBuild()`
          */
-        export function LiteNet():Array<Object>;
+        export function LiteNet(): object[];
 
         /**
          *  A vanilla recurrent neural network with 3 recurrent cells.
@@ -944,12 +958,31 @@ declare module 'neurex' {
          * 
          *
          */
-        export function vanillaRNN(units_per_cell: Number, activation_function: String): Array<Object>;
+        export function vanillaRNN(units_per_cell: Number, activation_function: String): object[];
 
         /**
-         * A type of neural network which has an decoding and encoding parts
-         */
-        export function AutoEncoder(): Array<Object>;
+        * Generates a Generative Pre-trained Transformer (GPT) style decoder-only architecture boilerplate.
+        * 
+        * Includes token embeddings, causal multi-head self-attention with residual 
+        * connections, layer normalization, and a feed-forward neural network.
+        * 
+        * @see {@link https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf|Improving Language Understanding by Generative Pre-Training (Radford et al., 2018)}
+        * @see {@link https://arxiv.org/abs/1706.03762|Attention Is All You Need (Vaswani et al., 2017)}
+        * 
+        * @authors
+        * Credits to the great mninds:
+        * - **GPT Architecture Proponents (OpenAI):** Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya Sutskever
+        * - **Transformer Architecture Inventors:** Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin
+        * 
+        * @param {number} embedDim - The hidden state/embedding dimension size (must be a positive integer).
+        * @param {number} seqLen - The maximum context length or sequence length (must be a positive integer).
+        * @param {number} numHeads - The number of attention heads for multi-head attention (must be a positive integer).
+        * 
+        * @returns {Array<Object>} An array representing the sequential layer configuration for the GPT architecture.
+        * 
+        * @throws {Error} Throws an error if any parameter is zero, negative, null, or undefined.
+        */
+        export function GPT(vocabSize: number, embedDim: number, seqLen: number, numHeads: number): object[];
     }
 
     /**

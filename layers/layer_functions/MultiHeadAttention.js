@@ -1,5 +1,5 @@
 const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings/entry');
-const { XavierInitialization, concatenateFloat32Array, unpackQKV, unpackQKVO } = require('../../utils/utils');
+const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('../../utils/utils');
 
 /**
  * Initialized parameters for this layer
@@ -47,7 +47,7 @@ const initParams = (size, shape, layer_data) => {
 
         layer_data.dkRoot = Math.sqrt(headDim);
         layer_data.embedDim = embeddingDim;
-        layer_data.seqLen = shape[3];
+        layer_data.seqLen = shape[3] || 1;
         layer_data.headDim = headDim;
 
         return {
@@ -88,13 +88,25 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
 const feedforward = (input, current_layer, pointer, modelID) => {
-    const output = CoreMultiHeadAttention(input, current_layer, pointer, modelID);
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during feed forward)");
+    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = current_layer;
+
+    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
+
+    current_layer.cache = {
+        X: input,
+        Q: Q, 
+        K: K, 
+        V: V,
+        mhaOutput: mhaOutput,
+        S_perHead: S_perHead
+    };
+
+    if (finalOutput.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during feed forward)");
 
     return {
-        outputs: output,
-        z_values: output,
+        outputs: finalOutput,
+        z_values: finalOutput,
         incrementor_value: 1
     };
 }
@@ -123,9 +135,22 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
  */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
 
-    const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer, modelID);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
-    return output;
+    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layer_data;
+    const { Q, K, V, S_perHead } = cache;
+    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
+
+    layer_data.cache = {
+        ...cache,
+        dQ: dQ,
+        dK: dK,
+        dV: dV,
+        dMhaOutput: dMhaOutput,
+        dX: dX
+    };
+
+    // const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer, modelID);
+    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
+    return dX;
 }
 
 /**

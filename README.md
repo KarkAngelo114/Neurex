@@ -30,10 +30,10 @@ Neurex is a Javascript-based, deep learning for Node.js. It supports training on
 4. ⚡ GPU acceleration for faster training ✅
 
 ## Why use Neurex
-1. Easy implementation - intuitive API calls. No need to fight with the API design
-2. Abstracted complexities - Intuitive API that handles the heavy lifting of backpropagation and weight initialization, allowing you to focus on architecture.
-3. Educational - Good for experimenting or learning how to build Neural networks
-4. Use vs See - Others just let you use their predefined networks. Neurex lets you build and see the network to train, allowing you to design your model for your own use case.
+1. **Modular** - Built with a modular structure so you can easily extend.
+2. **Simple To Use** - Has intuitive, organized high-level APIs for beginners to use without needing to learn low-level machinery of the library.
+3. **Educational** - Good for experimenting or learning how to build Neural networks.
+4. **Production-Ready** - Stable for production use and easy model loading and inferencing.
 
 
 ## Build your model sequentially
@@ -112,10 +112,10 @@ simpleAttention(`useBias: boolean`)
 layer.simpleAttention()
 ```
 
-multiHeadAttention(`numHeads: number, useBias: boolean`)
+multiHeadAttention(`numHeads: number, useCasualMasking: boolean, useBias: boolean`)
 - `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
 ```JavaScript
-layer.multiHeadAttention(8, true)
+layer.multiHeadAttention(8, true, true)
 ```
 
 layerNorm(`epsilon: number`)
@@ -370,7 +370,7 @@ const { Neurex, Layers, templates } = require('neurex');
     nrx.sequentialBuild([
         layer.inputShape({features: 2}),
         // drop in a connected network having 3 hidden layers, 5 neurons each
-        ...templates.simpleNeuralNetwork(),
+        templates.simpleNeuralNetwork(),
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();
@@ -386,7 +386,7 @@ const { Neurex, Layers, templates } = require('neurex');
     nrx.sequentialBuild([
         layer.inputShape({features: 2}),
         // drop in a convolutional network. If "isHeadless" parameter is set to true, the funnel-shape connected layer will be removed. Default is `false`
-        ...templates.simpleCNN(isHeadless = true),
+        templates.simpleCNN(isHeadless = true),
         layer.recurrentCell(18, 'tanh', true),
         layer.recurrentCell(18, 'tanh', true),
         layer.recurrentCell(18, 'tanh'),
@@ -405,7 +405,7 @@ const { Neurex, Layers, templates } = require('neurex');
 
     nrx.sequentialBuild([
         layer.embeddingLayer(5000, 50, 10),
-        ...templates.vanillaRNN(18, 'relu'), // uses 3 recurrent cells, each has 3 units be default and tanh activation. All uses `return_sequences = true`
+        templates.vanillaRNN(18, 'relu'),
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();

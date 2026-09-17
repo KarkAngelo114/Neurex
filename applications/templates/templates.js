@@ -2,6 +2,11 @@ const Layers = require("../../layers");
 
 const layer = new Layers();
 
+// Example Outputs:
+// getOptimalNumHeads(768)  -> 12 (headDim = 64)
+// getOptimalNumHeads(4096) -> 64 (headDim = 64)
+// getOptimalNumHeads(512)  -> 8  (headDim = 64)
+
 exports.simpleNeuralNetwork = () => {
     return [
         layer.connectedLayer(5),
@@ -89,23 +94,29 @@ exports.vanillaRNN = (units_per_cell = 3, activation_function = "tanh") => {
     ];
 }
 
-exports.AutoEncoder = () => {
+
+exports.GPT = (embedDim, seqLen, numHeads) => {
+    if (
+        !embedDim ||
+        embedDim <= 0 ||
+        !seqLen ||
+        seqLen <= 0 ||
+        !numHeads ||
+        numHeads <= 0
+    ) {
+        throw new Error(`[ERROR embedding dimension, sequence length and numHeads must not be 0, a negative integer, null or undefined`);
+    }
+
     return [
-        layer.connectedLayer(224),
-        layer.connectedLayer(112),
-        layer.connectedLayer(64),
-        layer.connectedLayer(32),
-        layer.connectedLayer(16),
-        layer.connectedLayer(8),
-        layer.connectedLayer(4),
-        layer.connectedLayer(2),
-        layer.connectedLayer(2),
-        layer.connectedLayer(4,'tanh'),
-        layer.connectedLayer(8,'tanh'),
-        layer.connectedLayer(16,'tanh'),
-        layer.connectedLayer(32,'tanh'),
-        layer.connectedLayer(64,'tanh'),
-        layer.connectedLayer(112,'tanh'),
-        layer.connectedLayer(224,'tanh'),
+        layer.residualStart(),
+        layer.multiHeadAttention(numHeads, true, false), // N heads, using causal masking, no biases
+        layer.residualEnd(),
+        layer.layerNorm(),
+
+        layer.residualStart(),
+        layer.connectedLayer(embedDim*seqLen*4, 'relu', false),
+        layer.connectedLayer(embedDim*seqLen, 'linear', false),
+        layer.residualEnd(),
+        layer.layerNorm(),
     ];
 }
