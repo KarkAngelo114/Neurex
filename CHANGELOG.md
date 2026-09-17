@@ -6,12 +6,14 @@
 - Added `simpleAttention` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Added `multiHeadAttention` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Added `layerNorm` layer. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
-- added learning rate schedulers
-- added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
+- Added `sinusoidalEncoding`. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Added the residual connectors (`residualStart` and `residualEnd`). See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Added learning rate schedulers.
+- Added auto-switching feature via `configure()` method for optimizer switching amidst model training. See [here](https://neurex-documentation.vercel.app/javascript-nodejs#configure)
 - You can now add you own optimizers and learning rate scheduler. See the latest documentation about [optimizers](https://neurex-documentation.vercel.app/javascript-nodejs#optimizers), and [lr_schedulers](https://neurex-documentation.vercel.app/javascript-nodejs#schedulers), and how to plug in your own.
-- added plugins for visualizer tools. Built-in visualizers are `lossVisualizer()`, `lossLandscapeVisualizer()`, and `modelVisualizer()`
-- exposed core training primitives methods that makes up the existing high-level API `train()` method: `setParams()`, `feedforward()`, `getOutputLayerDelta()`, `backpropagation()`, and `updateParams()`. With these exposed methods. Writing custom training loops is now possible for advance users. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
-- now can export trained `nrx` models to ONNX (`.onnx`) via `export_to_ONNX()` method. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Added plugins for visualizer tools. Built-in visualizers are `lossVisualizer()`, `lossLandscapeVisualizer()`, and `modelVisualizer()`
+- Exposed core training primitives methods that makes up the existing high-level API `train()` method: `setParams()`, `feedforward()`, `getOutputLayerDelta()`, `backpropagation()`, and `updateParams()`. With these exposed methods. Writing custom training loops is now possible for advance users. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- Now can export trained `nrx` models to ONNX (`.onnx`) via `export_to_ONNX()` method. (_Note: Not all layer types might get supported._)
 
 ### Fixes
 - fixed all derivative activation functions.
@@ -24,7 +26,7 @@
 
 | <p style = "text-align: center">Namespace</p> | <p style = "text-align: center">Contains</p> |
 | :--- | :--- |
-| `templates` | `simpleNeuralNetwork`, `simpleCNN`, and `vanillaRNN` |
+| `templates` | `simpleNeuralNetwork`, `simpleCNN`, `vanillaRNN` and the `GPT` style architecture |
 |`gradientNormalizers`|`clipGradient`|
 |`optimizers`|`Adam`, `SGD`, and `RMSprop` |
 |`schedulers`|`stepDecay`, `exponentialDecay`, `cosineAnnealing`, and `reduceOnPlateau`|

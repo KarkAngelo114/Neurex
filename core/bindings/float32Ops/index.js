@@ -1431,6 +1431,31 @@ const element_wise_add = (arr1, arr2) => {
     return output;
 }
 
+const SinusoidalPositionalEncoding = (input, embeddingDim, sequenceLength) => {
+   if (input.length !== embeddingDim * sequenceLength) {
+        throw new Error(
+            `Sinusoidal positional encoding shape mismatch: input length ${input.length}, ` +
+            `expected ${embeddingDim * sequenceLength}`
+        );
+    }
+
+    const output = new Float32Array(input);
+
+    for (let pos = 0; pos < sequenceLength; pos++) {
+        const offset = pos * embeddingDim;
+
+        for (let i = 0; i < embeddingDim; i++) {
+            const pairIndex = Math.floor(i / 2);
+            const exponent = (2 * pairIndex) / embeddingDim;
+            const angle = pos / Math.pow(10000, exponent);
+
+            output[offset + i] += (i % 2 === 0) ? Math.sin(angle) : Math.cos(angle);
+        }
+    }
+
+    return output;
+}
+
 
 module.exports = {
     Relu,
@@ -1485,5 +1510,6 @@ module.exports = {
     CoreAttentionBackward,
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
-    element_wise_add
+    element_wise_add,
+    SinusoidalPositionalEncoding
 }

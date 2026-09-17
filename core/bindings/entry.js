@@ -11,7 +11,6 @@ const {BooleanAvailability} = require('../../gpu/modeSelector');
 const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
 const { getGlobalParams } = require('../../gpu/globals');
-const { transpose2D, unpackQKVO } = require('../../utils/utils');
 
 let addon;
 let functions;
@@ -100,6 +99,8 @@ const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions
     pointer,
     modelID
 )
+
+const sinusoidalPE = (input, embeddingDim, sequenceLength) => float32_Modules.SinusoidalPositionalEncoding(input, embeddingDim, sequenceLength);
 
 /**
  * "✅☑️"
@@ -873,6 +874,7 @@ module.exports = {
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
     shutdown,
+    sinusoidalPE,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,
