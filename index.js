@@ -10,7 +10,7 @@ const { load_images_from_directory, load_single_image, load_multiple_images } = 
 const { element_wise_mul, element_wise_sub, scaleDiff, jaccard, Relu, Sigmoid, Tanh, Softmax, Linear  } = require('./core/bindings/float32Ops');
 const { Annotator } = require('./preprocessor/annotator');
 const { detectGPU } = require('./gpu/gpu_init');
-const { simpleNeuralNetwork, simpleCNN, vanillaRNN } = require('./applications/templates');
+const { simpleNeuralNetwork, simpleCNN, vanillaRNN, GPT } = require('./applications/templates');
 const { Encode, buildVocab, buildWord2Id, tokenize } = require('./preprocessor/tokenizer');
 const { stepDecay, exponentialDecay, cosineAnnealing, reduceOnPlateau } = require('./schedulers');
 const { SGD, Adam, RMSprop } = require('./optimizers');
@@ -36,6 +36,7 @@ module.exports= {
         simpleNeuralNetwork,
         simpleCNN,
         vanillaRNN,
+        GPT
     },
     gradientNormalizers: {
         clipGradient

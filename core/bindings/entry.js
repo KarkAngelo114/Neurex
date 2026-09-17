@@ -472,10 +472,19 @@ const element_wise_sub = (flat_arr_1, flat_arr_2) => {
     return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2));
 }
 
+/**
+ * 
+ * "✅☑️"
+ * @function
+ * @param {Array<Number>} arr1 - a flat array input
+ * @param {Array<Number>} arr2- a flat array input
+ * @returns A flat array output after adding input_array_1[i] to the values of input_array_2[i]
+ * @throws am error will occured if both array are not equal in length
+ */
 const element_wise_add = (arr1, arr2) => {
     if (arr1.length != arr2.length) throw new Error(`[ERROR] Error: Both arrays are not equal in length. array1: ${arr1.length} | array2:${arr2.length}`);
 
-    return float32_Modules.element_wise_add(arr1, arr2);
+    return functions.element_wise_add(arr1, arr2);
 }
 
 /**
@@ -535,7 +544,6 @@ const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeig
     getGlobalParams(modelID).globalBiases[pointer],
     modelID
 );
-
 
 /**
  * "✅☑️"
@@ -756,19 +764,19 @@ const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, poin
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
  * @param {Number} numHeads number of heads that process scaled dot product in parallel
  * @param {Number} headDim head dim value
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
- * @param {Boolean} useCasualMasking casual masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
+ * @param {Boolean} useCausalMasking causal masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, mhaOutput: Float32Array, S_perHead: Float32Array, finalOutput: Float32Array}}
  */
-const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttention(
+const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttention(
     input,
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
@@ -777,13 +785,13 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
     numHeads,
     headDim, 
     dkRoot,
-    useCasualMasking,
+    useCausalMasking,
     pointer,
     modelID
 );
 
 /**
- * "☑️"
+ * "✅☑️"
  * @param {Float32Array} delta incoming delta
  * @param {Float32Array} Q cached Q
  * @param {Float32Array} K cached K
@@ -799,7 +807,7 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
  * @param {String} modelID string value to reference model's unique parameters
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dMhaOutput: Float32Array, dX: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCasualMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttentionBackward(
     delta,
     getGlobalParams(modelID).globalWeights[pointer],
     Q,
@@ -811,7 +819,7 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     numHeads,
     headDim,
     dkRoot,
-    useCasualMasking,
+    useCausalMasking,
     pointer,
     modelID
 );

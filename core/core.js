@@ -313,7 +313,7 @@ class Neurex {
                 numHeads: layer?.numHeads || 8,
                 shapeType: layer?.shapeType || null,
                 eps: layer?.eps || 0,
-                useCasualMasking: layer?.useCasualMasking || false,
+                useCausalMasking: layer?.useCausalMasking || false,
             })),
             "miscellaneous": miscellaneous
         };
@@ -493,7 +493,7 @@ class Neurex {
                     newLayer.seqLen = layerData.maxSequenceLength;
                 }
                 else if (layerData.layer_name === "Multi Head Attention") {
-                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads, layerData.useCasualMasking, layerData.useBias);
+                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads, layerData.useCausalMasking, layerData.useBias);
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
@@ -502,7 +502,7 @@ class Neurex {
                     newLayer.seqLen = layerData.maxSequenceLength;
                     newLayer.numHeads = layerData.numHeads;
                     newLayer.headDim = layerData.headDim;
-                    newLayer.useCasualMasking = layerData.useCasualMasking;
+                    newLayer.useCausalMasking = layerData.useCausalMasking;
                 }
                 else if (layerData.layer_name === "Layer Normalization") {
                     newLayer = layerBuilder.layerNorm(layerData.eps);
@@ -572,7 +572,7 @@ class Neurex {
                 throw new Error("ERR_NO_LAYERS_TO_BUILD");
             }
 
-            model.forEach(layer => {
+            model.flat(Infinity).forEach(layer => {
                 // extract input size
                 if (layer.layer_name === "Input Layer") {
                     this.input_size = layer.layer_size;

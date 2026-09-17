@@ -370,7 +370,7 @@ const { Neurex, Layers, templates } = require('neurex');
     nrx.sequentialBuild([
         layer.inputShape({features: 2}),
         // drop in a connected network having 3 hidden layers, 5 neurons each
-        ...templates.simpleNeuralNetwork(),
+        templates.simpleNeuralNetwork(),
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();
@@ -386,7 +386,7 @@ const { Neurex, Layers, templates } = require('neurex');
     nrx.sequentialBuild([
         layer.inputShape({features: 2}),
         // drop in a convolutional network. If "isHeadless" parameter is set to true, the funnel-shape connected layer will be removed. Default is `false`
-        ...templates.simpleCNN(isHeadless = true),
+        templates.simpleCNN(isHeadless = true),
         layer.recurrentCell(18, 'tanh', true),
         layer.recurrentCell(18, 'tanh', true),
         layer.recurrentCell(18, 'tanh'),
@@ -405,7 +405,7 @@ const { Neurex, Layers, templates } = require('neurex');
 
     nrx.sequentialBuild([
         layer.embeddingLayer(5000, 50, 10),
-        ...templates.vanillaRNN(18, 'relu'), // uses 3 recurrent cells, each has 3 units be default and tanh activation. All uses `return_sequences = true`
+        templates.vanillaRNN(18, 'relu'),
         layer.connectedLayer(1, 'sigmoid')
     ])
 })();
