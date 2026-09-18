@@ -1444,7 +1444,33 @@ const SinusoidalPositionalEncoding = (input, embeddingDim, sequenceLength) => {
     for (let pos = 0; pos < sequenceLength; pos++) {
         const offset = pos * embeddingDim;
 
-        for (let i = 0; i < embeddingDim; i++) {
+        let i = 0;
+
+        // Unroll the embedding-dimension loop four times per iteration.
+        for (; i <= embeddingDim - 4; i += 4) {
+            const pairIndex = Math.floor(i / 2);
+            const exponent = (2 * pairIndex) / embeddingDim;
+            const angle = pos / Math.pow(10000, exponent);
+
+            output[offset + i] += (i % 2 === 0) ? Math.sin(angle) : Math.cos(angle);
+
+            const pairIndex1 = Math.floor((i + 1) / 2);
+            const exponent1 = (2 * pairIndex1) / embeddingDim;
+            const angle1 = pos / Math.pow(10000, exponent1);
+            output[offset + i + 1] += (i % 2 === 1) ? Math.sin(angle1) : Math.cos(angle1);
+
+            const pairIndex2 = Math.floor((i + 2) / 2);
+            const exponent2 = (2 * pairIndex2) / embeddingDim;
+            const angle2 = pos / Math.pow(10000, exponent2);
+            output[offset + i + 2] += (i % 2 === 0) ? Math.sin(angle2) : Math.cos(angle2);
+
+            const pairIndex3 = Math.floor((i + 3) / 2);
+            const exponent3 = (2 * pairIndex3) / embeddingDim;
+            const angle3 = pos / Math.pow(10000, exponent3);
+            output[offset + i + 3] += (i % 2 === 1) ? Math.sin(angle3) : Math.cos(angle3);
+        }
+
+        for (; i < embeddingDim; i++) {
             const pairIndex = Math.floor(i / 2);
             const exponent = (2 * pairIndex) / embeddingDim;
             const angle = pos / Math.pow(10000, exponent);
