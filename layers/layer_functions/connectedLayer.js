@@ -1,5 +1,5 @@
 const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul } = require("../../core/bindings");
-const { XavierInitialization, ifOneHotEndcoded } = require("../../utils/utils");
+const { XavierInitialization, ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
 
@@ -31,9 +31,8 @@ const initParams = (size, shape, layer_data) => {
         for (let i = 0; i < outputSize; i++) {
             biases[i] = (Math.random() * 2 - 1) * limit;
         }
-    }
+    }    
     
-
     const weightShape = [inputSize, outputSize];
     const updatedShape = [1, 1, outputSize]
 
@@ -109,22 +108,15 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
 const feedforward = (input, current_layer, pointer, modelID) => {
-    const [inputSize, outputSize] = current_layer.weightShape; // weight shape [input, output]
-    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID); // perform the MatMul() operation
+    const [inputSize, outputSize] = current_layer.weightShape;
+    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID);
 
-    const activation_function = activation[current_layer.activation_function.name]; // activation function
-    let outputs = activation_function(z_values); // use the activation function       
+    const activation_function = activation[current_layer.activation_function.name];
+    let outputs = activation_function(z_values, pointer, modelID);
     if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
 
-    current_layer.cache = {
-        layer_output: outputs,
-    }
-                    
-    return {
-        outputs, 
-        z_values,
-        incrementor_value: 1
-    };
+    current_layer.cache = { layer_output: outputs };
+    return { outputs, z_values, incrementor_value: 1 };
 }
 
 /**
@@ -196,12 +188,11 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
  * @param {Object} layer_data - this layer's own configuration
  * @returns {Float32Array} delta for the layer before this one
  */
-const applyOwnDerivative = (delta, z, layer_data) => {
+const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
     const storedOutput = layer_data.cache.layer_output;
 
-    const dAct = dActivation(z, storedOutput); // just in case this layer uses softmax activation if this layer is a hidden layer. Softmax derivative uses two array inputs
-
+    const dAct = dActivation(z, storedOutput, pointer, modelID);
     const result = element_wise_mul(dAct, delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in applyOwnDerivative (connectedLayer)");
     return result;

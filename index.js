@@ -19,6 +19,7 @@ const { lossLandscapeVisualizer } = require('./applications/visualizer/lossLands
 const { modelVisualizer } = require('./applications/visualizer/modelVisualizer');
 const { clipGradient } = require('./normalizers');
 const { mnist_digits } = require('./applications/datasets');
+const { createTensorBuffer } = require('./utils/utils');
 
 
 
@@ -82,5 +83,8 @@ module.exports= {
     },
     datasets: {
         mnist_digits
+    },
+    tensors: {
+        createTensorBuffer
     }
 }
