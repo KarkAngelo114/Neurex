@@ -1,5 +1,5 @@
 const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul } = require("../../core/bindings");
-const { XavierInitialization, ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
+const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
 
@@ -15,22 +15,14 @@ const initParams = (size, shape, layer_data) => {
     const outputSize = layer_data.layer_size;
     const TotalWeightSize = outputSize * inputSize;
     const useBias = layer_data.useBias;
-                    
-    const weights = new Float32Array(TotalWeightSize);
-    const weightGrads = new Float32Array(TotalWeightSize);
-    const biases = new Float32Array(outputSize);
-    const biasGrads = new Float32Array(outputSize);
-                    
-    const limit = XavierInitialization(inputSize, outputSize);
-
-    for (let i = 0; i < TotalWeightSize; i++) {
-        weights[i] = (Math.random() * 2 - 1) * limit;
-    }
+    
+    let weights = createTensorBuffer([TotalWeightSize], {prefilledWith:'xavier', min: inputSize, max: outputSize}).data;
+    let weightGrads = createTensorBuffer([TotalWeightSize], {prefilledWith:'zeroes'}).data;
+    let biases = createTensorBuffer([outputSize], {prefilledWith:'zeroes'}).data;
+    let biasGrads = createTensorBuffer([outputSize], {prefilledWith:'zeroes'}).data;
     
     if (useBias) {
-        for (let i = 0; i < outputSize; i++) {
-            biases[i] = (Math.random() * 2 - 1) * limit;
-        }
+        biases = createTensorBuffer([outputSize], {prefilledWith:'xavier', min: inputSize, max: outputSize}).data;
     }    
     
     const weightShape = [inputSize, outputSize];

@@ -1,5 +1,5 @@
 const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings/entry');
-const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('../../utils/utils');
+const { createTensorBuffer, concatenateFloat32Array, unpackQKVO } = require('../../utils/utils');
 
 /**
  * Initialized parameters for this layer
@@ -22,25 +22,18 @@ const initParams = (size, shape, layer_data) => {
             throw new Error(`[MULTI-HEAD ATTENTION ERROR]------- embeddingDim is not divisible to numHeads. Embedding dim: ${embeddingDim} | Num heads: ${numHeads}`);
         }
 
-        const Q_weights = new Float32Array(embeddingDim * embeddingDim);
-        const K_weights = new Float32Array(embeddingDim * embeddingDim);
-        const V_weights = new Float32Array(embeddingDim * embeddingDim);
-        const O_weights = new Float32Array(embeddingDim * embeddingDim);
-
-        const limit = XavierInitialization(embeddingDim, embeddingDim);
-        for (let i = 0; i < Q_weights.length; i++) {
-            Q_weights[i] = (Math.random() * 2 - 1) * limit;
-            K_weights[i] = (Math.random() * 2 - 1) * limit;
-            V_weights[i] = (Math.random() * 2 - 1) * limit;
-            O_weights[i] = (Math.random() * 2 - 1) * limit;
-        }
-
-        const biases = new Float32Array(embeddingDim * 4);
-        if (useBias) {
-            for (let i = 0; i < biases.length; i++) {
-                biases[i] = (Math.random() * 2 - 1) * limit;
-            }
-        }
+        const parameterOptions = {
+            min: embeddingDim,
+            max: embeddingDim,
+            prefilledWith: "xavier"
+        };
+        const Q_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+        const K_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+        const V_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+        const O_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+        const biases = useBias
+            ? createTensorBuffer([embeddingDim * 4], parameterOptions).data
+            : new Float32Array(embeddingDim * 4);
 
         const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights, O_weights]);
         const weightShape = [embeddingDim, embeddingDim * 4]; // combined QKVO projection

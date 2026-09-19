@@ -1,5 +1,5 @@
 const { CoreAttention, CoreAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings');
-const { XavierInitialization, concatenateFloat32Array, unpackQKVO } = require('../../utils');
+const { createTensorBuffer, concatenateFloat32Array, unpackQKVO } = require('../../utils');
 
 /**
  * Initialized parameters for this layer
@@ -14,23 +14,17 @@ const initParams = (size, shape, layer_data) => {
     const embeddingDim = shape[2];
     const useBias = layer_data.useBias;
 
-    const Q_weights = new Float32Array(embeddingDim * embeddingDim);
-    const K_weights = new Float32Array(embeddingDim * embeddingDim);
-    const V_weights = new Float32Array(embeddingDim * embeddingDim);
-
-    const limit = XavierInitialization(embeddingDim, embeddingDim);
-    for (let i = 0; i < Q_weights.length; i++) {
-        Q_weights[i] = (Math.random() * 2 - 1) * limit;
-        K_weights[i] = (Math.random() * 2 - 1) * limit;
-        V_weights[i] = (Math.random() * 2 - 1) * limit;
-    }
-
-    const biases = new Float32Array(embeddingDim * 3);
-    if (useBias) {
-        for (let i = 0; i < biases.length; i++) {
-            biases[i] = (Math.random() * 2 - 1) * limit;
-        }
-    }
+    const parameterOptions = {
+        min: embeddingDim,
+        max: embeddingDim,
+        prefilledWith: "xavier"
+    };
+    const Q_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+    const K_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+    const V_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
+    const biases = useBias
+        ? createTensorBuffer([embeddingDim * 3], parameterOptions).data
+        : new Float32Array(embeddingDim * 3);
 
     const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights]);
     const weightShape = [embeddingDim, embeddingDim * 3]; // combined QKV projection

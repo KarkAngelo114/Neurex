@@ -988,7 +988,7 @@ declare module 'neurex' {
         * 
         * @throws {Error} Throws an error if any parameter is zero, negative, null, or undefined.
         */
-        export function GPT(vocabSize: number, embedDim: number, seqLen: number, numHeads: number): object[];
+        export function GPT(embedDim: number, seqLen: number, numHeads: number): object[];
     }
 
     /**
@@ -1107,16 +1107,20 @@ declare module 'neurex' {
         min?: number;
         /** max value */
         max?: number;
-        /** prefilled with: `randint`, `randfloat`, `zeroes`, `rand_pos_int`, `rand_neg_int`, `rand_pos_float`, `rand_neg_float`, `randintf`, `rand_pos_intf`,`rand_neg_intf` */
-        prefilledWith?: "randint" | "randfloat" | "zeroes" | "rand_pos_int" | "rand_neg_int" | "rand_pos_float" | "rand_neg_float" | "randintf" | "rand_pos_intf" | "rand_neg_intf";
+        /** 
+        * prefilled with: `randint`, `randfloat`, `zeroes`, `ones`, `rand_pos_int`, `rand_neg_int`, `rand_pos_float`, `rand_neg_float`, `randintf`, `rand_pos_intf`,`rand_neg_intf` 
+        * If uses `xavier`, it generates a random number uniformly from the limit range computed using the values of `min` and `max`.
+        */
+        prefilledWith?: "randint" | "randfloat" | "zeroes" | "ones" | "rand_pos_int" | "rand_neg_int" | "rand_pos_float" | "rand_neg_float" | "randintf" | "rand_pos_intf" | "rand_neg_intf" | "xavier";
     }
 
     export namespace tensors {
         /**
-         * 
+         * A utility function use for creating tensor represented as flat `float32array` buffer
          * @param {Array<Number>} shape shape array representation
          * @param {creationOptions} options options used for creating a buffer
+         * @returns {{shape: number[], data: Float32Array}}
          */
-        export function createTensorBuffer(shape: number[], options?: creationOptions): Float32Array;
+        export function createTensorBuffer(shape: number[], options?: creationOptions): { shape: number[], data: Float32Array};
     }
 }

@@ -1,11 +1,13 @@
 const { computeLayerNorm, accumulate_element_wise_mul, computeBiasGradsForConnected_Layer } = require("../../core/bindings/entry");
+const { createTensorBuffer } = require("../../utils/utils");
 
 const initParams = (size, shape, layer_data) => {
     // gamma initialized to 1s, beta initialized to 0s
-    const gamma = new Float32Array(size).fill(1.0);
-    const beta = new Float32Array(size).fill(0.0);
-    const gammaGrads = new Float32Array(size).fill(0.0);
-    const betaGrads = new Float32Array(size).fill(0.0);
+
+    let gamma = createTensorBuffer([size], {prefilledWith: "ones"}).data;
+    let beta = createTensorBuffer([size], {prefilledWith: "zeroes"}).data;
+    let gammaGrads = createTensorBuffer([size], {prefilledWith: "zeroes"}).data;
+    let betaGrads = createTensorBuffer([size], {prefilledWith: "zeroes"}).data;
 
     return {
         updatedSize: size,

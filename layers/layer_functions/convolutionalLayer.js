@@ -1,6 +1,6 @@
 const activation = require('../../core/bindings')
 const { applyPadding, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
-const { XavierInitialization, calculateTensorShape, getPaddingSizes } = require("../../utils/utils");
+const { XavierInitialization, calculateTensorShape, getPaddingSizes, createTensorBuffer } = require("../../utils/utils");
 
 
 
@@ -26,22 +26,16 @@ const initParams = (size, shape, layer_data) => {
 
     const TotalSize = filters * kH * kW * inputDepth;
 
-    let kernels = new Float32Array(TotalSize);
-    let kernelGrads = new Float32Array(TotalSize);
-    let biases = new Float32Array(filters);
-    let biasGrads = new Float32Array(filters);
     const fanIn = kH * kW * inputDepth;
     const fanOut = kH * kW * filters;
-    const limit = XavierInitialization(fanIn, fanOut);
 
-    for (let i = 0; i < TotalSize; i++) {
-        kernels[i] = (Math.random() * 2 - 1) * limit;
-    }
+    let kernels = createTensorBuffer([TotalSize], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
+    let kernelGrads = createTensorBuffer([TotalSize], {prefilledWith:'zeroes'}).data;
+    let biases = createTensorBuffer([filters], {prefilledWith:'zeroes'}).data;
+    let biasGrads = createTensorBuffer([filters], {prefilledWith:'zeroes'}).data;
 
     if (useBias) {
-        for (let i = 0; i < filters; i++) {
-            biases[i] = (Math.random() * 2 - 1) * limit;
-        }
+        biases = createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
     }
     
 

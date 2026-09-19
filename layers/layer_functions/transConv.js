@@ -1,7 +1,7 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
 const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
-const { XavierInitialization, calculateTransposedTensorShape } = require('../../utils/utils');
+const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 
 
 /**
@@ -29,13 +29,17 @@ const initParams = (size, shape, layer_data) => {
         const strides = layer_data.strides || 1;
         const TotalSize = filters * kh * kw * iD;
 
-        const weights = new Float32Array(TotalSize);
-        const biases = new Float32Array(filters);
+        
+        const fanIn = kh * kw * iD;
+        const fanOut = kh * kw * filters;
+
+        let weights = createTensorBuffer([TotalSize], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
+        let biases = useBias ? createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data : new Float32Array(filters);
+
         const weightGrads = new Float32Array(weights.length);
         const biasGrads =  new Float32Array(biases.length);
 
-        const fanIn = kh * kw * iD;
-        const fanOut = kh * kw * filters;
+
         const limit = XavierInitialization(fanIn, fanOut);
 
         // weights

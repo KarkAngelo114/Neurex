@@ -1,4 +1,4 @@
-const { XavierInitialization, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
+const { createTensorBuffer, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const activation = require('../../core/bindings');
 const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta, recurrentWeightGradsAccumulation, recurrentBiasGradsAccumulation } = require('../../core/bindings');
 /**
@@ -25,28 +25,20 @@ const initParams = (size, shape, layer_data) => {
     const total_recurrent_weights = units * units; 
     const totalBiases = units; 
 
-    const input_weights = new Float32Array(total_input_weights);
-    const recurrent_weights = new Float32Array(total_recurrent_weights);
-    const biases = new Float32Array(totalBiases);
-    const weightGrads = new Float32Array(total_input_weights + total_recurrent_weights); 
-    const biasGrads = new Float32Array(totalBiases);
-
-    const limit1 = XavierInitialization(feature_size, units); // Use feature_size
-    const limit2 = XavierInitialization(units, units);
-                    
-    for (let i = 0; i < total_input_weights; i++) {
-        input_weights[i] = (Math.random() * 2 - 1) * limit1;
-    }
-
-    for (let i = 0; i < total_recurrent_weights; i++) {
-        recurrent_weights[i] = (Math.random() * 2 - 1) * limit2;
-    }
-
-    if (useBias) {
-        for (let i = 0; i < totalBiases; i++) {
-            biases[i] = (Math.random() * 2 - 1) * limit1;
-        }
-    }
+    const input_weights = createTensorBuffer([total_input_weights],{ prefilledWith: "xavier", min: feature_size, max: units }).data;
+    const recurrent_weights = createTensorBuffer([total_recurrent_weights], { prefilledWith: "xavier", min: units, max: units }).data;
+    const biases = useBias
+        ? createTensorBuffer([totalBiases], {
+            prefilledWith: "xavier",
+            min: feature_size,
+            max: units
+        }).data
+        : createTensorBuffer([totalBiases], { prefilledWith: "zeroes" }).data;
+    const weightGrads = createTensorBuffer(
+        [total_input_weights + total_recurrent_weights],
+        { prefilledWith: "zeroes" }
+    ).data;
+    const biasGrads = createTensorBuffer([totalBiases], { prefilledWith: "zeroes" }).data;
     
 
     const concatenated_weights = concatenateFloat32Array([input_weights, recurrent_weights]);

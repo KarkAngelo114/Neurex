@@ -1,6 +1,5 @@
 const { XavierInitialization } = require("../../utils/utils");
-const activation = require('../../core/bindings');
-const { getEmbeddings, DeltaMatMul, returnEmbeddings, recurrentTimeDelta } = require('../../core/bindings');
+const { getEmbeddings, returnEmbeddings } = require('../../core/bindings');
 
 
 /**

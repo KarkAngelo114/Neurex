@@ -1362,7 +1362,7 @@ class Neurex {
 
             this.hasBuilt = true;
         } catch (error) {
-            console.error(`${color.red}[BUILD ERROR]------- ${error.message}${color.reset}`);
+            console.error(`${color.red}[BUILD ERROR] ${color.reset}${error.message}`);
             process.exit(1);
         }
     }

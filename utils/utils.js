@@ -306,6 +306,21 @@ function transpose2D(matrix, rows, cols) {
     return output;
 }
 
+/**
+ * Creates a Float32Array tensor buffer using the requested initialization strategy.
+ *
+ * @param {number[]} shape - Tensor dimensions. Each dimension must be positive.
+ * @param {Object} [options] - Buffer initialization options.
+ * @param {number} [options.min=10] - Minimum value for random initialization.
+ * @param {number} [options.max=10] - Maximum value for random initialization.
+ * @param {string} [options.prefilledWith="zeroes"] - Initialization strategy:
+ * `randint`, `randfloat`, `zeroes`, `rand_pos_int`, `rand_neg_int`,
+ * `rand_pos_float`, `rand_neg_float`, `randintf`, `rand_pos_intf`,
+ * `rand_neg_intf`, or `xavier`.
+ * @returns {Float32Array|{shaoe: number[], data: Float32Array}} A zero-filled
+ * buffer or, for other strategies, an object containing the shape and data.
+ * @throws {Error} If the shape, initialization strategy, or random range is invalid.
+ */
 const createTensorBuffer = (shape, options) => {
     const min = options?.min ?? 10;
     const max = options?.max ?? 10;
@@ -315,13 +330,15 @@ const createTensorBuffer = (shape, options) => {
         "randint", // random int (pos or neg
         "randfloat", // random float (pos or neg)
         "zeroes", // zeroes
+        "ones", // ones
         "rand_pos_int", // random pos int only
         "rand_neg_int",  // random neg int only
         "rand_pos_float", // random pos float only (no ints)
         "rand_neg_float", // random neg float only (no ints)
         "randintf", // random floats and ints (pos or neg)
         "rand_pos_intf", // random pos floats and ints only
-        "rand_neg_intf" // random neg floats and ints only
+        "rand_neg_intf", // random neg floats and ints only
+        "xavier", // initialized floats using a xavier
     ];
 
     if (!shape || !prefilledWith) {
@@ -342,7 +359,35 @@ const createTensorBuffer = (shape, options) => {
     }
 
     const type = prefilledWith.toLowerCase();
-    if (type === "zeroes") return new Float32Array(size);
+    if (type === "zeroes") {
+        return {
+            data: new Float32Array(size),
+            shape: shape
+        }
+    };
+
+    if (type === "ones") {
+        return {
+            data: new Float32Array(size).fill(1.0),
+            shape: shape
+        }
+    }
+
+    if (type === "xavier") {
+        const limit = XavierInitialization(min, max);
+        const arr = new Float32Array(size);
+
+        for (let i = 0; i < size; i++) {
+            arr[i] = (Math.random() * 2 - 1) * limit;
+        }
+
+        const obj = {
+            data: arr,
+            shape: shape
+        };
+
+        return obj;
+    }
 
     if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
         throw new Error("ERR_RANDOM_RANGE");
@@ -375,8 +420,12 @@ const createTensorBuffer = (shape, options) => {
         rand_neg_intf: () => Math.random() < 0.5 ? randomInteger(negativeMin, negativeMax) : randomFloat(negativeMin, negativeMax)
     };
 
-    return new Float32Array(Array.from({ length: size }, generators[type]));
+    const data =  new Float32Array(Array.from({ length: size }, generators[type]));
     
+    return {
+        shape: shape,
+        data: data
+    }
 }
 
 module.exports = {
