@@ -20,15 +20,17 @@ __kernel void delta_convolve(
 
     float sum = 0.0f;
 
-    // ===== convolution accumulation with loop unrolling =====
     for (int kh = 0; kh < KH; kh++) {
+        int rkh = KH - 1 - kh;   // flipped kernel-height index
+
         for (int kw = 0; kw < KW; kw++) {
+            int rkw = KW - 1 - kw;   // flipped kernel-width index
+
             int ph = h * stride + kh;
             int pw = w * stride + kw;
             int baseInputIdx = (ph * Wp + pw) * C_in;
-            int baseKernelIdx = ((kh) * KW + kw) * C_k;
+            int baseKernelIdx = (rkh * KW + rkw) * C_k;   // uses rkh/rkw, not kh/kw
 
-            // Unrolled loop: process 4 filters at a time
             int f = 0;
             for (; f <= F - 4; f += 4) {
                 int inputIdx0 = baseInputIdx + f;
@@ -47,7 +49,6 @@ __kernel void delta_convolve(
                 sum += input[inputIdx3] * weights[kernelIdx3];
             }
 
-            // Handle remaining filters
             for (; f < F; f++) {
                 int inputIdx = baseInputIdx + f;
                 int kernelIdx = (f * KH + kh) * KW * C_k + baseKernelIdx + c_out;

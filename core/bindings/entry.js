@@ -100,7 +100,7 @@ const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions
     modelID
 )
 
-const sinusoidalPE = (input, embeddingDim, sequenceLength) => float32_Modules.SinusoidalPositionalEncoding(input, embeddingDim, sequenceLength);
+const sinusoidalPE = (input, embeddingDim, sequenceLength) => functions.SinusoidalPositionalEncoding(input, embeddingDim, sequenceLength);
 
 /**
  * "✅☑️"
