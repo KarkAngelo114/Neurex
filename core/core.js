@@ -66,7 +66,6 @@ class Neurex {
         this.biasGrads = [];
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
-        this.isInit = false;
 
         this.parametric_layers = [];
         this.miscellaneous = null;
@@ -120,11 +119,10 @@ class Neurex {
         
         
         if (!this.hasInitializedNativeBindings) {
-            this.hasInitializedNativeBindings = true;
             init();
         }
-        
-        this.isInit = true;
+
+        this.hasInitializedNativeBindings = true;
     }
 
     /**
@@ -702,12 +700,8 @@ class Neurex {
         if (!this.hasInitializedNativeBindings) {
             init();
         }
-        this.shuffle = shuffle;
 
-        if (!this.isInit) {
-            init();
-            this.isInit = true;
-        }
+        this.shuffle = shuffle;
     
         setGlobalParams(
             this.modelID,
@@ -1040,7 +1034,6 @@ class Neurex {
         if (!this.hasInitializedNativeBindings) {
             init();
             this.hasInitializedNativeBindings = true;
-            this.isInit = true;
         }
 
         setGlobalParams(this.modelID, this.weights, this.biases);
@@ -1174,6 +1167,7 @@ class Neurex {
             const next_layer    = this.layers[layer_index + 1];
 
             const nextPointer = layerPointers[layer_index + 1];
+            const currentPointer = layerPointers[layer_index];
 
             const dLda = next_layer.projectDeltaBackward(
                 current_delta,
@@ -1186,7 +1180,9 @@ class Neurex {
             current_delta = current_layer.applyOwnDerivative(
                 dLda,
                 zs[layer_index],
-                current_layer
+                current_layer,
+                currentPointer,
+                this.modelID
             );
 
             deltas[layer_index] = current_delta;
@@ -1338,12 +1334,11 @@ class Neurex {
                     biasGrads, 
                     inputShape, 
                     outputShape, 
-                    paramShape, overrides } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
+                    paramShape, overrides, } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
                 this.currentSize = updatedSize;
                 this.currentShape = updatedShape;
                 const isParametric = layer_data.isParametric;
-                
 
                 if (weights.length > 0) this.weights.push(weights);
                 if (biases.length > 0) this.biases.push(biases);

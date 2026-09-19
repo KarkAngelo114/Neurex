@@ -160,7 +160,7 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID) => functio
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu)
  */
-const relu = (input) => functions.Relu(input)
+const relu = (input, pointer, modelID) => functions.Relu(input, pointer, modelID)
 
 /**
  * "✅☑️"
@@ -168,7 +168,7 @@ const relu = (input) => functions.Relu(input)
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid)
  */
-const sigmoid = (input) => functions.Sigmoid(input);
+const sigmoid = (input, pointer, modelID) => functions.Sigmoid(input, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -176,7 +176,7 @@ const sigmoid = (input) => functions.Sigmoid(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh)
  */
-const tanh = (input) => functions.Tanh(input);
+const tanh = (input, pointer, modelID) => functions.Tanh(input, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -184,7 +184,7 @@ const tanh = (input) => functions.Tanh(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Softmax)
  */
-const softmax = (input) => functions.Softmax(input);
+const softmax = (input, pointer, modelID) => functions.Softmax(input, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -192,7 +192,7 @@ const softmax = (input) => functions.Softmax(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Linear)
  */
-const linear = (input) => functions.Linear(input); 
+const linear = (input, pointer, modelID) => functions.Linear(input, pointer, modelID); 
 
 /**
  * "✅☑️"
@@ -200,7 +200,7 @@ const linear = (input) => functions.Linear(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using ReLu Derivative)
  */
-const drelu = (input) => functions.DReLu(input);
+const drelu = (input, _, pointer, modelID) => functions.DReLu(input, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -208,7 +208,7 @@ const drelu = (input) => functions.DReLu(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Sigmoid Derivative)
  */
-const dsigmoid = (input) => functions.DSigmoid(input);
+const dsigmoid = (input, _, pointer, modelID) => functions.DSigmoid(input, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -216,7 +216,7 @@ const dsigmoid = (input) => functions.DSigmoid(input);
  * @param {Float32Array} input - 1D array of features 
  * @returns - 1D array of activated features (Using Tanh Derivative)
  */
-const dtanh = (input) => functions.DTanh(input);
+const dtanh = (input, _, pointer, modelID) => functions.DTanh(input, pointer, modelID);
 
 /**
  * "✅☑️"

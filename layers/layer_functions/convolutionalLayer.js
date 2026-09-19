@@ -198,11 +198,11 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
  * @param {Object} layer_data - this layer's own configuration
  * @returns {Float32Array} delta for the layer before this one
  */
-const applyOwnDerivative = (delta, z, layer_data) => {
+const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
     const storedOutput = layer_data.cache.layer_output;
     
-    const result = element_wise_mul(dActivation(z, storedOutput), delta);
+    const result = element_wise_mul(dActivation(z, storedOutput, pointer, modelID), delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
     return result;
 }

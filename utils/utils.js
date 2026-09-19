@@ -306,6 +306,79 @@ function transpose2D(matrix, rows, cols) {
     return output;
 }
 
+const createTensorBuffer = (shape, options) => {
+    const min = options?.min ?? 10;
+    const max = options?.max ?? 10;
+    const prefilledWith = options?.prefilledWith || "zeroes";
+
+    const types = [
+        "randint", // random int (pos or neg
+        "randfloat", // random float (pos or neg)
+        "zeroes", // zeroes
+        "rand_pos_int", // random pos int only
+        "rand_neg_int",  // random neg int only
+        "rand_pos_float", // random pos float only (no ints)
+        "rand_neg_float", // random neg float only (no ints)
+        "randintf", // random floats and ints (pos or neg)
+        "rand_pos_intf", // random pos floats and ints only
+        "rand_neg_intf" // random neg floats and ints only
+    ];
+
+    if (!shape || !prefilledWith) {
+        console.error("[ERROR] Missing 'shape' or 'prefilledWith' arguments");
+        throw new Error('ERR_TENSOR_CREATION');
+    }
+
+    if (!Array.isArray(shape) || shape.some(n => n <= 0)) {
+        console.error("[ERROR] shape must be a valid array with positive numbers");
+        throw new Error("ERR_SHAPE_ERROR");
+    }
+
+    const size = shape.reduce((a, b) => a * b, 1);
+
+    if (!types.includes(prefilledWith.toLowerCase())) {
+        console.error(`Error prefilled type "${prefilledWith}". Use [${types.join(", ")}] only.`)
+        throw new Error("ERR_TENSOR_PREFILLED_TYPE_UNK");
+    }
+
+    const type = prefilledWith.toLowerCase();
+    if (type === "zeroes") return new Float32Array(size);
+
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+        throw new Error("ERR_RANDOM_RANGE");
+    }
+
+    const integer = (low, high) => Math.floor(Math.random() * (Math.floor(high) - Math.ceil(low) + 1)) + Math.ceil(low);
+    const nonInteger = (low, high) => { if (high <= low) return low;
+        let value;
+        do {
+            value = Math.random() * (high - low) + low;
+        } 
+        while (Number.isInteger(value));
+        return value;
+    };
+    const positiveMin = Math.max(0, min);
+    const positiveMax = Math.max(0, max);
+    const negativeMin = Math.min(0, min);
+    const negativeMax = Math.min(0, max);
+    const randomInteger = (low, high) => integer(Math.min(low, high), Math.max(low, high));
+    const randomFloat = (low, high) => nonInteger(Math.min(low, high), Math.max(low, high));
+    const generators = {
+        randint: () => randomInteger(min, max),
+        randfloat: () => randomFloat(min, max),
+        rand_pos_int: () => randomInteger(positiveMin, positiveMax),
+        rand_neg_int: () => randomInteger(negativeMin, negativeMax),
+        rand_pos_float: () => randomFloat(positiveMin, positiveMax),
+        rand_neg_float: () => randomFloat(negativeMin, negativeMax),
+        randintf: () => Math.random() < 0.5 ? randomInteger(min, max) : randomFloat(min, max),
+        rand_pos_intf: () => Math.random() < 0.5 ? randomInteger(positiveMin, positiveMax) : randomFloat(positiveMin, positiveMax),
+        rand_neg_intf: () => Math.random() < 0.5 ? randomInteger(negativeMin, negativeMax) : randomFloat(negativeMin, negativeMax)
+    };
+
+    return new Float32Array(Array.from({ length: size }, generators[type]));
+    
+}
+
 module.exports = {
     calculateTensorShape,
     calculateTransposedTensorShape,
@@ -317,5 +390,6 @@ module.exports = {
     concatenateFloat32Array,
     getTransposedPaddingSizes,
     unpackQKVO,
-    transpose2D
+    transpose2D,
+    createTensorBuffer
 }

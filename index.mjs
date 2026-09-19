@@ -18,4 +18,5 @@ export const {
     preprocesors, // preprocessors namespace
     math, // math namespace
     datasets, // datasets namespace
+    tensors, // tensor namespace
 } = pkg;

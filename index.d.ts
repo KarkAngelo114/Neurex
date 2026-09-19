@@ -1101,4 +1101,22 @@ declare module 'neurex' {
          */
         export function mnist_digits(): { dataset: Float32Array[], labels: number[][]};
     }
+
+    export interface creationOptions {
+        /** min value */
+        min?: number;
+        /** max value */
+        max?: number;
+        /** prefilled with: `randint`, `randfloat`, `zeroes`, `rand_pos_int`, `rand_neg_int`, `rand_pos_float`, `rand_neg_float`, `randintf`, `rand_pos_intf`,`rand_neg_intf` */
+        prefilledWith?: "randint" | "randfloat" | "zeroes" | "rand_pos_int" | "rand_neg_int" | "rand_pos_float" | "rand_neg_float" | "randintf" | "rand_pos_intf" | "rand_neg_intf";
+    }
+
+    export namespace tensors {
+        /**
+         * 
+         * @param {Array<Number>} shape shape array representation
+         * @param {creationOptions} options options used for creating a buffer
+         */
+        export function createTensorBuffer(shape: number[], options?: creationOptions): Float32Array;
+    }
 }
