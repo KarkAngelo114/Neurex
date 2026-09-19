@@ -32,15 +32,9 @@ const mha = require("./layer_functions/MultiHeadAttention");
 const normModule = require('./layer_functions/layerNorm');
 const residual_start = require('./layer_functions/residual_start');
 const residual_end = require('./layer_functions/residual_end');
+const spe = require('./layer_functions/sinusoidal_positionalEncoding');
 
 class Layers {
-    constructor () {
-        this.weights = [];
-        this.biases = [];
-        this.weightGrads = [];
-        this.biaeGrads = [];
-    }
-
     /**
      * @method inputShape
      * @param {object} shapeConfig - specify the number of features
@@ -102,9 +96,29 @@ class Layers {
             feedforward: (input, current_layer, pointer, modelID) => embedding.feedforward(input, current_layer, pointer, modelID),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
             projectDeltaBackward: (delta) => delta,
-            applyOwnDerivative: (delta,) => delta,
+            applyOwnDerivative: (delta) => delta,
             accumulateWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
             accumulateBiasGradients: (biasGrads) => biasGrads,
+        }
+    }
+
+    /**
+     * A classic sinusoidal positional encoding
+     * @returns {Object}
+     */
+    sinusoidalEncoding() {
+        return {
+            layer_name:"Sinusoidal Encoding",
+            isParametric: false,
+            shapeType: "sequential",
+            initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
+            determineInferenceType: () => {},
+            feedforward: (input, current_layer) => spe.feedforward(input, current_layer),
+            getOutputLayerDelta: () => {},
+            projectDeltaBackward: (delta) => delta,
+            applyOwnDerivative: (delta) => delta,
+            accumulateWeightGradients: () => {},
+            accumulateBiasGradients: () => {},
         }
     }
 

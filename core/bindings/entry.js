@@ -100,6 +100,8 @@ const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions
     modelID
 )
 
+const sinusoidalPE = (input, embeddingDim, sequenceLength) => float32_Modules.SinusoidalPositionalEncoding(input, embeddingDim, sequenceLength);
+
 /**
  * "✅☑️"
  * @param {Array<Number>} activated_outputs activation outputs. During feedfoward, the activation outputs before going to the embedding layer is actually the raw token array
@@ -872,6 +874,7 @@ module.exports = {
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
     shutdown,
+    sinusoidalPE,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

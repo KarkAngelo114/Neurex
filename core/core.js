@@ -231,7 +231,6 @@ class Neurex {
         console.log(`Total learnable parameters: ${(totalWeights + totalBiases).toLocaleString()}`);
         console.log(`Total size (MegaBytes): ${totalSizeMB.toFixed(2)} MB`);
         console.log(hr('='));
-        console.log("\n");
     }
 
     /**
@@ -521,6 +520,13 @@ class Neurex {
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.weightShape = layerData.weightShape;
+                }
+                else if (layerData.layer_name === "Sinusoidal Encoding") {
+                    newLayer = layerBuilder.sinusoidalEncoding();
+                    newLayer.inputShape = layerData.inputShape;
+                    newLayer.outputShape = layerData.outputShape;
+                    newLayer.embeddingDim = layerData.embeddingDim;
+                    newLayer.maxSequenceLength = layerData.maxSequenceLength;
                 }
                 else {
                     console.error(`${color.red}[ERROR]${color.reset} Unknown layer type '${layerData.layer_name}' found in model. It might you've loaded a model that is not compatible to this version of Neurex yet nor has the corresponding layer type to map back. To confirm, you can check layer definitions in ${color.gray}https://neurex-documentation.vercel.app/javascript-nodejs#layers${color.reset} or update to the newest version of Neurex.`);
@@ -814,8 +820,6 @@ class Neurex {
                 }
                     
             }
-        
-            console.log(`${color.orange}[TASK]${color.reset} Training session is starting\n`);
       
             // epoch loop
             for (let current_epoch = 0; current_epoch < epoch; current_epoch++) {

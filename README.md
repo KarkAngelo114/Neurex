@@ -124,6 +124,24 @@ layerNorm(`epsilon: number`)
 layer.layerNorm(1e-5) // default value is `1e-5`
 ```
 
+sinusoidalEncoding()
+- Your classic sinusoidal positional encoding
+```JavaScript
+layer.sinusoidalEncoding()
+```
+
+residualStart()
+- The `residualStart` allows you to start the residual connection. It will cache the input to be use by the `residualEnd`
+```JavaScript
+layer.residualStart()
+```
+
+residualEnd()
+- The `residualEnd` marks the end of the residual connection. It will add the cached input set by the `residualStart` with the output projected by earlier layers.
+```JavaScript
+layer.residualEnd()
+```
+
 
 
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
