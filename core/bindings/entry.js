@@ -11,7 +11,6 @@ const {BooleanAvailability} = require('../../gpu/modeSelector');
 const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
 const { getGlobalParams } = require('../../gpu/globals');
-const { transpose2D, unpackQKVO } = require('../../utils/utils');
 
 let addon;
 let functions;

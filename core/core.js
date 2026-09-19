@@ -19,7 +19,7 @@ const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
-const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
+const { onFloat32Module, modeConfiguration, BooleanAvailability } = require('../gpu/modeSelector');
 const { init, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
@@ -1292,11 +1292,13 @@ class Neurex {
 
         this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
-        setGlobalParams(
-            this.modelID,
-            this.weights, 
-            this.biases, 
-        );
+        if (!BooleanAvailability().hasGPU) {
+            setGlobalParams(
+                this.modelID,
+                this.weights, 
+                this.biases, 
+            );
+        }
     }
 
     // ========= Private methods =======
