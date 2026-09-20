@@ -1,79 +1,88 @@
 const { reset, yellow, red } = require('../color-code');
-const {detectGPU} = require('../gpu/gpu_init');
+const { detectGPU } = require('../gpu/gpu_init');
 
 let hasGPU = false;
+let selectedDevice = null;
 let force_Use_Default_JS_Float32_Module = false;
 
+// Vendors whose GPUs are shared-memory / integrated by design
+const INTEGRATED_NAME_HINTS = /\b(UHD|Iris|HD Graphics|Radeon\(TM\) Graphics|Vega \d+ Graphics)\b/i;
+
+/**
+ * "Dedicated" = has its own VRAM. hostUnifiedMemory is the primary signal,
+ * with a name-based sanity check because drivers report it inconsistently.
+ */
+const isDedicated = (d) => !d.hostUnifiedMemory && !INTEGRATED_NAME_HINTS.test(d.gpu);
+
+/** Returns dedicated GPUs sorted best → worst (VRAM, then compute units, then clock). */
+const rankDedicatedDevices = (devices = []) =>
+    devices
+        .filter(isDedicated)
+        .sort((a, b) => {
+            if (a.globalMemBytes !== b.globalMemBytes) {
+                return a.globalMemBytes > b.globalMemBytes ? -1 : 1;   // BigInt-safe compare
+            }
+            if (a.computeUnits !== b.computeUnits) return b.computeUnits - a.computeUnits;
+            return b.maxClockMHz - a.maxClockMHz;
+        });
+
+/** Detect + rank in one call. Never throws. */
+const resolveBestDevice = () => {
+    const data = detectGPU();
+    if (!data?.ok) return { data, best: null, ranked: [] };
+    const ranked = rankDedicatedDevices(data.devices);
+    return { data, best: ranked[0] ?? null, ranked };
+};
 
 exports.modeConfiguration = (value) => {
-    const data = detectGPU();
+    const targetMode = String(value).toLowerCase();
 
-    // if auto
-    if (value.toLowerCase() === "auto") {
-        if (!data || data.devices.length == 0) {
-            console.warn(`\n${yellow}[INFO]${reset} GPU compute is not available on this environment. Switching to CPU fallback...`);
-            hasGPU = false;
-            return;
-        }
-        if (data.devices[0].hostUnifiedMemory) {
-            console.warn(`\n${yellow}[INFO]${reset} GPU compute is not available on this environment. Switching to CPU fallback...`);
-            hasGPU = false;
-            return;
-        }
-
-        hasGPU = true;
-
-        return;
+    if (!["auto", "gpu", "cpu"].includes(targetMode)) {
+        throw new Error(`${red}[ERROR] Invalid mode: ${targetMode}. Use "gpu", "cpu" or "auto" only${reset}`);
     }
 
-    if (value.toLowerCase() === "gpu") {
-        if (force_Use_Default_JS_Float32_Module) {
-            throw new Error("[ERROR] Cannot detect if 'force_Use_Default_JS_Float32_Module' is true. In your configure(), ensure that 'onFloat32Module' is false");
-        }
-
-        if (!data || data.devices.length == 0) {
-            throw new Error(`${red}[ERROR]${reset} No devices found for mode:"gpu". Use mode:"cpu" or mode:"auto"`);
-        }
-
-        if (data.devices[0].hostUnifiedMemory && value.toLowerCase() === "gpu") {
-            throw new Error(`${red}[ERROR]${reset} Cannot use mode:"gpu" if host unified memory is true. This error can be avoided if you will only set mode:"gpu" if GPU is actually available, otherwise set mode:"cpu" or mode:"auto"`);
-        }
-
-        if (!data.devices[0].hostUnifiedMemory && value.toLowerCase() === "gpu") {
-            force_Use_Default_JS_Float32_Module = false;
-            hasGPU = true;
-            return;
-        };
-
-        return;
-    }
-
-    if (value.toLowerCase() === "cpu") {
-        force_Use_Default_JS_Float32_Module = false;
+    if (targetMode === "cpu") {
         hasGPU = false;
+        selectedDevice = null;
         return;
     }
 
-    throw new Error(`${red}[ERROR] Invalid mode: ${value.toLowerCase()}. Use "gpu", "cpu" or "auto" only${reset}`);
-}
+    if (targetMode === "gpu" && force_Use_Default_JS_Float32_Module) {
+        throw new Error(`${red}[ERROR]${reset} Cannot use GPU mode when force_Use_Default_JS_Float32_Module is true.`);
+    }
+
+    const { data, best } = resolveBestDevice();
+
+    if (!best) {
+        const reason = data?.ok === false
+            ? `OpenCL error: ${data.error}`
+            : "No dedicated GPU found (integrated GPUs are not supported for compute)";
+
+        if (targetMode === "gpu") {
+            throw new Error(`${red}[ERROR]${reset} mode:"gpu" requested but ${reason}. Use mode:"cpu" or mode:"auto".`);
+        }
+
+        console.warn(`\n${yellow}[INFO]${reset} GPU compute unavailable (${reason}). Falling back to CPU...`);
+        hasGPU = false;
+        selectedDevice = null;
+        return;
+    }
+
+    hasGPU = true;
+    selectedDevice = best;
+};
 
 exports.onFloat32Module = (value) => {
-
     if (value) {
         console.log(`${yellow}[INFO]${reset} Forcing to use default float32 module on JS.`);
         hasGPU = false;
+        selectedDevice = null;
     }
-
     force_Use_Default_JS_Float32_Module = value;
 };
 
-
-
-exports.BooleanAvailability = () => {
-    const data = detectGPU();
-    return {
-        hasGPU, 
-        force_Use_Default_JS_Float32_Module,
-        data
-    }
-}
+exports.BooleanAvailability = () => ({
+    hasGPU,
+    force_Use_Default_JS_Float32_Module,
+    device: selectedDevice,   // includes .index → pass to Init_GPU(kernelPath, device.index)
+});

@@ -29,7 +29,6 @@ module.exports= {
     MinMaxScaler,
     Annotator,
     Layers,
-    detectGPU,
     lossVisualizer,
     lossLandscapeVisualizer,
     modelVisualizer,
@@ -86,5 +85,8 @@ module.exports= {
     },
     tensors: {
         createTensorBuffer
+    },
+    utils: {
+        detectGPU,
     }
 }

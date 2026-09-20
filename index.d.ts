@@ -1123,4 +1123,12 @@ declare module 'neurex' {
          */
         export function createTensorBuffer(shape: number[], options?: creationOptions): { shape: number[], data: Float32Array};
     }
+
+    /** namespace for utility functions */
+    export namespace utils {
+        /**
+         * `detectGPU` function looks for GPU devices.
+         */
+        export function detectGPU(): object;
+    }
 }

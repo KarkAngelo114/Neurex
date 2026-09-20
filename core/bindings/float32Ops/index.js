@@ -1,4 +1,4 @@
-const { unpackQKVO, transpose2D } = require("../../../utils/utils");
+const { unpackQKVO, transpose2D, concatenateFloat32Array } = require("../../../utils/utils");
 
 const Relu = (arr) => {
     const output = new Float32Array(arr);
@@ -1482,6 +1482,49 @@ const SinusoidalPositionalEncoding = (input, embeddingDim, sequenceLength) => {
     return output;
 }
 
+const accumulateAttentionWeightsGradients = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen) => {
+    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads, O_weightGrads: OwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim, true);
+
+    let QwG;
+    let KwG;
+    let VwG;
+    let OwG;
+
+    for (let t = 0; t < seqLen; t++) {
+        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+
+        QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
+        KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
+        VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
+
+        const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        const dMhaRow = dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        OwG = computeWeightGradientsForWeightsInConnectedLayer(mhaRow, dMhaRow, OwGrads, embedDim, embedDim);
+    }
+
+    return concatenateFloat32Array([QwG, KwG, VwG, OwG]);
+}
+
+const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen) => {
+    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads, O_biasGrads: ObGrads }= unpackQKVO(null, null, null, biasGrads, embedDim, true);
+
+    let QbG; 
+    let KbG;
+    let VbG;
+    let ObG;
+
+    for (let t = 0; t < seqLen; t++) {
+        QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
+        KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
+        VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
+        ObG = computeBiasGradsForConnected_Layer(ObGrads, dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim));
+    }
+    
+    return concatenateFloat32Array([QbG, KbG, VbG, ObG]);
+}
 
 module.exports = {
     Relu,
@@ -1536,6 +1579,8 @@ module.exports = {
     CoreAttentionBackward,
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
+    accumulateAttentionWeightsGradients,
+    accumulateAttentionBiasGrads,
     element_wise_add,
     SinusoidalPositionalEncoding
 }

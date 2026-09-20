@@ -1292,13 +1292,11 @@ class Neurex {
 
         this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
 
-        if (!BooleanAvailability().hasGPU) {
-            setGlobalParams(
-                this.modelID,
-                this.weights, 
-                this.biases, 
-            );
-        }
+        setGlobalParams(
+            this.modelID,
+            this.weights, 
+            this.biases, 
+        );
     }
 
     // ========= Private methods =======

@@ -239,3 +239,63 @@ __kernel void multi_head_attention_backward_dx(
 	}
 	dX[token * embedDim + column] = value;
 }
+
+__kernel void accumulate_attention_weight_grads(
+	__global const float* input,
+	__global const float* mhaOutput,
+	__global const float* dQ,
+	__global const float* dK,
+	__global const float* dV,
+	__global const float* dMhaOutput,
+	__global float* weightGrads,
+	int embedDim,
+	int seqLen
+) {
+	int block = get_global_id(0);
+	int inputIndex = get_global_id(1);
+	int outputIndex = get_global_id(2);
+	if (block >= 4 || inputIndex >= embedDim || outputIndex >= embedDim) return;
+
+	float sum = 0.0f;
+	for (int t = 0; t < seqLen; t++) {
+		float activation = block == 3
+			? mhaOutput[t * embedDim + inputIndex]
+			: input[t * embedDim + inputIndex];
+		float delta = block == 0
+			? dQ[t * embedDim + outputIndex]
+			: (block == 1
+				? dK[t * embedDim + outputIndex]
+				: (block == 2
+					? dV[t * embedDim + outputIndex]
+					: dMhaOutput[t * embedDim + outputIndex]));
+		sum += activation * delta;
+	}
+	weightGrads[block * embedDim * embedDim + inputIndex * embedDim + outputIndex] += sum;
+}
+
+__kernel void accumulate_attention_bias_grads(
+	__global const float* dQ,
+	__global const float* dK,
+	__global const float* dV,
+	__global const float* dMhaOutput,
+	__global float* biasGrads,
+	int embedDim,
+	int seqLen
+) {
+	int block = get_global_id(0);
+	int index = get_global_id(1);
+	if (block >= 4 || index >= embedDim) return;
+
+	float sum = 0.0f;
+	for (int t = 0; t < seqLen; t++) {
+		float delta = block == 0
+			? dQ[t * embedDim + index]
+			: (block == 1
+				? dK[t * embedDim + index]
+				: (block == 2
+					? dV[t * embedDim + index]
+					: dMhaOutput[t * embedDim + index]));
+		sum += delta;
+	}
+	biasGrads[block * embedDim + index] += sum;
+}

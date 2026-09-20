@@ -29,7 +29,7 @@ const init = () => {
         */
 
 
-        const {hasGPU, force_Use_Default_JS_Float32_Module, data} = BooleanAvailability();
+        const {hasGPU, force_Use_Default_JS_Float32_Module, device} = BooleanAvailability();
 
         if (force_Use_Default_JS_Float32_Module) {
             console.log(`${yellow}[INFO]${reset} Defaulting to pure JS implementation. To speed things up, consider using native C++ bindigs by enabling mode:"cpu" or mode:"auto".`);
@@ -39,26 +39,35 @@ const init = () => {
 
         addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
-        if (hasGPU) {
-            console.log(`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device ${yellow}${data.devices[0].gpu}${reset} whose vendor is ${yellow}${data.devices[0].vendor}${reset} with a memory of ${yellow}${(Number(data.devices[0].globalMemBytes) / (1024 ** 3 )).toFixed(2)} GB${reset}.`);
+        if (hasGPU && device) {
+            const vramGB = (Number(device.globalMemBytes) / (1024 ** 3)).toFixed(2);
+
+            console.log(
+`\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device:`+ 
+`GPU: ${yellow}${device.gpu}${reset}` +
+`Vendor: (${yellow}${device.vendor}${reset}) · ` +
+`VRAM capacity: ${yellow}${vramGB} GB${reset} ` +
+`Compute units: ${yellow}${device.computeUnits}${reset} compute units · ` +
+`OpenCL version: ${device.openclVersion.trim()}`
+            );
+
             const kernelSource = path.join(__dirname, "..", "..", "gpu", "kernels");
-            
+
             console.log("Compiling kernels...");
-            const res = addon.Init_GPU(kernelSource);
+            const res = addon.Init_GPU(kernelSource, device.index);
 
             if (!res.ok) {
-                console.warn(`\n${yellow}[WARN]${reset} GPU Kernel initialization failed. Failing back to CPU`);
-                console.log(res.error);
-                // if "failed", we need to set the global boolean state on C++ to false to use CPU-based functions.
+                console.warn(`\n${yellow}[WARN]${reset} GPU kernel initialization failed. Falling back to CPU.`);
+                console.warn(res.error);
                 addon.setOnGPU(false);
                 functions = addon;
                 return;
             }
-            
-            console.log("Kernels successfully compiled...");
+
+            console.log(`${yellow}[INFO]${reset} Kernels successfully compiled on ${device.gpu}.`);
             addon.setOnGPU(true);
             functions = addon;
-            return
+            return;
         }
 
         if (!hasGPU && !force_Use_Default_JS_Float32_Module) {
@@ -397,10 +406,11 @@ const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, par
 /**
  * 
  * "✅☑️"
- * @param {Float32Array>} activated_outputs 
- * @param {Float32Array>} delta 
- * @param {Float32Array>} weightGrads
- * @param {Array<Number>} weightShape
+ * @param {Float32Array} activated_outputs 
+ * @param {Float32Array} delta 
+ * @param {Float32Array} weightGrads
+ * @param {Number} inputSize
+ * @param {Number} outputSize
  * @returns float32array of accumulated weight gradients
  */
 const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
@@ -825,6 +835,29 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     modelID
 );
 
+const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, activation_outputs, weightGrads, embedDim, seqLen) => functions.accumulateAttentionWeightsGradients(
+    dQ,
+    dK,
+    dV,
+    deltaMHA,
+    MHA_output,
+    activation_outputs,
+    weightGrads,
+    embedDim,
+    seqLen
+);
+
+
+const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen) => functions.accumulateAttentionBiasGrads(
+    dQ,
+    dK,
+    dV,
+    dMhaOutput,
+    biasGrads,
+    embedDim,
+    seqLen
+);
+
 module.exports = {
     getEmbeddings,
     returnEmbeddings,
@@ -873,6 +906,8 @@ module.exports = {
     CoreAttentionBackward,
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
+    accumulateAttentionWeightsGradients,
+    accumulateAttentionBiasGrads,
     shutdown,
     sinusoidalPE,
     derivatives: {

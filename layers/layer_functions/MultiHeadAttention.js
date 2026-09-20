@@ -1,5 +1,5 @@
-const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings/entry');
-const { createTensorBuffer, concatenateFloat32Array, unpackQKVO } = require('../../utils/utils');
+const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, accumulateAttentionWeightsGradients, accumulateAttentionBiasGrads } = require('../../core/bindings/entry');;
+const { createTensorBuffer, concatenateFloat32Array } = require('../../utils/utils');
 
 /**
  * Initialized parameters for this layer
@@ -141,8 +141,7 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
         dX: dX
     };
 
-    // const output = CoreMultiHeadAttentionBackward(delta, layer_data, pointer, modelID);
-    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
+    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during projecting delta backward)");
     return dX;
 }
 
@@ -167,29 +166,11 @@ const applyOwnDerivative = (delta) => {
 const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
     const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
-    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads, O_weightGrads: OwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim, true);
 
-    let QwG;
-    let KwG;
-    let VwG;
-    let OwG;
+    const output = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during graudient accumulation)");
 
-    for (let t = 0; t < seqLen; t++) {
-        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
-        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
-        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
-        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
-
-        QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
-        KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
-        VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
-
-        const mhaRow = mhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
-        const dMhaRow = dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim);
-        OwG = computeWeightGradientsForWeightsInConnectedLayer(mhaRow, dMhaRow, OwGrads, embedDim, embedDim);
-    }
-
-    return concatenateFloat32Array([QwG, KwG, VwG, OwG]);
+    return output;
 }
 
 /**
@@ -202,20 +183,12 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
 const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
     const { dQ, dK, dV, dMhaOutput } = cache;
-    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads, O_biasGrads: ObGrads }= unpackQKVO(null, null, null, biasGrads, embedDim, true);
 
-    let QbG;
-    let KbG;
-    let VbG;
-    let ObG;
+    const output = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen);
 
-    for (let t = 0; t < seqLen; t++) {
-        QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
-        KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
-        VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
-        ObG = computeBiasGradsForConnected_Layer(ObGrads, dMhaOutput.subarray(t * embedDim, (t + 1) * embedDim));
-    }
-    return concatenateFloat32Array([QbG, KbG, VbG, ObG]);
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during graudient accumulation)");
+    return output;
+
 }
 
 module.exports = {

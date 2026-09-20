@@ -7,7 +7,6 @@ export const {
     Annotator, // annotator class
     Layers,  // layer class
     metrics, // metrics namespace
-    detectGPU,
     templates, // templates namespace
     gradientNormalizers, // gradient normalizers namespace
     schedulers, // schedulers namespace
@@ -19,4 +18,5 @@ export const {
     math, // math namespace
     datasets, // datasets namespace
     tensors, // tensor namespace
+    utils, // utils namespace
 } = pkg;
