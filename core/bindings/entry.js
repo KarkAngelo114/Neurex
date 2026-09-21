@@ -858,6 +858,25 @@ const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDi
     seqLen
 );
 
+const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionWeightGrads(
+    dQ,
+    dK,
+    dV,
+    activation_outputs,
+    weightGrads,
+    embedDim,
+    seqLen
+);
+
+const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionBiasGrads(
+    dQ,
+    dK,
+    dV,
+    biasGrads,
+    embedDim,
+    seqLen
+);
+
 module.exports = {
     getEmbeddings,
     returnEmbeddings,
@@ -908,6 +927,8 @@ module.exports = {
     CoreMultiHeadAttentionBackward,
     accumulateAttentionWeightsGradients,
     accumulateAttentionBiasGrads,
+    accumulateSimpleAttentionWeightGrads,
+    accumulateSimpleAttentionBiasGrads,
     shutdown,
     sinusoidalPE,
     derivatives: {

@@ -1526,6 +1526,44 @@ const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDi
     return concatenateFloat32Array([QbG, KbG, VbG, ObG]);
 }
 
+
+const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen) => {
+    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim);
+
+    let QwG;
+    let KwG;
+    let VwG;
+
+    for (let t = 0; t < seqLen; t++) {
+        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+
+        QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
+        KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
+        VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
+    }
+
+    return concatenateFloat32Array([QwG, KwG, VwG]);
+}
+
+const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen) => {
+    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads } = unpackQKVO(null, null, null, biasGrads, embedDim);
+    
+    let QbG;
+    let KbG;
+    let VbG;
+
+    for (let t = 0; t < seqLen; t++) {
+        QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
+        KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
+        VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
+    }
+    
+    return concatenateFloat32Array([QbG, KbG, VbG]);
+}
+
 module.exports = {
     Relu,
     Sigmoid,
@@ -1582,5 +1620,7 @@ module.exports = {
     accumulateAttentionWeightsGradients,
     accumulateAttentionBiasGrads,
     element_wise_add,
-    SinusoidalPositionalEncoding
+    SinusoidalPositionalEncoding,
+    accumulateSimpleAttentionWeightGrads,
+    accumulateSimpleAttentionBiasGrads
 }

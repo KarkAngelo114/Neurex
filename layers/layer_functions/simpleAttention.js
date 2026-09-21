@@ -1,5 +1,5 @@
-const { CoreAttention, CoreAttentionBackward, computeBiasGradsForConnected_Layer, computeWeightGradientsForWeightsInConnectedLayer } = require('../../core/bindings');
-const { createTensorBuffer, concatenateFloat32Array, unpackQKVO } = require('../../utils');
+const { CoreAttention, CoreAttentionBackward, accumulateSimpleAttentionWeightGrads, accumulateSimpleAttentionBiasGrads } = require('../../core/bindings');
+const { createTensorBuffer, concatenateFloat32Array } = require('../../utils');
 
 /**
  * Initialized parameters for this layer
@@ -146,24 +146,12 @@ const applyOwnDerivative = (delta) => {
 const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
     const { dQ, dK, dV } = cache;
-    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim);
+    
+    const output = accumulateSimpleAttentionWeightGrads(dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen);
 
-    let QwG;
-    let KwG;
-    let VwG;
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during weight gradient accumulation)");
 
-    for (let t = 0; t < seqLen; t++) {
-        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
-        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
-        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
-        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
-
-        QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
-        KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
-        VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
-    }
-
-    return concatenateFloat32Array([QwG, KwG, VwG]);
+    return output;
 }
 
 /**
@@ -176,19 +164,12 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
 const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
     const { embedDim, seqLen, cache } = layer_data;
     const { dQ, dK, dV } = cache;
-    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads } = unpackQKVO(null, null, null, biasGrads, embedDim);
     
-    let QbG;
-    let KbG;
-    let VbG;
+    const output = accumulateSimpleAttentionBiasGrads(dQ, dK, dV, biasGrads, embedDim, seqLen);
+    
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during bias gradient accumulation)");
 
-    for (let t = 0; t < seqLen; t++) {
-        QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
-        KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
-        VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
-    }
-    
-    return concatenateFloat32Array([QbG, KbG, VbG]);
+    return output;
 }
 
 module.exports = {

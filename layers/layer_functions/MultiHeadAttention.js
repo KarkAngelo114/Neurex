@@ -168,7 +168,7 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
     const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
 
     const output = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during graudient accumulation)");
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
 
     return output;
 }
@@ -186,7 +186,7 @@ const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
 
     const output = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen);
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during graudient accumulation)");
+    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
     return output;
 
 }

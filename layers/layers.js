@@ -137,13 +137,13 @@ class Layers {
         try {
 
             if (!activation_function || !layer_size || layer_size <= 0) {
-                throw new Error(`[ERROR]------- Layer Error | Activation function: ${activation_function} | layer size: ${layer_size}`);
+                throw new Error(`[ERROR] Layer Error | Activation function: ${activation_function} | layer size: ${layer_size}`);
             }
 
             let function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
             }
 
             return {
@@ -194,14 +194,14 @@ class Layers {
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+                throw new Error(`[ERROR] "${padding.toLowerCase()}" is invalid. Use 'same' or 'valid' only`);
             }
 
             // check if the activation function is valid
             const function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
             }
 
             return {
@@ -243,13 +243,13 @@ class Layers {
     maxPooling(poolSize, strides = 1, padding = "same") {
         try {
             if (poolSize[0] <= 0 || poolSize[1] <= 0) {
-                throw new Error(`[ERROR]------- pool size value cannot be 0 or a negative value`);
+                throw new Error(`[ERROR] pool size value cannot be 0 or a negative value`);
             }
 
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+                throw new Error(`[ERROR] ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
             }
 
             if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
@@ -288,8 +288,8 @@ class Layers {
         try {
             let function_name = activation_function.toLowerCase();
 
-            if (!activation[function_name] || !activation.derivatives[function_name])  throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid.`);
-            if (!units || units <= 0) throw new Error(`[ERROR]------- Units cannot be null, negative integer or a 0. | Units: ${units}`);
+            if (!activation[function_name] || !activation.derivatives[function_name])  throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid.`);
+            if (!units || units <= 0) throw new Error(`[ERROR] Units cannot be null, negative integer or a 0. | Units: ${units}`);
 
             return {
                 layer_name: "Recurrent Cell", 
@@ -340,14 +340,14 @@ class Layers {
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR]------- ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+                throw new Error(`[ERROR] ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
             }
 
             // check if the activation function is valid
             const function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR]------- Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
             }
 
             return {
@@ -482,10 +482,10 @@ class Layers {
             endConnection: false,
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, current_layer, pointer, modelID) => residual_start.feedforward(input, modelID),
+            feedforward: (input, _currentLayer, _pointer, modelID) => residual_start.feedforward(input, modelID),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => residual_start.projectDeltaBackward(delta, modelID),
-            applyOwnDerivative: (delta, z, layer_data) => delta,
+            projectDeltaBackward: (delta, _pointer, _targetShape, _layerData, modelID) => residual_start.projectDeltaBackward(delta, modelID),
+            applyOwnDerivative: (delta, _z, _layerData) => delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
         }
@@ -502,10 +502,10 @@ class Layers {
             endConnection: true,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, current_layer, pointer, modelID) => residual_end.feedforward(input, modelID),
+            feedforward: (input, _currentLayer, _pointer, modelID) => residual_end.feedforward(input, modelID),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => residual_end.projectDeltaBackward(delta, modelID),
-            applyOwnDerivative: (delta, z, layer_data) => delta,
+            projectDeltaBackward: (delta, _pointer, _targetShape, _layerData, modelID) => residual_end.projectDeltaBackward(delta, modelID),
+            applyOwnDerivative: (delta, _z, _layerData) => delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
         }
