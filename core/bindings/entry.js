@@ -45,7 +45,7 @@ const init = () => {
             console.log(
 `\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device:`+ 
 `\n- GPU: ${yellow}${device.gpu}${reset}` +
-`\m- Vendor: (${yellow}${device.vendor}${reset})` +
+`\n- Vendor: (${yellow}${device.vendor}${reset})` +
 `\n- VRAM capacity: ${yellow}${vramGB} GB${reset}` +
 `\n- Compute units: ${yellow}${device.computeUnits}${reset} compute units` +
 `\n- OpenCL version: ${device.openclVersion.trim()}`
