@@ -44,11 +44,11 @@ const init = () => {
 
             console.log(
 `\n⚡ I, ${path.join(__dirname,"..", "..", "gpu", "gpu_init.js")} found a device:`+ 
-`GPU: ${yellow}${device.gpu}${reset}` +
-`Vendor: (${yellow}${device.vendor}${reset}) · ` +
-`VRAM capacity: ${yellow}${vramGB} GB${reset} ` +
-`Compute units: ${yellow}${device.computeUnits}${reset} compute units · ` +
-`OpenCL version: ${device.openclVersion.trim()}`
+`\n- GPU: ${yellow}${device.gpu}${reset}` +
+`\m- Vendor: (${yellow}${device.vendor}${reset})` +
+`\n- VRAM capacity: ${yellow}${vramGB} GB${reset}` +
+`\n- Compute units: ${yellow}${device.computeUnits}${reset} compute units` +
+`\n- OpenCL version: ${device.openclVersion.trim()}`
             );
 
             const kernelSource = path.join(__dirname, "..", "..", "gpu", "kernels");
