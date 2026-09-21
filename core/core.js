@@ -512,12 +512,14 @@ class Neurex {
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.weightShape = layerData.weightShape;
+                    this.insideResidual = true;
                 }
                 else if (layerData.layer_name === "Residual End") {
                     newLayer = layerBuilder.residualEnd();
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
                     newLayer.weightShape = layerData.weightShape;
+                    this.insideResidual = false;
                 }
                 else if (layerData.layer_name === "Sinusoidal Encoding") {
                     newLayer = layerBuilder.sinusoidalEncoding();
@@ -613,10 +615,30 @@ class Neurex {
      * @throws {Error} - if there are no layers
      */
     pop() {
-        if (this.layers.length === 0) throw new Error(`${color.red}[ERROR]-------- No layers has been added${color.reset}`);
+        if (this.layers.length === 0) throw new Error(`${color.red}[ERROR]${color.reset} No layers has been added`);
 
         const index = this.layers.length - 1;
         const removedLayer = this.layers[index];
+
+        if (removedLayer.layer_name === "Residual Start") {
+            this.insideResidual = false;
+        }
+
+    
+
+        // if the residual end is removed AND the state `insideResidual` is false, the state will be updated to true.
+        // assume a model is loaded and has residual connections. When a model is loaded, it tracks for `insideResidual` state
+        // and during model reconstruction, reisdual layers will get read, so if it reads "Residual Start", the state will be true and if reads 
+        // "Residual End", the state will be false
+        if (removedLayer.layer_name === "Residual End" && !this.insideResidual) {
+            console.warn(`\n${color.yellow}[WARN]${color.reset} You have removed an end connection for residual connections.`);
+            console.warn(`${color.yellow}[WARN]${color.reset} The layer that starts the residual connection has no closing "Residual End".`)
+            console.warn(`${color.yellow}[WARN]${color.reset} If you purposely remove the end residual connection to add more layers inside`);
+            console.warn(`${color.yellow}[WARN]${color.reset} the residual connection block, ensure to add the "Residual End" again to avoid errors when training.`);
+            console.warn(`${color.yellow}[WARN]${color.reset} Please use "modelSummary()" to track your model`);
+            this.insideResidual = true;
+        }
+
 
         this.layers.splice(index, 1);
         this.num_layers--;
@@ -632,6 +654,8 @@ class Neurex {
         }
 
         this.lastLayerObject = this.layers[this.layers.length - 1];
+
+        
 
     }
 
@@ -1541,7 +1565,7 @@ class Neurex {
                 D = layer.embeddingDim;
                 S = layer.maxSequenceLength;
             }
-            else if (layer.layer_name === "Simple Attention" || layer.layer_name === "Multi Head Attention") {
+            else if (layer.layer_name === "Simple Attention" || layer.layer_name === "Multi Head Attention" || layer.layer_name === "Sinusoidal Encoding") {
                 H = 1;
                 W = 1;
                 D = layer.embedDim || layer.embeddingDim;
@@ -1577,6 +1601,7 @@ class Neurex {
                 D = d;
                 S = s;
             }
+           
         }
 
         this.currentShape = [H, W, D, S];
@@ -1607,10 +1632,10 @@ class Neurex {
         }
 
         if (prevType && currType && prevType !== currType && currentLayer.layer_name !== "Reshape") {
-            console.warn(`\n${color.yellow}[SHAPE WARNING]------- Connecting "${prevLayer.layer_name}" (outputs ${prevType} data) directly to "${currentLayer.layer_name}" (expects ${currType} data).${color.reset}`);
-            console.warn(`${color.yellow}[SHAPE WARNING]------- These layers interpret tensor shape differently, so this connection is likely unintentional.${color.reset}`);
-            console.warn(`${color.yellow}[SHAPE WARNING]------- Consider inserting layer.reshape(targetShape) between them to make the conversion explicit.${color.reset}`);
-            console.warn(`${color.yellow}[SHAPE WARNING]------- Proceeding anyway — if this is intentional, you can safely ignore this warning.\n${color.reset}\n`);
+            console.warn(`\n${color.yellow}[SHAPE WARNING] Connecting "${prevLayer.layer_name}" (outputs ${prevType} data) directly to "${currentLayer.layer_name}" (expects ${currType} data).${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING] These layers interpret tensor shape differently, so this connection is likely unintentional.${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING] Consider inserting layer.reshape(targetShape) between them to make the conversion explicit.${color.reset}`);
+            console.warn(`${color.yellow}[SHAPE WARNING] Proceeding anyway — if this is intentional, you can safely ignore this warning.\n${color.reset}\n`);
         }
     }
 
