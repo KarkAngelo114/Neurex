@@ -1,4 +1,4 @@
-const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul } = require("../../core/bindings");
+const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul, computeWeightGradientsForWeightsInConnectedLayer, computeBiasGradsForConnected_Layer } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -185,8 +185,38 @@ const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
     const storedOutput = layer_data.cache.layer_output;
 
     const dAct = dActivation(z, storedOutput, pointer, modelID);
-    const result = element_wise_mul(dAct, delta);
+    const result = element_wise_mul(dAct, delta, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in applyOwnDerivative (connectedLayer)");
+    return result;
+}
+
+const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => {
+    const [inputSize, outputSize] = layer_data.weightShape;
+
+    const result = computeWeightGradientsForWeightsInConnectedLayer(
+        activation_outputs,
+        deltas,
+        weightGrads,
+        inputSize,
+        outputSize,
+        pointer,
+        modelID
+    );
+
+    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in accumulateWeightGradients (connectedLayer)");
+    return result;
+}
+
+const accumulateBiasGradients = (biasgrads, deltas, pointer, modelID) => {
+
+    const result = computeBiasGradsForConnected_Layer(
+        biasgrads,
+        deltas,
+        pointer,
+        modelID
+    );
+
+    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in accumulateWeightGradients (connectedLayer)");
     return result;
 }
 
@@ -198,4 +228,6 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
+    accumulateWeightGradients,
+    accumulateBiasGradients
 }

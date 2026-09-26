@@ -1221,8 +1221,8 @@ class Neurex {
             const delta = deltas[layer_index];
 
             // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
-            this.weightGrads[pointer] = layer.accumulateWeightGradients(a_prev, delta, this.weightGrads[pointer], layer);
-            this.biasGrads[pointer] = layer.accumulateBiasGradients(this.biasGrads[pointer], delta, layer);
+            this.weightGrads[pointer] = layer.accumulateWeightGradients(a_prev, delta, this.weightGrads[pointer], layer, pointer, this.modelID);
+            this.biasGrads[pointer] = layer.accumulateBiasGradients(this.biasGrads[pointer], delta, layer, pointer, this.modelID);
         }
 
         return {

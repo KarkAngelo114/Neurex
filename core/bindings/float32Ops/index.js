@@ -303,17 +303,6 @@ const ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
     };
 };
 
-/**
- * 
- * @param {Float32Array} input 
- * @param {Number} strides 
- * @param {Array<Number>} outputShape 
- * @param {Array<Number>} kernelShape 
- * @param {Array<Number>} inputShape 
- * @param {Float32Array} weights
- * @param {Float32Array} biases
- * @returns 
- */
 const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
 
     
@@ -380,7 +369,6 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights,
     return output;
 };
 
-
 const DilateInput = (input, shape, stride) => {
     const [H, W, C] = shape;
     const dilatedH = (H - 1) * stride + 1;
@@ -429,16 +417,6 @@ const RotateKernels = (F, KH, KW, D, weights) => {
     return rotated; 
 };
 
-/**
- * 
- * @param {Float32Array} input 
- * @param {Array<Number>} delta_shape 
- * @param {Array<Number>} kernels_shape 
- * @param {Array<Number>} outputShape 
- * @param {Float32Array} weights 
- * @param {Number} stride 
- * @returns 
- */
 const ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights, stride) => {
 
     const [Hp, Wp, C_in] = delta_shape;
@@ -501,17 +479,27 @@ const computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     return grads;
 };
 
-/**
- * 
- * @param {Float32Array} input 
- * @param {Float32Array} delta 
- * @param {Float32Array} weightGrads 
- * @param {Array<Number>} inputShape 
- * @param {Array<Number>} outputShape 
- * @param {Array<Number>} kernelSize 
- * @param {Array<Number>} stride 
- * @returns 
- */
+const accumulateGammaGrads = (biasGrads, delta) => {
+    const output = biasGrads;
+
+    for (let i = 0; i < delta.length; i++) {
+        output[i] += delta[i];
+    }
+
+    return output;
+}
+
+const accumulateBetaGrads = (biasGrads, delta) => {
+    const output = biasGrads;
+
+    for (let i = 0; i < delta.length; i++) {
+        output[i] += delta[i];
+    }
+
+    return output;
+}
+
+
 const computeKernelGradients = (input, delta, weightGrads, inputShape, outputShape, kernelSize, stride) => {
 
     const [inputH, inputW, Cin] = inputShape;
@@ -1064,6 +1052,54 @@ const computelayerNorm = (input, size, gamma, beta, eps) => {
     }
 
     return outputs;
+}
+
+function computeLayerNormBackward(dY, X, gamma, size) {
+    const dX = new Float32Array(size);
+    const dGamma = new Float32Array(size);
+    const dBeta = new Float32Array(size);
+
+    // 1. Recompute forward statistics (Mean & Variance)
+    let mean = 0;
+    for (let i = 0; i < size; i++) {
+        mean += X[i];
+    }
+
+    mean /= size;
+
+    let variance = 0;
+    for (let i = 0; i < size; i++) {
+        variance += (X[i] - mean) ** 2;
+    }
+    variance /= size;
+
+    const stdInv = 1.0 / Math.sqrt(variance + eps);
+
+    // 2. Compute normalized values (xHat) and intermediate parameter gradients
+    const xHat = new Float32Array(size);
+    let sumDy = 0;
+    let sumDyXhat = 0;
+
+    for (let i = 0; i < size; i++) {
+        xHat[i] = (X[i] - mean) * stdInv;
+        
+        // Parameter Gradients
+        dBeta[i] = dY[i];
+        dGamma[i] = dY[i] * xHat[i];
+
+        // Accumulate scalar sums for input gradient equation
+        const dyGamma = dY[i] * gamma[i];sumDy += dyGamma;
+        sumDyXhat += dyGamma * xHat[i];
+    }
+
+    // 3. Compute Input Gradient (dX) using closed-form formula
+    const invSize = 1.0 / size;
+    for (let i = 0; i < size; i++) {
+        const dyGamma = dY[i] * gamma[i];
+        dX[i] = stdInv * (dyGamma - (sumDy * invSize) - (xHat[i] * sumDyXhat * invSize));
+    }
+
+    return { dX, dGamma, dBeta };
 }
 
 const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
@@ -1622,5 +1658,8 @@ module.exports = {
     element_wise_add,
     SinusoidalPositionalEncoding,
     accumulateSimpleAttentionWeightGrads,
-    accumulateSimpleAttentionBiasGrads
+    accumulateSimpleAttentionBiasGrads,
+    computeLayerNormBackward,
+    accumulateGammaGrads,
+    accumulateBetaGrads
 }

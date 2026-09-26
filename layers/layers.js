@@ -11,11 +11,6 @@
  *
  */
 
-const {
-    computeWeightGradientsForWeightsInConnectedLayer, 
-    computeBiasGradsForConnected_Layer,
-} = require('../core/bindings/entry');
-
 const activation = require('../core/bindings/entry');
 
 // import modular functions of different layers. 
@@ -160,8 +155,8 @@ class Layers {
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => ann.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
                 projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
                 applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => ann.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => computeWeightGradientsForWeightsInConnectedLayer(activation_outputs, deltas, weightGrads, layer_data.weightShape[0], layer_data.weightShape[1]),
-                accumulateBiasGradients: (biasgrads, deltas) => computeBiasGradsForConnected_Layer(biasgrads, deltas)
+                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => ann.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data, pointer, modelID),
+                accumulateBiasGradients: (biasgrads, deltas, layerData, pointer, modelID) => ann.accumulateBiasGradients(biasgrads, deltas, pointer, modelID)
             };
         }
         catch (error) {
@@ -460,13 +455,13 @@ class Layers {
             useBias: true, // true by default
             isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
-            determineInferenceType: () => normModule.determineInferenceType(),
+            determineInferenceType: () => {},
             feedforward: (input, current_layer, pointer, modelID) => normModule.feedforward(input, current_layer, pointer, modelID),
-            getOutputLayerDelta: () => normModule.getOutputLayerDelta(),
+            getOutputLayerDelta: () => {},
             projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => normModule.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
             applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => normModule.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => normModule.accumulateGammaGrads(activation_outputs, deltas, weightGrads, layer_data),
-            accumulateBiasGradients: (biasgrads, deltas, layer_data) => normModule.accumulateBetaGrads(biasgrads, deltas, layer_data),
+            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, _, pointer, modelID) => normModule.accumulateGammaGrads(activation_outputs, deltas, weightGrads, pointer, modelID),
+            accumulateBiasGradients: (biasgrads, deltas, _2, pointer, modelID) => normModule.accumulateBetaGrads(biasgrads, deltas, pointer, modelID),
         }
     }
 
@@ -482,9 +477,9 @@ class Layers {
             endConnection: false,
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, _currentLayer, _pointer, modelID) => residual_start.feedforward(input, modelID),
+            feedforward: (input, _1, _2, modelID) => residual_start.feedforward(input, modelID),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, _pointer, _targetShape, _layerData, modelID) => residual_start.projectDeltaBackward(delta, modelID),
+            projectDeltaBackward: (delta, _1, _2, _3, modelID) => residual_start.projectDeltaBackward(delta, modelID),
             applyOwnDerivative: (delta, _z, _layerData) => delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
@@ -502,10 +497,10 @@ class Layers {
             endConnection: true,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, _currentLayer, _pointer, modelID) => residual_end.feedforward(input, modelID),
+            feedforward: (input, _1, _2, modelID) => residual_end.feedforward(input, modelID),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, _pointer, _targetShape, _layerData, modelID) => residual_end.projectDeltaBackward(delta, modelID),
-            applyOwnDerivative: (delta, _z, _layerData) => delta,
+            projectDeltaBackward: (delta, _1, _2, _3, modelID) => residual_end.projectDeltaBackward(delta, modelID),
+            applyOwnDerivative: (delta, ..._) => delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
         }

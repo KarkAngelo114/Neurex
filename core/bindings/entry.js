@@ -234,7 +234,7 @@ const dtanh = (input, _, pointer, modelID) => functions.DTanh(input, pointer, mo
  * @param {Float32Array} arr2 - Float32Array input
  * @returns - 1D array of activated features (Using Softmax Derivative)
  */
-const dsoftmax = (arr1, arr2) => functions.DSoftmax(arr1, arr2);
+const dsoftmax = (arr1, arr2, pointer, modelID) => functions.DSoftmax(arr1, arr2);
 
 /**
  * "✅☑️"
@@ -404,16 +404,27 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2,
 const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID);
 
 /**
- * 
  * "✅☑️"
- * @param {Float32Array} activated_outputs 
- * @param {Float32Array} delta 
- * @param {Float32Array} weightGrads
- * @param {Number} inputSize
- * @param {Number} outputSize
- * @returns float32array of accumulated weight gradients
+ * @param {*} activations 
+ * @param {*} delta 
+ * @param {*} weightGrads 
+ * @param {*} inputSize 
+ * @param {*} outputSize 
+ * @param {*} pointer 
+ * @param {*} modelID 
+ * @returns 
  */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize);
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize, pointer, modelID);
+
+/**
+ * "✅☑️"
+ * @param {*} biasGrads 
+ * @param {*} delta 
+ * @param {*} pointer 
+ * @param {*} modelID 
+ * @returns 
+ */
+const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) => functions.computeBiasGradsForConnected_Layer(biasGrads, delta, pointer, modelID);
 
 /**
  * "✅☑️"
@@ -428,13 +439,7 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
  */
 const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1) => functions.computeKernelGradients(input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride);
 
-/**
- * "✅☑️"
- * @param {Float32Array} biasGrads 
- * @param {Float32Array} delta 
- * @returns float32array of accumulated bias gradients
- */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta) => functions.computeBiasGradsForConnected_Layer(biasGrads, delta);
+
 
 /**
  * "✅☑️"
@@ -453,19 +458,18 @@ const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => function
 const scale = (input, scalingValue) => functions.scale(input, scalingValue);
 
 /**
- * 
  * "✅☑️"
- * @function 
- * @param {Array<Number>} flat_arr_1 - a flat array input
- * @param {Array<Number>} flat_arr_2 - a flat array input
- * @returns A flat array output after multiplying input_array_1[i] to the values of input_array_2[i]
- * @throws am error will occured if both array are not equal in length
+ * @param {*} flat_arr_1 
+ * @param {*} flat_arr_2 
+ * @param {*} pointer 
+ * @param {*} modelID 
+ * @returns 
  */
-const element_wise_mul = (flat_arr_1, flat_arr_2) => {
+const element_wise_mul = (flat_arr_1, flat_arr_2, pointer, modelID) => {
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
     
-    return functions.element_wise_mul(flat_arr_1, flat_arr_2);
+    return functions.element_wise_mul(flat_arr_1, flat_arr_2, pointer, modelID);
 }
 
 /**
@@ -709,20 +713,39 @@ const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.compu
 );
 
 /**
- * "✅☑️"
- * @function accumulate_element_wise_mul performs an accumulating element-wise multiplication operation wherein the 3rd array input will be accumulated on. (Not to be confused with `element_wise_mul()`)
- * @param {Float32Array} flat_arr_1 input array
- * @param {Float32Array} flat_arr_2 input array
- * @param {Float32Array} flat_arr_3 input array to accumulated on
- * @returns {Float32Array} accumulated result
+ * 
+ * @param {Float32Array} dY incoming delta 
+ * @param {Float32Array} X cached input during forward pass 
+ * @param {Number} size feature size 
+ * @param {number} pointer 
+ * @param {String} modelID
+ * @returns {{ dX: Float32Array, dGamma: Float32Array, dBeta: Float32Array }}
  */
-const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
+const computeLayerNormBackward = (dY, X, size, pointer, modelID) => float32_Modules.computeLayerNormBackward(
+    dY,
+    X,
+    getGlobalParams(modelID).globalWeights[pointer],
+    size,
+    pointer,
+    modelID
+);
+
+/**
+ * 
+ * @param {*} flat_arr_1 
+ * @param {*} flat_arr_2 
+ * @param {*} flat_arr_3 
+ * @param {*} pointer 
+ * @param {*} modelID 
+ * @returns 
+ */
+const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer, modelID) => {
 
     if (!flat_arr_1 || !flat_arr_2 || !flat_arr_3) throw new Error("[ERROR]------- requires '3' input arrays for this operation."); 
 
     if (flat_arr_1.length !== flat_arr_2.length || flat_arr_1.length !== flat_arr_3.length) throw new Error(`${red}[ERROR]------- Error: 3 input arrays are not equal in length. array1: ${flat_arr_1.length} | array2: ${flat_arr_2.length} ${reset} | array3: ${flat_arr_3.length}`);
 
-    return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3);
+    return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3, pointer, modelID);
 };
 
 /**
@@ -835,6 +858,19 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     modelID
 );
 
+/**
+ * "✅☑️"
+ * @param {Float32Array} dQ 
+ * @param {Float32Array} dK 
+ * @param {Float32Array} dV 
+ * @param {Float32Array} deltaMHA 
+ * @param {Float32Array} MHA_output 
+ * @param {Float32Array} activation_outputs 
+ * @param {Float32Array} weightGrads 
+ * @param {Number} embedDim 
+ * @param {Number} seqLen 
+ * @returns 
+ */
 const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, activation_outputs, weightGrads, embedDim, seqLen) => functions.accumulateAttentionWeightsGradients(
     dQ,
     dK,
@@ -848,6 +884,17 @@ const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, a
 );
 
 
+/**
+ * "✅☑️"
+ * @param {Float32Array} dQ 
+ * @param {Float32Array} dK 
+ * @param {Float32Array} dV 
+ * @param {Float32Array} dMhaOutput 
+ * @param {Float32Array} biasGrads 
+ * @param {Number} embedDim 
+ * @param {Number} seqLen 
+ * @returns 
+ */
 const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen) => functions.accumulateAttentionBiasGrads(
     dQ,
     dK,
@@ -858,6 +905,17 @@ const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDi
     seqLen
 );
 
+/**
+ * "☑️"
+ * @param {Float32Array} dQ 
+ * @param {Float32Array} dK 
+ * @param {Float32Array} dV 
+ * @param {Float32Array} activation_outputs 
+ * @param {Float32Array} weightGrads 
+ * @param {Number} embedDim 
+ * @param {Number} seqLen 
+ * @returns 
+ */
 const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionWeightGrads(
     dQ,
     dK,
@@ -868,6 +926,16 @@ const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, we
     seqLen
 );
 
+/**
+ * "☑️"
+ * @param {Float32Array} dQ 
+ * @param {Float32Array} dK 
+ * @param {Float32Array} dV 
+ * @param {Float32Array} biasGrads 
+ * @param {Number} embedDim 
+ * @param {Number} seqLen 
+ * @returns 
+ */
 const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionBiasGrads(
     dQ,
     dK,
@@ -875,6 +943,36 @@ const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seq
     biasGrads,
     embedDim,
     seqLen
+);
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} delta 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
+ */
+const accumulateGammaGrads = (biasGrads, delta, pointer, modelID) => functions.accumulateGammaGrads(
+    biasGrads,
+    delta,
+    pointer,
+    modelID
+);
+
+/**
+ * "✅☑️"
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} delta 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
+ */
+const accumulateBetaGrads = (biasGrads, delta, pointer, modelID) => functions.accumulateBetaGrads(
+    biasGrads,
+    delta,
+    pointer,
+    modelID
 );
 
 module.exports = {
@@ -931,6 +1029,9 @@ module.exports = {
     accumulateSimpleAttentionBiasGrads,
     shutdown,
     sinusoidalPE,
+    computeLayerNormBackward,
+    accumulateGammaGrads,
+    accumulateBetaGrads,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,
