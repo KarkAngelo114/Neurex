@@ -71,14 +71,6 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     throw new Error('Convolutional layer cannot be an output layer for now');
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} input input features 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
 const feedforward = (input, current_layer, pointer, modelID) => {
     let [f, kh, kw, kd] = current_layer.weightShape;
     let [input_H, input_W, input_D] = current_layer.inputShape; 
@@ -104,7 +96,7 @@ const feedforward = (input, current_layer, pointer, modelID) => {
 
     // 5. activate each depth input using the given activation function
     const activation_function = activation[current_layer.activation_function.name];
-    const outputs = activation_function(convolve_result);
+    const outputs = activation_function(convolve_result, pointer, modelID);
 
     if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");
 
@@ -119,28 +111,10 @@ const feedforward = (input, current_layer, pointer, modelID) => {
     };
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
     throw new Error('Convolutional layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
 }
 
-/**
- * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer for THIS conv layer
- * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
- * @param {Object} layer_data - THIS conv layer's own configuration (weightShape, outputShape, strides, padding)
- * @param {String} modelID model ID
- * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
- */
 const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
     const [Fn, KHn, KWn, KCn] = layer_data.weightShape;
     const [oHn, oWn, oDn]     = layer_data.outputShape;
@@ -173,8 +147,7 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
     }
 
     // 3. Apply padding
-    const { data: paddedInput, shape } =
-        applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
+    const { data: paddedInput, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
     const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID);
@@ -183,33 +156,18 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
     return result;
 }
 
-/**
- * Applies this conv layer's own activation derivative to the projected delta.
- * Called on the *current* layer from the core backprop loop.
- *
- * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
- * @param {Float32Array} z - pre-activation values (z) for this layer
- * @param {Object} layer_data - this layer's own configuration
- * @returns {Float32Array} delta for the layer before this one
- */
 const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
     const dActivation = activation.derivatives[layer_data.activation_function.name];
     const storedOutput = layer_data.cache.layer_output;
+    const dAct = dActivation(z, storedOutput, pointer, modelID);
     
-    const result = element_wise_mul(dActivation(z, storedOutput, pointer, modelID), delta);
+    const result = element_wise_mul(dAct, delta);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
     return result;
 }
 
-/**
- * 
- * @param {Float32Array} activation_outputs all outputs during feedforward
- * @param {Float32Array} deltas all outputs during backpropagation 
- * @param {Float32Array} weightGrads initially zeroed accumulators
- * @param {Object} layer_data layer configuration data
- * @returns {Float32Array} Float32Array accumulated gradients
- */
-const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
+
+const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => {
     const [filters, kH, kW, inDepth] = layer_data.weightShape
     const [inH, inW] = layer_data.inputShape
     const [outH, outW] = layer_data.outputShape
@@ -221,7 +179,10 @@ const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_d
         weightGrads,
         [inH, inW, inDepth],
         [outH, outW, filters],
-        [kH, kW]
+        [kH, kW],
+        1,
+        pointer, 
+        modelID
     );
 
     if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
@@ -229,17 +190,10 @@ const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_d
     return output;
 }
 
-/**
- * 
- * @param {Float32Array} biasgrads initially zeroed gradient accumulators 
- * @param {Float32Array} deltas all outputs during backpropagation
- * @param {Object} layer_data layer configuration data
- * @returns {Float32Array} Float32Array accumulated gradients
- */
-const computeBiasGradients = (biasgrads, deltas, layer_data) => {
+const computeBiasGradients = (biasgrads, deltas, layer_data, pointer, modelID) => {
     const [filters] = layer_data.weightShape;
     const [outH, outW] = layer_data.outputShape;
-    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters);
+    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters, pointer, modelID);
 }
 
 module.exports = {

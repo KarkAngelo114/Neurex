@@ -52,17 +52,27 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
     layer_data.cache.dGamma = dGamma;
     layer_data.cache.dBeta = dBeta;
 
+    if (dX.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after delta projection`);
+
     return dX;
 };
 
 const accumulateGammaGrads = (a_prev, delta, gammaGrads, pointer, modelID, layer_data) => {
     const dGamma = layer_data.cache.dGamma;
-    return accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID);
+    const output = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID);
+
+    if (output.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after gamma grads accumulation`);
+
+    return output;
 };
 
 const accumulateBetaGrads = (betaGrads, delta, pointer, modelID, layer_data) => {
     const dBeta = layer_data.cache.dBeta;
-    return accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID);
+    const output = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID);
+
+    if (output.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after beta grads accumulation`);
+
+    return output;
 };
 
 module.exports = {
@@ -71,7 +81,6 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
     accumulateGammaGrads,
     accumulateBetaGrads,
 }

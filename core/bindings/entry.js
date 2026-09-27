@@ -162,131 +162,126 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID) => functio
     pointer,
     modelID
 );
-
 /**
  * "✅☑️"
- * @function relu
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using ReLu)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
-const relu = (input, pointer, modelID) => functions.Relu(input, pointer, modelID)
-
+const relu = (input, pointer, modelID) => functions.Relu(input, pointer, modelID);
 /**
  * "✅☑️"
- * @function sigmoid
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Sigmoid)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const sigmoid = (input, pointer, modelID) => functions.Sigmoid(input, pointer, modelID);
-
 /**
  * "✅☑️"
- * @function tanh
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Tanh)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const tanh = (input, pointer, modelID) => functions.Tanh(input, pointer, modelID);
-
 /**
  * "✅☑️"
- * @function softmax
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Softmax)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const softmax = (input, pointer, modelID) => functions.Softmax(input, pointer, modelID);
-
 /**
  * "✅☑️"
- * @function linear
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Linear)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const linear = (input, pointer, modelID) => functions.Linear(input, pointer, modelID); 
-
 /**
  * "✅☑️"
- * @function drelu
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using ReLu Derivative)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const drelu = (input, _, pointer, modelID) => functions.DReLu(input, pointer, modelID);
-
 /**
  * "✅☑️"
- * @function dsigmoid
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Sigmoid Derivative)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const dsigmoid = (input, _, pointer, modelID) => functions.DSigmoid(input, pointer, modelID);
-
 /**
  * "✅☑️"
- * @function dtanh
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Tanh Derivative)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const dtanh = (input, _, pointer, modelID) => functions.DTanh(input, pointer, modelID);
 
 /**
- * "✅☑️"
- * @function dsoftmax
- * @param {Float32Array} arr1 - Float32Array input
- * @param {Float32Array} arr2 - Float32Array input
- * @returns - 1D array of activated features (Using Softmax Derivative)
+ *  "✅☑️"
+ * @param {Float32Array} arr1 
+ * @param {Float32Array} arr2 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
-const dsoftmax = (arr1, arr2, pointer, modelID) => functions.DSoftmax(arr1, arr2);
-
+const dsoftmax = (arr1, arr2, pointer, modelID) => functions.DSoftmax(arr1, arr2, pointer, modelID);
 /**
  * "✅☑️"
- * @function dlinear
- * @param {Float32Array} input - 1D array of features 
- * @returns - 1D array of activated features (Using Linear Derivative)
+ * @param {Float32Array} input 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
-const dlinear = (input) => functions.DLinear(input);
-
+const dlinear = (input, _, pointer, modelID) => functions.DLinear(input, pointer, modelID);
 /**
  * "✅☑️"
- * @param {Float32Array} p predictions array 
- * @param {Float32Array} a actuals array 
- * @returns loss output
+ * @param {Float32Array} p 
+ * @param {Float32Array} a 
+ * @returns 
  */
 const mse = (p, a) => functions.mse(new Float32Array(p), new Float32Array(a));
-
 /**
  * "✅☑️"
- * @param {Float32Array} p predictions array 
- * @param {Float32Array} a actuals array 
- * @returns loss output
+ * @param {Float32Array} p 
+ * @param {Float32Array} a 
+ * @returns 
  */
 const mae = (p, a) => functions.mae(new Float32Array(p), new Float32Array(a));
-
 /**
  * "✅☑️"
- * @param {Float32Array} p predictions array 
- * @param {Float32Array} a actuals array 
- * @param {Number} epsilon epsilon value. Default is `1e-15`
- * @returns loss output
+ * @param {Float32Array} p 
+ * @param {Arrayy<Number>} a 
+ * @param {Number} epsilon 
+ * @returns 
  */
 const categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.categorical_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
-
 /**
  * "✅☑️"
- * @param {Float32Array} p predictions array 
- * @param {Float32Array} a actuals array 
- * @param {Number} epsilon epsilon value. Default is `1e-15`
- * @returns loss output
+ * @param {Float32Array} p 
+ * @param {Arrayy<Number>} a 
+ * @param {Number} epsilon 
+ * @returns 
  */
 const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.sparse_categorical_cross_entropy(new Float32Array(p), a, epsilon);
-
 /**
  * "✅☑️"
- * @param {Float32Array} p predictions array 
- * @param {Float32Array} a actuals array 
- * @param {Number} epsilon epsilon value. Default is `1e-15`
- * @returns loss output
+ * @param {Float32Array} p 
+ * @param {Arrayy<Number>} a 
+ * @param {Number} epsilon 
+ * @returns 
  */
 const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
-
 /**
  * "✅☑️"
  * @param {Float32Array} input 
@@ -297,20 +292,19 @@ const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_c
  * @param {Number} padBottom 
  * @param {Number} padLeft 
  * @param {Number} padRight 
- * @returns padded tensor
+ * @returns 
  */
 const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight);
-
 /**
  * "✅☑️"
- * @param {Float32Array} input input to perform convolution
- * @param {Number} strides stride value
- * @param {Array<Number>} outputShape [oH, oW]
- * @param {Array<Number>} kernelShape [num_filters, Kh, Kw, channels]
- * @param {Array<Number>} inputShape [iH, iW] 
- * @param {Number} pointer pointer value to fetch corresponding parameters of the layer from the global store
- * @param {String} modelID model ID
- * @returns {Float32Array} convolution result
+ * @param {Float32Array} input 
+ * @param {Number} strides 
+ * @param {Array<Number>} outputShape 
+ * @param {Array<Number>} kernelShape 
+ * @param {Array<Number>} inputShape 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
 const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, modelID) => functions.Convolve(
     input, 
@@ -325,7 +319,7 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer,
 );
 
 /**
- * "✅☑️" dilate the input inserting 0s
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Array<Number>} shape_array 
  * @param {Number} strides 
@@ -335,14 +329,14 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
 
 /**
  * "✅☑️"
- * @param {Float32Array} input input tensors
- * @param {Array<Number>} deltaShape delta shape: [Hp, Wp, C_in]
- * @param {Array<Number>} kernel_shape kernel shape: [F, KH, KW, C_k]
- * @param {Array<Number>} outputShape output shape: [oH, oW]
- * @param {Numer} pointer pointer value to fetch parameters from the global store
- * @param {Nunber} stride stride value
- * @param {String} modelID model ID
- * @returns {Float32Array} convolve result
+ * @param {Float32Array} input 
+ * @param {Array<Number>} deltaShape 
+ * @param {Array<Number>} kernel_shape 
+ * @param {Array<Number>} outputShape 
+ * @param {Number} pointer 
+ * @param {Number} stride 
+ * @param {String} modelID 
+ * @returns 
  */
 const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1, modelID) => functions.ConvolveDelta(
     input, 
@@ -351,6 +345,7 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
     outputShape, 
     getGlobalParams(modelID).globalWeights[pointer],
     stride,
+    pointer,
     modelID
 );
 
@@ -414,17 +409,30 @@ const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, par
  * @param {*} modelID 
  * @returns 
  */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID) => functions.computeWeightGradientsForWeightsInConnectedLayer(activations, delta, weightGrads, inputSize, outputSize, pointer, modelID);
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID) => functions.computeWeightGradientsForWeightsInConnectedLayer(
+    activations, 
+    delta, 
+    weightGrads, 
+    inputSize, 
+    outputSize, 
+    pointer, 
+    modelID
+);
 
 /**
  * "✅☑️"
- * @param {*} biasGrads 
- * @param {*} delta 
- * @param {*} pointer 
- * @param {*} modelID 
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} delta 
+ * @param {Number} pointer 
+ * @param {String} modelID 
  * @returns 
  */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) => functions.computeBiasGradsForConnected_Layer(biasGrads, delta, pointer, modelID);
+const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) => functions.computeBiasGradsForConnected_Layer(
+    biasGrads, 
+    delta, 
+    pointer, 
+    modelID
+);
 
 /**
  * "✅☑️"
@@ -435,19 +443,41 @@ const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) 
  * @param {Array<Number>} outputShape output shape: [H, W, Cout]
  * @param {Array<Number>} kernelSize kernel size: [Kh, Kw]
  * @param {Number} stride stride value. Default value is `1`
+ * @param {Number} pointer 
+ * @param {String} modelID 
  * @returns accumulated gradients
  */
-const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1) => functions.computeKernelGradients(input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride);
-
-
+const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1, pointer, modelID) => functions.computeKernelGradients(
+    input, 
+    delta, 
+    ZeroedGrads, 
+    inputShape, outputShape, 
+    kernelSize, 
+    stride,
+    pointer,
+    modelID
+);
 
 /**
- * "✅☑️"
- * @param {Float32Array} grads - bias grads in float32array 
- * @param {Float32Array} deltas - float32array delta 
- * @returns Accumulated bias gradients in float32array
+ * 
+ * @param {Float32Array} grads 
+ * @param {Float32Array} deltas 
+ * @param {Number} oh 
+ * @param {Number} ow 
+ * @param {Number} num_filters 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @returns 
  */
-const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters) => functions.computeBiasGradsForConv(grads, deltas, oh, ow, num_filters);
+const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters, pointer, modelID) => functions.computeBiasGradsForConv(
+    grads, 
+    deltas, 
+    oh, 
+    ow, 
+    num_filters,
+    pointer,
+    modelID
+);
 
 /**
  * "✅☑️" performs X[i] /= scaling_value
@@ -655,8 +685,8 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
  * @param {pointer} pointer 
- * @param {String} modelID model ID
- * @returns {Float32Array} delta tensor to be projected
+ * @param {String} modelID
+ * @returns {Float32Array}
  */
 const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID) => functions.transConvBackward(
     input,
@@ -680,9 +710,11 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
  * @param {*} inputShape 
  * @param {*} outputShape 
  * @param {*} weightShape 
+ * @param {pointer} pointer 
+ * @param {String} modelID
  * @returns 
  */
-const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape) => functions.accumulateKernelGradsForTransConv(
+const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape, pointer, modelID) => functions.accumulateKernelGradsForTransConv(
     activation_outputs,
     delta, 
     zeroGradAccumulator,
@@ -690,7 +722,9 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
     filters, 
     inputShape, 
     outputShape, 
-    weightShape
+    weightShape,
+    pointer, 
+    modelID
 );
 
 /**
@@ -721,7 +755,7 @@ const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.compu
  * @param {String} modelID
  * @returns {{ dX: Float32Array, dGamma: Float32Array, dBeta: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, size, pointer, modelID) => float32_Modules.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, size, pointer, modelID) => functions.computeLayerNormBackward(
     dY,
     X,
     getGlobalParams(modelID).globalWeights[pointer],
