@@ -755,11 +755,12 @@ const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.compu
  * @param {String} modelID
  * @returns {{ dX: Float32Array, dGamma: Float32Array, dBeta: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, size, pointer, modelID) => functions.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, size, eps, pointer, modelID) => functions.computeLayerNormBackward(
     dY,
     X,
     getGlobalParams(modelID).globalWeights[pointer],
-    size,
+    size, 
+    eps,
     pointer,
     modelID
 );
@@ -987,8 +988,8 @@ const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seq
  * @param {String} modelID 
  * @returns 
  */
-const accumulateGammaGrads = (biasGrads, delta, pointer, modelID) => functions.accumulateGammaGrads(
-    biasGrads,
+const accumulateGammaGrads = (grads, delta, pointer, modelID) => functions.accumulateGammaGrads(
+    grads,
     delta,
     pointer,
     modelID
@@ -1002,8 +1003,8 @@ const accumulateGammaGrads = (biasGrads, delta, pointer, modelID) => functions.a
  * @param {String} modelID 
  * @returns 
  */
-const accumulateBetaGrads = (biasGrads, delta, pointer, modelID) => functions.accumulateBetaGrads(
-    biasGrads,
+const accumulateBetaGrads = (grads, delta, pointer, modelID) => functions.accumulateBetaGrads(
+    grads,
     delta,
     pointer,
     modelID

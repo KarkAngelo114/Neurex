@@ -1,66 +1,97 @@
-
-// sigmoid
-__kernel void sigmoid(__global float* input, const int inputSize) {
+// linear
+__kernel void linear(
+    __global const float* input,
+    __global float* output,
+    const int inputSize
+) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
-    input[i] = 1.0f / (1.0f + exp(-input[i]));
+    // write to output buffer
+    output[i] = input[i];
 }
 
 // relu
-__kernel void relu(__global float* input, const int inputSize) {
+__kernel void relu(
+    __global const float* input, 
+    __global float* output,
+    const int inputSize
+) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
-    input[i] = input[i] > 0.0f ? input[i] : 0.0f;
+    output[i] = input[i] > 0.0f ? input[i] : 0.0f;
+}
+
+
+// sigmoid
+__kernel void sigmoid(__global const float* input, __global float* output, const int inputSize) {
+    int i = get_global_id(0);
+
+    if (i >= inputSize) return;
+
+    output[i] = 1.0f / (1.0f + exp(-input[i]));
 }
 
 // tanh
-__kernel void Tanh(__global float* input, const int inputSize) {
+__kernel void Tanh(__global const float* input, __global float* output, const int inputSize) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
-    input[i] = tanh(input[i]);
+    output[i] = tanh(input[i]);
 }
 
 // softmax
-__kernel void softmax(__global float* input,const float maxVal,const float sum,const int inputSize) {
+__kernel void softmax(__global const float* input, __global float* output, const float maxVal, const float sum, const int inputSize) {
     
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
-    input[i] = exp(input[i] - maxVal) / sum;
+    output[i] = exp(input[i] - maxVal) / sum;
 }
 
 //====================== derivatives ==============================//
-__kernel void drelu(__global float* input, const int inputSize) {
+__kernel void drelu(__global const float* input, __global float* output, const int inputSize) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
-    input[i] = input[i] > 0.0f ? 1.0f : 0.0f;
+    output[i] = input[i] > 0.0f ? 1.0f : 0.0f;
 }
 
-__kernel void dsigmoid(__global float* input, const int inputSize) {
+__kernel void dsigmoid(__global const float* input, __global float* output, const int inputSize) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
     float sigmoidOutput = 1.0f / (1.0f + exp(-input[i]));
-    input[i] = sigmoidOutput * (1.0f - sigmoidOutput);
+    output[i] = sigmoidOutput * (1.0f - sigmoidOutput);
 
 }
 
-__kernel void dtanh(__global float* input, const int inputSize) {
+__kernel void dtanh(__global const float* input, __global float* output, const int inputSize) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
 
     float tanhOutput = tanh(input[i]);
 
-    input[i] = 1.0f - (tanhOutput * tanhOutput);
+    output[i] = 1.0f - (tanhOutput * tanhOutput);
+}
+
+__kernel void dlinear(
+    __global const float* input,
+    __global float* output,
+    const int inputSize
+) {
+    int i = get_global_id(0);
+
+    if (i >= inputSize) return;
+
+    // write to output buffer
+    output[i] = 1.0f;
 }

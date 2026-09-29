@@ -296,7 +296,7 @@ declare module 'neurex' {
     export class Neurex {
         /**
         * Allows configuration of your neural network's parameters. You may configure them optionally. Be careful of tweaking them as they will have an effect on your model's performance.
-        * @param {NeurexConfig} configs - Configuration options for the neural network.
+        * @param {NeurexConfig} configs Configuration options for the neural network.
         */
         
         configure(configs: NeurexConfig): void;
@@ -693,6 +693,13 @@ declare module 'neurex' {
         export function ClassificationMetrics(predictions: number[][], actuals: number[][], classificationType: string, labels: any[], showOutputs: Boolean): void;
     }
 
+    export interface tokenizerOption {
+        /** minimum character length. If below threshold, it will automatically fills the needed amount with a `filler`*/
+        minLen?: number | 10;
+        /** the filler string is used to fill up the remaining tokens if the tokenized input is below the `minLen` threshold*/
+        filler?: string;
+    }
+
     /**
      * preprocessor functions namespace. Consists of built-in functions used for preprocessing data like `split_dataset`, `OneHotEncoded`, `IntegerLabeling`
      *  `BinaryLabeling`, `load_images_from_directory`, `load_single_image`, `load_multiple_images`, `tokenize`, `buildVocab`, `buildWord2Id`, and `Encode`
@@ -779,9 +786,10 @@ declare module 'neurex' {
         /**
         * @function tokenize allows you to tokenize a sentence
         * @param {String} sentence input sentence
+        * @param {tokenizerOption} options options for tokenizing inputs
         * @returns {Array<String>} array of tokenized words 
         */
-        export function tokenize(sentence: String): String[];
+        export function tokenize(sentence: String, options: tokenizerOption): String[];
 
         /**
         * @function buildVocab - allows you to tokenized an entire corpus into tokens of words, symbols, numbers and removing duplicated words.
@@ -886,35 +894,6 @@ declare module 'neurex' {
         export function jaccard(arr1: any[], arr2: any[]): Number;
     }
 
-    /**
-     * @function detectGPU() 
-     
-     * - Runs a quick detection test for GPU availability. This is also used internally for CPU/GPU branching
-     * 
-     * Example output:
-     * ```bash
-     *   {
-     *       ok: true,
-     *       error: '',
-     *       platformCount: 1,
-     *       devices: [
-     *           {
-     *               gpu: 'Intel(R) UHD Graphics',
-     *               vendor: 'Intel(R) Corporation',
-     *               platform: 'Intel(R) OpenCL Graphics',
-     *               driverVersion: '32.0.101.6127',
-     *               openclVersion: 'OpenCL 3.0 NEO ',
-     *               deviceType: 'gpu',
-     *               globalMemBytes: 3378651136n,
-     *               computeUnits: 32,
-     *               maxClockMHz: 1250,
-     *               hostUnifiedMemory: true
-     *           }
-     *       ]
-     *   }
-     *```
-     */
-    export function detectGPU(): Object;
 
     /**
      * provides some predefined network templates which can be drop in the `sequentialBuild()`. The templates doesn't have input layer nor a predefined output layer so that you can add your own.
@@ -969,7 +948,7 @@ declare module 'neurex' {
         /**
         * Generates a Generative Pre-trained Transformer (GPT) style decoder-only architecture boilerplate.
         * 
-        * Includes token embeddings, causal multi-head self-attention with residual 
+        * Includes causal multi-head self-attention with residual 
         * connections, layer normalization, and a feed-forward neural network.
         * 
         * @see {@link https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf|Improving Language Understanding by Generative Pre-Training (Radford et al., 2018)}
@@ -980,15 +959,16 @@ declare module 'neurex' {
         * - **GPT Architecture Proponents (OpenAI):** Alec Radford, Karthik Narasimhan, Tim Salimans, Ilya Sutskever
         * - **Transformer Architecture Inventors:** Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin
         * 
-        * @param {number} embedDim - The hidden state/embedding dimension size (must be a positive integer).
-        * @param {number} seqLen - The maximum context length or sequence length (must be a positive integer).
-        * @param {number} numHeads - The number of attention heads for multi-head attention (must be a positive integer).
+        * @param {number} embedDim The hidden state/embedding dimension size (must be a positive integer).
+        * @param {number} seqLen The maximum context length or sequence length (must be a positive integer).
+        * @param {number} numHeads The number of attention heads for multi-head attention (must be a positive integer).
+        * @param {boolean} autoReshape enables auto reshape after linear transformation if the output will be fed to the next transformer block. Default is `true`.
         * 
         * @returns {Array<Object>} An array representing the sequential layer configuration for the GPT architecture.
         * 
         * @throws {Error} Throws an error if any parameter is zero, negative, null, or undefined.
         */
-        export function GPT(embedDim: number, seqLen: number, numHeads: number): object[];
+        export function GPT_trasformer_block(embedDim: number, seqLen: number, numHeads: number,  autoReshape: boolean): object[];
     }
 
     /**
@@ -1126,9 +1106,34 @@ declare module 'neurex' {
 
     /** namespace for utility functions */
     export namespace utils {
-        /**
-         * `detectGPU` function looks for GPU devices.
-         */
+       /**
+        * @function detectGPU() 
+        
+        * - Runs a quick detection test for GPU availability. This is also used internally for CPU/GPU branching
+        * 
+        * Example output:
+        * ```bash
+        *   {
+        *       ok: true,
+        *       error: '',
+        *       platformCount: 1,
+        *       devices: [
+        *           {
+        *               gpu: 'Intel(R) UHD Graphics',
+        *               vendor: 'Intel(R) Corporation',
+        *               platform: 'Intel(R) OpenCL Graphics',
+        *               driverVersion: '32.0.101.6127',
+        *               openclVersion: 'OpenCL 3.0 NEO ',
+        *               deviceType: 'gpu',
+        *               globalMemBytes: 3378651136n,
+        *               computeUnits: 32,
+        *               maxClockMHz: 1250,
+        *               hostUnifiedMemory: true
+        *           }
+        *       ]
+        *   }
+        *```
+        */
         export function detectGPU(): object;
     }
 }

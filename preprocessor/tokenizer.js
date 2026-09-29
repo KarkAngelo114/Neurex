@@ -1,11 +1,20 @@
-const tokenize = (sentence) => {
-    return (
-        sentence
-            .toLowerCase()
-            .match(
-                /<\/?[\p{L}][\p{L}\p{N}-]*>|[\p{L}]+(?:'[\p{L}]+)*|\p{N}+|[^\p{L}\p{N}\s]/gu
-            ) || []
-    );
+const tokenize = (sentence, options) => {
+    const tokenize = sentence.toLowerCase().match(/<\/?[\p{L}][\p{L}\p{N}-]*>|[\p{L}]+(?:'[\p{L}]+)*|\p{N}+|[^\p{L}\p{N}\s]/gu) || [];
+    
+    // if user wants to automatically pad the tokenized words
+    if (options) {
+        const minLength = options?.minLen || 10;
+        const filler = options?.filler || "<NONE>";
+
+        if (tokenize.length < minLength) {
+            const neededPad = Math.abs(tokenize.length - minLength);
+            for (let i = 0; i < neededPad; i++) {
+                tokenize.push(filler); // raw token strings with filler
+            }
+        }
+    }
+
+    return tokenize;
 };
 
 const buildVocab = (sentences) => {

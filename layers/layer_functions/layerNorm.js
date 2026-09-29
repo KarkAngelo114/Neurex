@@ -26,61 +26,94 @@ const determineInferenceType = () => {
     throw new Error("[ERROR] LayerNorm cannot be used as an output layer.");
 }
 
-const feedforward = (input, current_layer, pointer, modelID) => {
-    const eps = current_layer.eps || 1e-5;
+const feedforward = (data) => {
+    const input = data.input;
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
+    const eps = layerData.eps || 1e-5;
     const D = input.length;
 
     const outputs = computeLayerNorm(input, D, eps, pointer, modelID);
 
-    current_layer.cache = {
+    if (outputs.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after normalization operation on layerNorm");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+
+    layerData.cache = {
         X: input
     }
 
-    return { outputs, z_values: outputs, incrementor_value: 1 };
+    return { 
+        outputs: outputs, 
+        z_values: outputs, 
+        incrementor_value: 1 
+    };
 };
 
 const getOutputLayerDelta = () => {
     throw new Error("[ERROR] LayerNorm cannot be used as an output layer.");
 }
 
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
-    const X = layer_data.cache.X;
+const applyOwnDerivative = (data) => {
+    const delta = data.delta;
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const eps = layerData.eps || 1e-5;
+
+    const X = layerData.cache.X;
     const size = delta.length;
 
-    const { dX, dGamma, dBeta } = computeLayerNormBackward(delta, X, size, pointer, modelID);
+    const { dX, dGamma, dBeta } = computeLayerNormBackward(delta, X, size, eps, pointer, modelID);
 
-    layer_data.cache.dGamma = dGamma;
-    layer_data.cache.dBeta = dBeta;
+    layerData.cache.dGamma = dGamma;
+    layerData.cache.dBeta = dBeta;
 
-    if (dX.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after delta projection`);
-
+    if (dX.some(v => Number.isNaN(v))) {
+        console.error("layerNorm has NaNs after delta projection");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+    
     return dX;
 };
 
-const accumulateGammaGrads = (a_prev, delta, gammaGrads, pointer, modelID, layer_data) => {
-    const dGamma = layer_data.cache.dGamma;
-    const output = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID);
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const gammaGrads = data.weightGrads;
+    const betaGrads = data.biasGrads;
 
-    if (output.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after gamma grads accumulation`);
+    const dGamma = layerData.cache.dGamma;
+    const accumulatedGammaGrads = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID);
 
-    return output;
-};
+    if (accumulatedGammaGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after accumulating gamma grads");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+    
+    const dBeta = layerData.cache.dBeta;
+    const accumulatedBetaGrads = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID);
 
-const accumulateBetaGrads = (betaGrads, delta, pointer, modelID, layer_data) => {
-    const dBeta = layer_data.cache.dBeta;
-    const output = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID);
+    if (accumulatedBetaGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after accumulating beta grads");
+        throw new Error("ERR_NAN_DETECTED");
+    }
 
-    if (output.some(Number.isNaN)) throw new Error(`Layer norm has NaNs after beta grads accumulation`);
-
-    return output;
-};
+    return {
+        accumulatedWeightGrads: accumulatedGammaGrads,
+        accumulatedBiasGrads: accumulatedBetaGrads
+    }
+}
 
 module.exports = {
     initParams,
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    projectDeltaBackward,
-    accumulateGammaGrads,
-    accumulateBetaGrads,
+    applyOwnDerivative,
+    gradientAccumulation
 }

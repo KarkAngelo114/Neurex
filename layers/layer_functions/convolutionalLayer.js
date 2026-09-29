@@ -71,36 +71,50 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     throw new Error('Convolutional layer cannot be an output layer for now');
 }
 
-const feedforward = (input, current_layer, pointer, modelID) => {
-    let [f, kh, kw, kd] = current_layer.weightShape;
-    let [input_H, input_W, input_D] = current_layer.inputShape; 
-    let padding = current_layer.padding;
-    let strides = current_layer.strides;
+const feedforward = (data) => {
+    const layerData = data.layerData;
+    const strides = layerData.strides;
+    const [f, kh, kw, kd] = layerData.weightShape;
+    const [input_H, input_W, input_D] = layerData.inputShape; 
+    const padding = layerData.padding;
+    const input = data.input;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
 
-    const totalSize = current_layer.inputShape.reduce((acc, val) => acc * val, 1);
-    if (input.length != totalSize) throw new Error(`[CONV ERROR]------- Input tensor doesn't match with the expected input tensor shape: Expected shape/size: ${[input_H, input_W, input_D]} or ${totalSize}. The size of the input entered is ${input.length}`); 
+    const totalSize = layerData.inputShape.reduce((acc, val) => acc * val, 1);
+
+    if (input.length != totalSize) {
+        console.error(`Input tensor doesn't match with the expected input tensor shape: Expected shape/size: ${[input_H, input_W, input_D]} or ${totalSize}. The size of the input entered is ${input.length}`);
+        throw new Error("EERR_CONV_SHAPE_MISMATCH");
+    }
 
     // 1. compute expected output tensor shape
-    const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, current_layer.strides, current_layer.padding);
+    const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, strides, padding);
 
     // 2. get padding sizes for each sides
     const {top, bottom, left, right} = getPaddingSizes(input_H, input_W, kh, kw, strides, padding);
 
     // 3. apply padding
-    const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
+    const {data: paddedTensor, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
     // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID);
+    const convolve_result = Convolve(paddedTensor, strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID);
 
-    if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
+    if (convolve_result.some(Number.isNaN)) {
+        console.error("NaN detected after Convolve operation during feedforward in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
 
     // 5. activate each depth input using the given activation function
-    const activation_function = activation[current_layer.activation_function.name];
+    const activation_function = activation[layerData.activation_function.name];
     const outputs = activation_function(convolve_result, pointer, modelID);
 
-    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has Nans");
+    if (outputs.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after activation function during feedforward in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
 
-    current_layer.cache = {
+    layerData.cache = {
         layer_output: outputs,
     }
 
@@ -115,19 +129,24 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     throw new Error('Convolutional layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
 }
 
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
-    const [Fn, KHn, KWn, KCn] = layer_data.weightShape;
-    const [oHn, oWn, oDn]     = layer_data.outputShape;
-    const [oHprev, oWprev]    = targetShape;   // output shape of the layer before this one
-    const stridesN             = layer_data.strides;
-    const paddingN             = layer_data.padding;
+const projectDeltaBackward = (data) => {
+
+    const layerData = data.layerData;
+    const delta = data.delta;
+    const targetShape = data.inputShape;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
+    const [Fn, KHn, KWn, KCn] = layerData.weightShape;
+    const [oHn, oWn, oDn]= layerData.outputShape;
+    const [oHprev, oWprev] = layerData.inputShape;
+    const stridesN = layerData.strides;
+    const paddingN = layerData.padding;
 
     // 1. Dilate the delta to undo the strides used in the forward pass
-    const { data: dilated, dilatedHeight: dilatedH, dilatedWidth: dilatedW } =
-        Dilate_Input(delta, [oHn, oWn, oDn], stridesN);
+    const { data: dilated, dilatedHeight: dilatedH, dilatedWidth: dilatedW } = Dilate_Input(delta, [oHn, oWn, oDn], stridesN);
 
-    // 2. Determine how much padding to add around the dilated delta so that
-    //    the full-convolution with the flipped kernel lands on the correct shape.
+    // 2. Determine how much padding to add around the dilated delta so that the full-convolution with the flipped kernel lands on the correct shape.
     let pT, pB, pL, pR;
     if (paddingN === "valid") {
         // "valid" forward → "full" backward: pad K-1 on every side
@@ -151,29 +170,50 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
 
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
     const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID);
-    if (result.some(v => Number.isNaN(v))) throw new Error("ConvolveDelta result has NaNs in projectDeltaBackward (convolutionalLayer)");
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during delta projection in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
 
     return result;
 }
 
-const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
-    const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const storedOutput = layer_data.cache.layer_output;
+const applyOwnDerivative = (data) => {
+    const layerData = data.layerData;
+    const delta = data.delta;
+    const z = data.z_value;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
+    const dActivation = activation.derivatives[layerData.activation_function.name];
+    const storedOutput = layerData.cache.layer_output;
     const dAct = dActivation(z, storedOutput, pointer, modelID);
     
-    const result = element_wise_mul(dAct, delta);
-    if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (convolutionalLayer)");
+    const result = element_wise_mul(dAct, delta, pointer, modelID);
+
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after applying derivative activation in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+
     return result;
 }
 
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const deltas = data.deltas;
+    const activation_outputs = data.activation_outputs;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
 
-const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => {
-    const [filters, kH, kW, inDepth] = layer_data.weightShape
-    const [inH, inW] = layer_data.inputShape
-    const [outH, outW] = layer_data.outputShape
+    const [filters, kH, kW, inDepth] = layerData.weightShape
+    const [inH, inW] = layerData.inputShape
+    const [outH, outW] = layerData.outputShape
 
 
-    const output = ComputeGradientForKernels(
+    const kernelWeightGrads = ComputeGradientForKernels(
         activation_outputs,
         deltas,
         weightGrads,
@@ -185,15 +225,24 @@ const computeWeightGradients = (activation_outputs, deltas, weightGrads, layer_d
         modelID
     );
 
-    if (output.some(Number.isNaN)) throw new Error(`Has NaNs after accumulation of kernel grads`);
+    if (kernelWeightGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected after kernel weightGrads accumulation in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
 
-    return output;
-}
 
-const computeBiasGradients = (biasgrads, deltas, layer_data, pointer, modelID) => {
-    const [filters] = layer_data.weightShape;
-    const [outH, outW] = layer_data.outputShape;
-    return computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters, pointer, modelID);
+    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID);
+
+    if (kernelBiasGrads.some(Number.isNaN)) {
+        console.error("NaN detected after kernel biasGrads accumulation in convolutional layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+
+
+    return {
+        accumulatedWeightGrads: kernelWeightGrads,
+        accumulatedBiasGrads: kernelBiasGrads
+    }
 }
 
 module.exports = {
@@ -203,6 +252,5 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
-    computeWeightGradients,
-    computeBiasGradients
+    gradientAccumulation
 }

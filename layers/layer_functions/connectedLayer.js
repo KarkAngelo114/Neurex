@@ -3,13 +3,6 @@ const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
 
-/**
- * Initialized parameters for this layer
- * @param {Number} size number of neurons for this layer 
- * @param {Array<Number>} shape shape of the incoming input
- * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
- */
 const initParams = (size, shape, layer_data) => {
     const inputSize = size;
     const outputSize = layer_data.layer_size;
@@ -41,13 +34,6 @@ const initParams = (size, shape, layer_data) => {
     }
 }
 
-/**
- * Determeines what is the task the model is trained on
- * @param {Object} layerObject layer configuration object
- * @param {String} lossFunc loss function is used for training
- * @param {Float32Array} trainY target labels 
- * @returns {string} task type
- */
 const determineInferenceType = (layerObject, lossFunc, trainY) => {
     let activation_function = layerObject.activation_function.name; // activation function
     let layer_size = layerObject.layer_size; // layer size
@@ -91,36 +77,34 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable.${reset}`);
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} input input features 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
-const feedforward = (input, current_layer, pointer, modelID) => {
-    const [inputSize, outputSize] = current_layer.weightShape;
+const feedforward = (data) => {
+    const input = data.input;
+    const layerData = data.layerData; // data.LayerData holds the metadata object of a layer during init params and build time
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
+    const [inputSize, outputSize] = layerData.weightShape;
     const z_values = MatMul(input, inputSize, outputSize, pointer, modelID);
 
-    const activation_function = activation[current_layer.activation_function.name];
+    const activation_function = activation[layerData.activation_function.name];
     let outputs = activation_function(z_values, pointer, modelID);
-    if (outputs.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs");
 
-    current_layer.cache = { layer_output: outputs };
-    return { outputs, z_values, incrementor_value: 1 };
+    if (outputs.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during feedforward in connected layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+
+    layerData.cache = { 
+        layer_output: outputs 
+    };
+
+    return { 
+        outputs: outputs, 
+        z_values: z_values, 
+        incrementor_value: 1 
+    };
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
 
     let dActivation = activation.derivatives[layerObj.activation_function.name];
@@ -155,45 +139,58 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     return dOutputLayer;
 }
 
-/**
- *
- * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer for this layer
- * @param {Array<Number>} targetShape - output shape of the layer receiving the projected delta (unused here, kept for interface consistency)
- * @param {Object} layer_data - this layer's own configuration
- * @param {String} modelID model ID
- * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
- */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
-    const [inputSize, outputSize] = layer_data.weightShape;
+const projectDeltaBackward = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const delta = data.delta;
+
+    const [inputSize, outputSize] = layerData.weightShape;
+
     const result = DeltaMatMul(delta, inputSize, outputSize, pointer, modelID);
-    if (result.some(v => Number.isNaN(v))) throw new Error("Error - DeltaMatMul result has NaNs in projectDeltaBackward (connectedLayer)");
+
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during delta projection in connected layer");
+        throw new Error("ERR_NAN_DETECTED");
+    };
+
     return result;
 }
 
-/**
- * Applies this layer's own activation derivative to the projected delta.
- * Called on the *current* layer from the core backprop loop.
- *
- * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
- * @param {Float32Array} z - pre-activation values (z) for this layer
- * @param {Object} layer_data - this layer's own configuration
- * @returns {Float32Array} delta for the layer before this one
- */
-const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
-    const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const storedOutput = layer_data.cache.layer_output;
+const applyOwnDerivative = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const delta = data.delta;
+    const z = data.z_value;
+
+    const dActivation = activation.derivatives[layerData.activation_function.name];
+    const storedOutput = layerData.cache.layer_output;
 
     const dAct = dActivation(z, storedOutput, pointer, modelID);
+
     const result = element_wise_mul(dAct, delta, pointer, modelID);
-    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in applyOwnDerivative (connectedLayer)");
+
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during derivative application in connected layer");
+        throw new Error("ERR_NAN_DETECTED");
+    }
+
     return result;
 }
 
-const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => {
-    const [inputSize, outputSize] = layer_data.weightShape;
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
+    const activation_outputs = data.activation_outputs;
+    const deltas = data.deltas;
 
-    const result = computeWeightGradientsForWeightsInConnectedLayer(
+    const [inputSize, outputSize] = layerData.weightShape;
+
+    const accumulatedWeightGrads = computeWeightGradientsForWeightsInConnectedLayer(
         activation_outputs,
         deltas,
         weightGrads,
@@ -203,21 +200,27 @@ const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, laye
         modelID
     );
 
-    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in accumulateWeightGradients (connectedLayer)");
-    return result;
-}
+    if (accumulatedWeightGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during weightGrads accumulation in connected layer");
+        throw new Error("ERR_NAN_DETECTED");
+    };
 
-const accumulateBiasGradients = (biasgrads, deltas, pointer, modelID) => {
-
-    const result = computeBiasGradsForConnected_Layer(
-        biasgrads,
+    const accumulatedBiasGrads = computeBiasGradsForConnected_Layer(
+        biasGrads,
         deltas,
         pointer,
         modelID
     );
 
-    if (result.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs in accumulateWeightGradients (connectedLayer)");
-    return result;
+    if (accumulatedBiasGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during biasGrads accumulation in connected layer");
+        throw new Error("ERR_NAN_DETECTED");
+    };
+
+    return {
+        accumulatedWeightGrads: accumulatedWeightGrads,
+        accumulatedBiasGrads: accumulatedBiasGrads
+    }
 }
 
 
@@ -228,6 +231,5 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
-    accumulateWeightGradients,
-    accumulateBiasGradients
+    gradientAccumulation
 }

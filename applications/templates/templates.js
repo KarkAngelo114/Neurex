@@ -95,7 +95,7 @@ exports.vanillaRNN = (units_per_cell = 3, activation_function = "tanh") => {
 }
 
 
-exports.GPT = (embedDim, seqLen, numHeads) => {
+exports.GPT_trasformer_block = (embedDim, seqLen, numHeads, autoReshape = true) => {
     if (
         !embedDim ||
         embedDim <= 0 ||
@@ -107,7 +107,7 @@ exports.GPT = (embedDim, seqLen, numHeads) => {
         throw new Error(`[ERROR embedding dimension, sequence length and numHeads must not be 0, a negative integer, null or undefined`);
     }
 
-    return [
+    const model = [
         layer.residualStart(),
         layer.multiHeadAttention(numHeads, true, false), // N heads, using causal masking, no biases
         layer.residualEnd(),
@@ -119,4 +119,12 @@ exports.GPT = (embedDim, seqLen, numHeads) => {
         layer.residualEnd(),
         layer.layerNorm(),
     ];
+
+    // if set to true, appends a rehsape layer to reshape the data back into sequential respresentation after linear transformation
+    // useful if stacking multiple blocks
+    if (autoReshape) {
+        model.push(layer.reshape([1, 1, embedDim, seqLen]));
+    }
+
+    return model;
 }

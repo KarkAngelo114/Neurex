@@ -1151,7 +1151,19 @@ class Neurex {
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer, this.modelID);
+            // data to dispatch
+            const feedforwardData = {
+                input: current_input,
+                layerData: current_layer,
+                pointer: pointer,
+                modelID: this.modelID,
+                weights: this.weights[pointer],
+                biases: this.biases[pointer]
+            } 
+
+            // dispatch to layers that exposes `feedforward`
+            const { outputs, z_values, incrementor_value } = current_layer.feedforward(feedforwardData);
+
             pointer+=incrementor_value;
 
             zs.push(z_values);
@@ -1193,21 +1205,30 @@ class Neurex {
             const nextPointer = layerPointers[layer_index + 1];
             const currentPointer = layerPointers[layer_index];
 
-            const dLda = next_layer.projectDeltaBackward(
-                current_delta,
-                nextPointer,
-                current_layer.outputShape,
-                next_layer,
-                this.modelID
-            );
+            // data to dispatch for delta projection
+            const backpropObjectData = {
+                delta: current_delta,
+                pointer: nextPointer,
+                targetOutputShape: current_layer.output_shape,
+                layerData: next_layer,
+                modelID: this.modelID,
+                weights: this.weights[nextPointer]
+            }
 
-            current_delta = current_layer.applyOwnDerivative(
-                dLda,
-                zs[layer_index],
-                current_layer,
-                currentPointer,
-                this.modelID
-            );
+            // dispatch to all layer types in the build having `projectDeltaBackward` function
+            const dLda = next_layer.projectDeltaBackward(backpropObjectData);
+
+            // data to dispatch for applying layer derivative (if any)
+            const applyDerivativeObjectData = {
+                delta: dLda,
+                z_value: zs[layer_index],
+                pointer: currentPointer,
+                layerData: current_layer,
+                modelID: this.modelID 
+            }
+
+            // dispatch to all layer types in the build having `applyOwnDerivative` (if any)
+            current_delta = current_layer.applyOwnDerivative(applyDerivativeObjectData);
 
             deltas[layer_index] = current_delta;
         }
@@ -1220,9 +1241,22 @@ class Neurex {
             const a_prev = activations[layer_index];
             const delta = deltas[layer_index];
 
-            // direct access to this.weightGrads and this.biasGrads when passing to these function and direct write for the updated (accumulated) gradients using a pointer.
-            this.weightGrads[pointer] = layer.accumulateWeightGradients(a_prev, delta, this.weightGrads[pointer], layer, pointer, this.modelID);
-            this.biasGrads[pointer] = layer.accumulateBiasGradients(this.biasGrads[pointer], delta, layer, pointer, this.modelID);
+            // data used for gradient accumulation of weights adn biases all at once
+            const gradientAccumulationObjectData = {
+                pointer: pointer,
+                activation_outputs: a_prev,
+                deltas: delta,
+                weightGrads: this.weightGrads[pointer],
+                biasGrads: this.biasGrads[pointer],
+                layerData: layer,
+                modelID: this.modelID
+            }
+
+            // dispatch to all layer types in the build having `gradientAccumulation` (if any)
+            const {accumulatedWeightGrads, accumulatedBiasGrads} = layer.gradientAccumulation(gradientAccumulationObjectData);
+
+            this.weightGrads[pointer] = accumulatedWeightGrads;
+            this.biasGrads[pointer] = accumulatedBiasGrads;
         }
 
         return {

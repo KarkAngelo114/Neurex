@@ -1,36 +1,37 @@
 const { unpackQKVO, transpose2D, concatenateFloat32Array } = require("../../../utils/utils");
 
 const Relu = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
-        output[i] = output[i] > 0 ? output[i] : 0;
+        output[i] = Math.max(arr[i], 0);
     }
     return output;
 };
 
 const Sigmoid = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
     for (let i = 0; i < output.length; i++) {
-        output[i] = 1 / (1 + Math.exp(-output[i]));
+        output[i] = 1 / (1 + Math.exp(-arr[i]));
     }
     return output;
 };
 
 const Tanh = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
     for (let i = 0; i < output.length; i++) {
-        output[i] = Math.tanh(output[i]);
+        output[i] = Math.tanh(arr[i]);
     }
     return output;
 };
 
 const Softmax = (arr) => {
-    const output = new Float32Array(arr);
-    const maxVal = Math.max(...output);
+    const output = new Float32Array(arr.length);
+    const maxVal = Math.max(...arr);
     let sum = 0;
 
     for (let i = 0; i < output.length; i++) {
-        output[i] = Math.exp(output[i] - maxVal);
+        output[i] = Math.exp(arr[i] - maxVal);
         sum += output[i];
     }
 
@@ -41,31 +42,30 @@ const Softmax = (arr) => {
     return output;
 };
 
-const Linear = (arr) => {
-    return new Float32Array(arr);
-};
+const Linear = (arr) => arr;
+
 
 const DReLu = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
     for (let i = 0; i < output.length; i++) {
-        output[i] = output[i] > 0 ? 1 : 0;
+        output[i] = arr[i] > 0 ? 1 : 0;
     }
     return output;
 };
 
 const DSigmoid = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
     for (let i = 0; i < output.length; i++) {
-        const s = 1 / (1 + Math.exp(-output[i]));
+        const s = 1 / (1 + Math.exp(-arr[i]));
         output[i] = s * (1 - s);
     }
     return output;
 };
 
 const DTanh = (arr) => {
-    const output = new Float32Array(arr);
+    const output = new Float32Array(arr.length);
     for (let i = 0; i < output.length; i++) {
-        const t = Math.tanh(output[i]);
+        const t = Math.tanh(arr[i]);
         output[i] = 1 - t * t;
     }
     return output;
@@ -479,8 +479,8 @@ const computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
     return grads;
 };
 
-const accumulateGammaGrads = (biasGrads, delta) => {
-    const output = biasGrads;
+const accumulateGammaGrads = (grads, delta) => {
+    const output = grads;
 
     for (let i = 0; i < delta.length; i++) {
         output[i] += delta[i];
@@ -489,8 +489,8 @@ const accumulateGammaGrads = (biasGrads, delta) => {
     return output;
 }
 
-const accumulateBetaGrads = (biasGrads, delta) => {
-    const output = biasGrads;
+const accumulateBetaGrads = (grads, delta) => {
+    const output = grads;
 
     for (let i = 0; i < delta.length; i++) {
         output[i] += delta[i];
@@ -1054,7 +1054,7 @@ const computelayerNorm = (input, size, gamma, beta, eps) => {
     return outputs;
 }
 
-function computeLayerNormBackward(dY, X, gamma, size) {
+function computeLayerNormBackward(dY, X, gamma, size, eps) {
     const dX = new Float32Array(size);
     const dGamma = new Float32Array(size);
     const dBeta = new Float32Array(size);

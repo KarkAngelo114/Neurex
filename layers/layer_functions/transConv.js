@@ -3,14 +3,6 @@ const activation = require('../../core/bindings');
 const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 
-
-/**
- * Initialized parameters for this layer
- * @param {Number} size number of neurons for this layer 
- * @param {Array<Number>} shape shape of the incoming input
- * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
- */
 const initParams = (size, shape, layer_data) => {
     try {
         const useBias = layer_data.useBias;
@@ -81,13 +73,7 @@ const initParams = (size, shape, layer_data) => {
     
 }
 
-/**
- * Determeines what is the task the model is trained on
- * @param {Object} layerObject layer configuration object
- * @param {String} lossFunc loss function is used for training
- * @param {Float32Array} trainY target labels 
- * @returns {string} task type
- */
+
 const determineInferenceType = (layerObject, lossFunc, trainY) => {
 
     if (lossFunc === "mae" || lossFunc === "mse") {
@@ -106,22 +92,18 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     throw new Error(`${red}[ERROR]------- Unknown loss function: ${lossFunc}${reset}`);
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} input input features 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
-const feedforward = (input, current_layer, pointer, modelID) => {
+const feedforward = (data) => {
+    const layerData = data.layerData;
+    const input = data.input;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
     
-    const inputShape = current_layer.inputShape; // [iH, iW, iD]
-    const outputShape = current_layer.outputShape; // [oH, oW, oD]
-    const weightShape = current_layer.weightShape; // [f, kh, kw, d]
-    const strides = current_layer.strides;
-    const filters = current_layer.filters;
-    const activation_function = activation[current_layer.activation_function.name];
+    const inputShape = layerData.inputShape; // [iH, iW, iD]
+    const outputShape = layerData.outputShape; // [oH, oW, oD]
+    const weightShape = layerData.weightShape; // [f, kh, kw, d]
+    const strides = layerData.strides;
+    const filters = layerData.filters;
+    const activation_function = activation[layerData.activation_function.name];
 
     const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
     if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
@@ -129,7 +111,7 @@ const feedforward = (input, current_layer, pointer, modelID) => {
     const output = activation_function(transConvOutput, pointer, modelID);
     if (output.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after applying activation");
 
-    current_layer.cache = {
+    layerData.cache = {
         layer_output: output,
     }
 
@@ -140,16 +122,6 @@ const feedforward = (input, current_layer, pointer, modelID) => {
     }
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
 const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
@@ -184,21 +156,16 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
    
 }
 
-/**
- *
- * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer
- * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
- * @param {Object} layer_data - kayer data
- * @param {String} modelID model ID
- * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
- */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
-    const inputShape = layer_data.inputShape;
-    const outputShape = layer_data.outputShape;
-    const weightShape = layer_data.weightShape;
-    const strides = layer_data.strides;
-    const filters = layer_data.filters;
+const projectDeltaBackward = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const delta = data.delta;
+    const inputShape = layerData.inputShape;
+    const outputShape = layerData.outputShape;
+    const weightShape = layerData.weightShape;
+    const strides = layerData.strides;
+    const filters = layerData.filters;
 
     const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
@@ -206,10 +173,16 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
     return result;
 }
 
+const applyOwnDerivative = (data) => {
+    const layerData = data.layerData;
+    const delta = data.delta;
+    const z = data.z_value;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
 
-const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
-    const dActivation = activation.derivatives[layer_data.activation_function.name];
-    const storedOutput = layer_data.cache.layer_output;
+    const dActivation = activation.derivatives[layerData.activation_function.name];
+    const storedOutput = layerData.cache.layer_output;
+
     const dAct = dActivation(z, storedOutput, pointer, modelID)
     const result = element_wise_mul(dAct, delta, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
@@ -217,25 +190,34 @@ const applyOwnDerivative = (delta, z, layer_data, pointer, modelID) => {
     return result;
 }
 
-const accumulateKernelGrads = (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => {
-    const strides = layer_data.strides;
-    const filters = layer_data.filters;
-    const inputShape = layer_data.inputShape; // [iH, iW, iD]
-    const outputShape = layer_data.outputShape; // [oH, oW, oD]
-    const weightShape = layer_data.weightShape; // [f, kh, kw, d]
 
-    const output = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape, pointer, modelID);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[TRANS CONV GRADIENT ACCUMULATION ERROR] result has NaNs in accumulateKernelGrads (trans conv)");
-    return output;
-}
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const deltas = data.deltas;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const activation_outputs = data.activation_outputs;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
 
-const accumulateBiasGradients = (biasgrads, deltas, layer_data, pointer, modelID) => {
-    const [filters] = layer_data.weightShape;
-    const [outH, outW] = layer_data.outputShape;
-    const output =  computeBiasGradsForConv(biasgrads, deltas, outH, outW, filters, pointer, modelID);
+    const strides = layerData.strides;
+    const filters = layerData.filters;
+    const inputShape = layerData.inputShape; // [iH, iW, iD]
+    const outputShape = layerData.outputShape; // [oH, oW, oD]
+    const weightShape = layerData.weightShape; // [f, kh, kw, d]
+
+    const kernelWeightGrads = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape, pointer, modelID);
+    if (kernelWeightGrads.some(v => Number.isNaN(v))) throw new Error("weight gradient accumulation outputs NaNs (trans conv)");
     
-    if (output.some(v => Number.isNaN(v))) throw new Error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
-    return output;
+    const [outH, outW] = layerData.outputShape;
+    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID);
+    
+    if (kernelBiasGrads.some(v => Number.isNaN(v))) throw new Error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
+
+    return {
+        accumulatedWeightGrads: kernelWeightGrads,
+        accumulatedBiasGrads: kernelBiasGrads
+    }
 }
 
 
@@ -246,6 +228,5 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
-    accumulateKernelGrads,
-    accumulateBiasGradients
+    gradientAccumulation
 }

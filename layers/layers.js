@@ -6,8 +6,7 @@
  * - getOutputLayerDelta()
  * - projectDeltaBackward() 
  * - applyOwnDerivative()
- * - accumulateWeightGrads()
- * - accumulateBiasGrads()
+ * - gradientAccumulation
  *
  */
 
@@ -151,12 +150,11 @@ class Layers {
                 shapeType: "flat",
                 initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
-                feedforward: (input, current_layer, pointer, modelID) => ann.feedforward(input, current_layer, pointer, modelID),
+                feedforward: (data) => ann.feedforward(data),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => ann.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => ann.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-                applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => ann.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => ann.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data, pointer, modelID),
-                accumulateBiasGradients: (biasgrads, deltas, layerData, pointer, modelID) => ann.accumulateBiasGradients(biasgrads, deltas, pointer, modelID)
+                projectDeltaBackward: (data) => ann.projectDeltaBackward(data),
+                applyOwnDerivative: (data) => ann.applyOwnDerivative(data),
+                gradientAccumulation: (data) => ann.gradientAccumulation(data), 
             };
         }
         catch (error) {
@@ -212,12 +210,11 @@ class Layers {
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
                 determineInferenceType: () => cnn.determineInferenceType(),
-                feedforward: (input, current_layer, pointer, modelID) => cnn.feedforward(input, current_layer, pointer, modelID),
+                feedforward: (data) => cnn.feedforward(data),
                 getOutputLayerDelta: () => cnn.getOutputLayerDelta(),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => cnn.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-                applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => cnn.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => cnn.computeWeightGradients(activation_outputs, deltas, weightGrads, layer_data, pointer, modelID),
-                accumulateBiasGradients: (biasgrads, deltas, layer_data, pointer, modelID) => cnn.computeBiasGradients(biasgrads, deltas, layer_data, pointer, modelID),
+                projectDeltaBackward: (data) => cnn.projectDeltaBackward(data),
+                applyOwnDerivative: (data) => cnn.applyOwnDerivative(data),
+                gradientAccumulation: (data) => cnn.gradientAccumulation(data)
             }
         }
         catch (error) {
@@ -258,12 +255,11 @@ class Layers {
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => maxpool.initParams(size, shape, layer_data),
                 determineInferenceType: () => maxpool.determineInferenceType(),
-                feedforward: (input, current_layer, pointer) => maxpool.feedforward(input, current_layer, pointer),
+                feedforward: (data) => maxpool.feedforward(data),
                 getOutputLayerDelta: () => maxpool.getOutputLayerDelta(),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => maxpool.projectDeltaBackward(delta, pointer, targetShape, layer_data, pointer, modelID),
-                applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => maxpool.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-                accumulateWeightGradients: () => {},
-                accumulateBiasGradients: () => {},
+                projectDeltaBackward: (data) => data.delta, // pass through
+                applyOwnDerivative: (data) => maxpool.applyOwnDerivative(data),
+                gradientAccumulation: () => {}
             }
         }
         catch (error) {
@@ -358,12 +354,11 @@ class Layers {
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => trans.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => trans.determineInferenceType(layerObject, lossFunc, trainY),
-                feedforward: (input, current_layer, pointer, modelID) => trans.feedforward(input, current_layer, pointer, modelID),
+                feedforward: (data) => trans.feedforward(data),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => trans.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => trans.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-                applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => trans.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data, pointer, modelID) => trans.accumulateKernelGrads(activation_outputs, deltas, weightGrads, layer_data, pointer, modelID),
-                accumulateBiasGradients: (biasgrads, deltas, layer_data, pointer, modelID) => trans.accumulateBiasGradients(biasgrads, deltas, layer_data, pointer, modelID),
+                projectDeltaBackward: (data) => trans.projectDeltaBackward(data),
+                applyOwnDerivative: (data) => trans.applyOwnDerivative(data),
+                gradientAccumulation: (data) => trans.gradientAccumulation(data),
             }
         }
         catch (error) {
@@ -456,12 +451,11 @@ class Layers {
             isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, current_layer, pointer, modelID) => normModule.feedforward(input, current_layer, pointer, modelID),
+            feedforward: (data) => normModule.feedforward(data),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => normModule.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-            applyOwnDerivative: (delta, z, layer_data, pointer, modelID) => normModule.applyOwnDerivative(delta, z, layer_data, pointer, modelID),
-            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, _3, pointer, modelID) => normModule.accumulateGammaGrads(activation_outputs, deltas, weightGrads, pointer, modelID),
-            accumulateBiasGradients: (biasgrads, deltas, _2, pointer, modelID) => normModule.accumulateBetaGrads(biasgrads, deltas, pointer, modelID),
+            projectDeltaBackward: (data) => data.delta,
+            applyOwnDerivative: (data) => normModule.applyOwnDerivative(data),
+            gradientAccumulation: (data) => normModule.gradientAccumulation(data),
         }
     }
 
