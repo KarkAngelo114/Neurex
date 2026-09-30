@@ -1,4 +1,4 @@
-const { yellow, red, reset, gray } = require('../../color-code');
+const { yellow, red, reset, gray, green } = require('../../color-code');
 
 // fetches the MNIST digits dataset from source
 const mnist_digits = async () => {
@@ -6,6 +6,7 @@ const mnist_digits = async () => {
     console.log(`${yellow}[INFO]${reset} Fetching MNiST digits datasets from ${gray}${source}${reset}`);
 
     const res = await fetch(source);
+    const contentLength = res.headers.get('Content-Length');
 
     if (res.status != 200) {
         console.error(`${red}[ERROR]${reset} Failed to fetch dataset. It might be network error or the source isn't available. Error code: ${res.status}`)
@@ -14,10 +15,13 @@ const mnist_digits = async () => {
 
     const parsed = await res.json();
 
+
     if (!parsed) {
         console.error(`${red}[ERROR]${reset} Failed to fetch dataset. It might be network error or the source isn't available.`)
         throw new Error("ERR_FAILED_TO_FETCH");
     }
+    const sizeInKB = parseInt(contentLength, 10) / 1024;
+    console.log(`${green}[SUCCESS]${reset} Dataset successfully fetched. [${sizeInKB.toFixed(2)} KB]`);
 
     let dataset = [];
     let labels = [];
