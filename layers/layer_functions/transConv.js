@@ -73,7 +73,6 @@ const initParams = (size, shape, layer_data) => {
     
 }
 
-
 const determineInferenceType = (layerObject, lossFunc, trainY) => {
 
     if (lossFunc === "mae" || lossFunc === "mse") {
