@@ -19,7 +19,7 @@ const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
-const { onFloat32Module, modeConfiguration, BooleanAvailability } = require('../gpu/modeSelector');
+const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
@@ -66,7 +66,7 @@ class Neurex {
         this.biasGrads = [];
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
-
+        this.pointers = 0;
         this.parametric_layers = [];
         this.miscellaneous = null;
 
@@ -1125,12 +1125,11 @@ class Neurex {
      */
     getOutputLayerDelta(predictions, actuals, zs, loss) {
         const lossOutput = lossFunctions[loss.toLowerCase()](predictions, actuals);
-        const pointer = this.layers.length - 1;
 
         const getOutputLayerDeltaObject = {
             predictions: predictions,
             actuals: actuals,
-            pointer: pointer,
+            pointer: this.pointers,
             modelID: this.modelID,
             zs: zs,
             loss: loss,
@@ -1176,7 +1175,8 @@ class Neurex {
             // dispatch to layers that exposes `feedforward`
             const { outputs, z_values, incrementor_value } = current_layer.feedforward(feedforwardData);
 
-            pointer+=incrementor_value;
+            pointer += incrementor_value;
+            this.pointers += incrementor_value;
 
             zs.push(z_values);
             current_input = outputs;
