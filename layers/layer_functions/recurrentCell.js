@@ -165,7 +165,7 @@ const feedforward = (data) => {
         if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
         
         // Update hidden state for the next step
-        current_hidden = activation[layerData.activation_function.name](z_t);
+        current_hidden = activation[layerData.activation_function.name](z_t, pointer, modelID);
 
         // Record history for backprop
         all_z_values.push(z_t);
@@ -178,6 +178,8 @@ const feedforward = (data) => {
         recurrentZs: all_z_values
     }
 
+    
+
     let final_output;
     if (layerData.return_sequence) {
         // Concatenate all hidden states into one big flat array if return_sequence is true
@@ -188,6 +190,8 @@ const feedforward = (data) => {
         final_output = all_hidden_states[sequence_length - 1];
     }
 
+    layerData.cache.storedOutput = final_output;
+
     return {
         outputs: final_output, 
         z_values: all_z_values,
@@ -195,17 +199,17 @@ const feedforward = (data) => {
     };
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
-const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+const getOutputLayerDelta = (data) => {
+    const layerObj = data.layerData;
+    const preds = data.predictions;
+    const actuals = data.actuals;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const lossFunc = data.loss;
+    const zs = data.zs;
+    const storedOutput = layerObj.cache.storedOutput;
+
+
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
 
@@ -222,11 +226,12 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
     else {
         if (preds.length != actuals.length) {
-            throw new Error("Predictions array is not equal to actuals array");
+            console.error(`[${red}ERROR${reset}] Predictions array is not equal to actuals array. Prediction size: ${preds.length} || Target data output size:${actuals.length}`);
+            throw new Error("[ERROR] Output data shape mismatch");
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs); 
+        const dAct = dActivation(lastLayerZs, storedOutput, pointer, modelID); 
 
         dOutputLayer = scaleDiff(preds, actuals, dAct);
 
@@ -235,6 +240,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
 
     return dOutputLayer;
+   
 }
 
 
@@ -272,7 +278,7 @@ const projectDeltaBackward = (data) => {
 
         // pass both recurrentZs[t] and hiddenStates[t]
         // the recurrenZs are array of float32array that are not yet passed through an activation function. While the hidden states are the activated outputs
-        const dAct = dActivation(recurrentZs[t], hiddenStates[t]);
+        const dAct = dActivation(recurrentZs[t], hiddenStates[t], pointer, modelID);
         
         // For element-wise activations, dAct is dL/dz. 
         // For Softmax, dsoftmax(a_t, dTotal) computes the Jacobian-vector product J^T * dTotal directly.

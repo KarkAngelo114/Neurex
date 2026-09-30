@@ -105,7 +105,16 @@ const feedforward = (data) => {
     };
 }
 
-const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+const getOutputLayerDelta = (data) => {
+    const layerObj = data.layerData;
+    const preds = data.predictions;
+    const actuals = data.actuals;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const lossFunc = data.loss;
+    const zs = data.zs;
+    const storedOutput = layerObj.cache.layer_output;
+
 
     let dActivation = activation.derivatives[layerObj.activation_function.name];
     let dOutputLayer = new Float32Array(preds.length); 
@@ -128,7 +137,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs); 
+        const dAct = dActivation(lastLayerZs, storedOutput, pointer, modelID); 
 
         dOutputLayer = scaleDiff(preds, actuals, dAct);
 
@@ -137,6 +146,7 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
     }
 
     return dOutputLayer;
+   
 }
 
 const projectDeltaBackward = (data) => {

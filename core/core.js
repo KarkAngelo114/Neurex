@@ -1125,7 +1125,19 @@ class Neurex {
      */
     getOutputLayerDelta(predictions, actuals, zs, loss) {
         const lossOutput = lossFunctions[loss.toLowerCase()](predictions, actuals);
-        const outputLayerDelta =  this.lastLayerObject.getOutputLayerDelta(predictions, actuals, zs, loss, this.task, this.lastLayerObject);
+        const pointer = this.layers.length - 1;
+
+        const getOutputLayerDeltaObject = {
+            predictions: predictions,
+            actuals: actuals,
+            pointer: pointer,
+            modelID: this.modelID,
+            zs: zs,
+            loss: loss,
+            layerData: this.lastLayerObject
+        }
+
+        const outputLayerDelta =  this.lastLayerObject.getOutputLayerDelta(getOutputLayerDeltaObject);
 
         return {
             loss: lossOutput,
