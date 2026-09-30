@@ -58,12 +58,11 @@ class Layers {
             isParametric: false,
             initParams: (size, shape, layer_data) => reshaper.initParams(size, shape, layer_data),
             determineInferenceType: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
-            feedforward: (input) => reshaper.feedforward(input),
+            feedforward: (data) => reshaper.feedforward(data),
             getOutputLayerDelta: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
-            projectDeltaBackward: (delta) => delta,
-            applyOwnDerivative: (delta) => delta,
-            accumulateWeightGradients: () => {},
-            accumulateBiasGradients: () => {},
+            projectDeltaBackward: (data) => data.delta,
+            applyOwnDerivative: (data) => data.delta,
+            gradientAccumulation: () => {}
         }
     }
 
@@ -84,15 +83,15 @@ class Layers {
             embeddingDim: embeddingDim,
             maxSequenceLength: maxSequenceLength,
             isParametric: true,
+            useBias: false, // Embedding layer doesn't have a bias
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => embedding.initParams(size, shape, layer_data),
             determineInferenceType: () => embedding.determineInferenceType(),
-            feedforward: (input, current_layer, pointer, modelID) => embedding.feedforward(input, current_layer, pointer, modelID),
+            feedforward: (data) => embedding.feedforward(data),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
-            projectDeltaBackward: (delta) => delta,
-            applyOwnDerivative: (delta) => delta,
-            accumulateWeightGradients: (activation_outputs, delta, weightGrads, layer_data) => embedding.return_embeddings(activation_outputs, delta, weightGrads, layer_data),
-            accumulateBiasGradients: (biasGrads) => biasGrads,
+            projectDeltaBackward: (data) => data.delta,
+            applyOwnDerivative: (data) => data.delta,
+            gradientAccumulation: (data) => embedding.gradientAccumulation(data)
         }
     }
 
@@ -293,12 +292,11 @@ class Layers {
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
-                feedforward: (input, current_layer, pointer, modelID) => rnn.feedforward(input, current_layer, pointer, modelID),
+                feedforward: (data) => rnn.feedforward(data),
                 getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => rnn.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => rnn.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-                applyOwnDerivative: (delta, z, layer_data) => rnn.applyOwnDerivative(delta, z, layer_data),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => rnn.accumulateRecurrentWeightGrads(activation_outputs, deltas, weightGrads, layer_data),
-                accumulateBiasGradients: (biasgrads, deltas, layer_data) => rnn.accumulateRecurrentBiasGrads(biasgrads, deltas, layer_data),
+                projectDeltaBackward: (data) => rnn.projectDeltaBackward(data),
+                applyOwnDerivative: (data) => rnn.applyOwnDerivative(data),
+                gradientAccumulation: (data) => rnn.gradientAccumulation(data) 
             }
         }
         catch (error) {

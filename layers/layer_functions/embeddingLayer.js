@@ -73,20 +73,21 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     process.exit(1);
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} input input features 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
-const feedforward = (input, current_layer, pointer, modelID) => {
-    const embeddingDim = current_layer.embeddingDim;
+
+const feedforward = (data) => {
+    const layerData = data.layerData;
+    const embeddingDim = layerData.embeddingDim;
+    const input = data.input;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
 
     const output = getEmbeddings(input, embeddingDim, pointer, modelID);
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (feedforward)");
+    if (output.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during feedforward in embedding layer");
+        throw new Error("ERR_NAN_DETECTED");
+    };
+
     
     return {
         outputs: output, 
@@ -95,37 +96,33 @@ const feedforward = (input, current_layer, pointer, modelID) => {
     };
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
-const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+const getOutputLayerDelta = () => {
     console.error('Embedding layer cannot be an output layer.');
     process.exit(1);
 }
 
-/**
- * 
- * @param {Float32Array} activation_outputs outputs during feedforward
- * @param {Float32Array} delta outputs during backpropagation
- * @param {Float32Array} weightGrads zero initialize gradients for accumulation
- * @param {Object} layer_data layer object configuration
- * @returns {Float32Array}
- */
-const return_embeddings = (activation_outputs, delta, weightGrads, layer_data) => {
 
-    const output = returnEmbeddings(activation_outputs, delta, weightGrads, layer_data.embeddingDim);
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
+    const activation_outputs = data.activation_outputs;
+    const deltas = data.deltas;
+    const embedDim = layerData.embeddingDim;
 
-    
-    if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs returning embeddings");
+    const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, pointer, modelID);
 
-    return output;
+    if (accumulatedGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during weight grads accumulation in embedding layer");
+        throw new Error("ERR_NAN_DETECTED");
+    };
+
+    return {
+        accumulatedWeightGrads: accumulatedGrads,
+        accumulatedBiasGrads: biasGrads
+    }
 }
 
 module.exports = {
@@ -133,5 +130,5 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    return_embeddings
+    gradientAccumulation
 }

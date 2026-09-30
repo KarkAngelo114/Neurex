@@ -763,6 +763,8 @@ const recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weigh
 }
 
 const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
+
+
     let [featureSize, units] = weightShape;
     let output = weightGrads;
 

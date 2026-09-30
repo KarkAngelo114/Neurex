@@ -124,12 +124,18 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * @param {String} modelID model ID
  * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
  */
-const feedforward = (inputSequence, current_layer, pointer, modelID) => {
+const feedforward = (data) => {
 
-    const units = current_layer.units;
+    const inputSequence = data.input;
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
+    const units = layerData.units;
+
     // Assume inputSequence is flat: [units * sequence_length]
-    const sequence_length = current_layer.maxSequenceLength || 1; 
-    const feature_size = current_layer.weightShape[0]; // [feature_size/size, units]
+    const sequence_length = layerData.maxSequenceLength || 1; 
+    const feature_size = layerData.weightShape[0]; // [feature_size/size, units]
 
     // 1. Initialize a clean hidden state vector for the start of THIS sequence sample
     let current_hidden = new Float32Array(units).fill(0); 
@@ -150,8 +156,8 @@ const feedforward = (inputSequence, current_layer, pointer, modelID) => {
         const z_t = recurrentMatMul(
             sequence_data, 
             current_hidden, 
-            [current_layer.weightShape[0], current_layer.weightShape[1]], 
-            [current_layer.weightShape[2], current_layer.weightShape[3]], 
+            [layerData.weightShape[0], layerData.weightShape[1]], 
+            [layerData.weightShape[2], layerData.weightShape[3]], 
             pointer,
             modelID
         );
@@ -159,7 +165,7 @@ const feedforward = (inputSequence, current_layer, pointer, modelID) => {
         if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
         
         // Update hidden state for the next step
-        current_hidden = activation[current_layer.activation_function.name](z_t);
+        current_hidden = activation[layerData.activation_function.name](z_t);
 
         // Record history for backprop
         all_z_values.push(z_t);
@@ -167,23 +173,24 @@ const feedforward = (inputSequence, current_layer, pointer, modelID) => {
     }
 
     // cache recurrent layer cell feedforward data
-    current_layer.cache = {
+    layerData.cache = {
         hidden_states: all_hidden_states,
         recurrentZs: all_z_values
     }
 
     let final_output;
-    if (current_layer.return_sequence) {
+    if (layerData.return_sequence) {
         // Concatenate all hidden states into one big flat array if return_sequence is true
         final_output = concatenateFloat32Array(all_hidden_states);
-    } else {
+    } 
+    else {
         // Just return the very last hidden state vector
         final_output = all_hidden_states[sequence_length - 1];
     }
 
     return {
         outputs: final_output, 
-        z_values: all_z_values, // Pass the array of z_values back to Neurex
+        z_values: all_z_values,
         incrementor_value: 1
     };
 }
@@ -231,7 +238,13 @@ const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) =
 }
 
 
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
+const projectDeltaBackward = (data) => {
+
+    const layer_data = data.layerData;
+    const delta = data.delta;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+
     const sequenceLength = layer_data.maxSequenceLength;
     const units = layer_data.units;
     const featureSize = layer_data.weightShape[0];
@@ -267,7 +280,7 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
             ? dAct // dsoftmax already calculates the vector product if passed (a, delta)
             : element_wise_mul(dTotal, dAct);
 
-        if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrentCell.projectDeltaBackward");
+        if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrent cell projectDeltaBackward");
 
         deltaTs[t] = delta_t;
         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer, modelID);
@@ -280,9 +293,18 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
 };
 
 
-const applyOwnDerivative = (delta, z, layer_data) => delta;
+const applyOwnDerivative = (data) => data.delta;
 
-const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads, layer_data) => {
+const gradientAccumulation = (data) => {
+    const layer_data = data.layerData;
+    const activation_outputs = data.activation_outputs;
+    const deltas = data.deltas;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
+
+    const units = layer_data.units;
     const weightShape = layer_data.weightShape;
     const sequenceLength = layer_data.maxSequenceLength;
     const hiddenStates = layer_data.cache.hidden_states;
@@ -290,26 +312,17 @@ const accumulateRecurrentWeightGrads = (activation_outputs, deltas, weightGrads,
 
     if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeWeightGradients — missing cached per-timestep deltas");
 
-    const output = recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+    const recurrentWeightGrads = recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+    if (recurrentWeightGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell weight grads have NaNs");
 
-    if (output.some(v => Number.isNaN(v))) throw new Error("recurrentCell weight grads have NaNs");
+    const recurrentBiasGrads = recurrentBiasGradsAccumulation(biasGrads, deltaTs, sequenceLength, units);
+    if (recurrentBiasGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell bias grads have NaNs");
 
-    return output;
-};
-
-const accumulateRecurrentBiasGrads = (biasgrads, deltas, layer_data) => {
-    const units = layer_data.units;
-    const sequenceLength = layer_data.maxSequenceLength;
-    const deltaTs = layer_data.cache.deltaTs;
-
-    if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeBiasGradients");
-
-    const output = recurrentBiasGradsAccumulation(biasgrads, deltaTs, sequenceLength, units);
-
-    if (output.some(v => Number.isNaN(v))) throw new Error("recurrentCell bias grads have NaNs");
-
-    return output;
-};
+    return {
+        accumulatedWeightGrads: recurrentWeightGrads,
+        accumulatedBiasGrads: recurrentBiasGrads
+    }
+}
 
 module.exports = {
     initParams,
@@ -318,6 +331,5 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
-    accumulateRecurrentWeightGrads,
-    accumulateRecurrentBiasGrads
+    gradientAccumulation
 }

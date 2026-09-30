@@ -28,10 +28,10 @@ const initParams = (size, shape, layer_data) => {
     }
 }
 
-const feedforward = (input) => {
+const feedforward = (data) => {
     return {
-        outputs: input,
-        z_values: input,
+        outputs: data.input,
+        z_values: data.input,
         incrementor_value:0
     }
 }
