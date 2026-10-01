@@ -66,7 +66,7 @@ class Neurex {
         this.biasGrads = [];
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
-        this.pointers = 0;
+        this.layerPointers = [];
         this.parametric_layers = [];
         this.miscellaneous = null;
 
@@ -1125,11 +1125,12 @@ class Neurex {
      */
     getOutputLayerDelta(predictions, actuals, zs, loss) {
         const lossOutput = lossFunctions[loss.toLowerCase()](predictions, actuals);
+        const pointer = this.layerPointers[this.num_layers - 1];
 
         const getOutputLayerDeltaObject = {
             predictions: predictions,
             actuals: actuals,
-            pointer: this.pointers - 1,
+            pointer: pointer,
             modelID: this.modelID,
             zs: zs,
             loss: loss,
@@ -1158,27 +1159,23 @@ class Neurex {
         let all_layer_outputs = [input];
         let zs = [];
 
-        let pointer = 0;
-        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
-            const current_layer = this.layers[layer_index];
+        this.layerPointers = this.#getLayerPointers();
 
-            // data to dispatch
+        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
+
+            const current_layer = this.layers[layer_index];
+            const pointer = this.layerPointers[layer_index];
+
             const feedforwardData = {
                 input: current_input,
                 layerData: current_layer,
-                pointer: pointer,
+                pointer,
                 modelID: this.modelID,
-                weights: this.weights[pointer],
-                biases: this.biases[pointer]
-            } 
+                weights: pointer >= 0 ? this.weights[pointer] : undefined,
+                biases: pointer >= 0 ? this.biases[pointer] : undefined
+            };
 
-            const { outputs, z_values, incrementor_value } = current_layer.feedforward(feedforwardData);
-
-            if (layer_index === this.num_layers - 1) {
-                this.pointers = pointer;
-            }
-
-            pointer += incrementor_value;
+            const { outputs, z_values } = current_layer.feedforward(feedforwardData);
 
             zs.push(z_values);
             current_input = outputs;
@@ -1696,6 +1693,22 @@ class Neurex {
         }
 
         return indices;
+    }
+
+    #getLayerPointers() {
+        const layerPointers = new Array(this.layers.length);
+
+        let pointer = 0;
+
+        for (let i = 0; i < this.layers.length; i++) {
+            if (this.parametric_layers.includes(this.layers[i].layer_name)) {
+                layerPointers[i] = pointer++;
+            } else {
+                layerPointers[i] = -1;
+            }
+        }
+
+        return layerPointers;
     }
 }
 
