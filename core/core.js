@@ -1413,6 +1413,13 @@ class Neurex {
                 if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
                 if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
                 if (isParametric) this.parametric_layers.push(layer_data.layer_name);
+                // TEMP DEBUG — remove once the pointer/weights mismatch is found
+                console.log(
+                    `[#build] layer="${layer_data.layer_name}" isParametric=${isParametric} ` +
+                    `weights.length=${weights.length} biases.length=${biases.length} ` +
+                    `=> this.weights.length=${this.weights.length} this.biases.length=${this.biases.length} ` +
+                    `this.parametric_layers.length=${this.parametric_layers.length}`
+                );
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
                 layer_data.outputShape = outputShape || [];
@@ -1707,6 +1714,14 @@ class Neurex {
                 layerPointers[i] = -1;
             }
         }
+
+        // TEMP DEBUG — remove once the pointer/weights mismatch is found
+        console.log(
+            `[#getLayerPointers] layers=[${this.layers.map(l => l.layer_name).join(', ')}] ` +
+            `parametric_layers=[${this.parametric_layers.join(', ')}] ` +
+            `layerPointers=[${layerPointers.join(', ')}] ` +
+            `this.weights.length=${this.weights.length} this.biases.length=${this.biases.length}`
+        );
 
         return layerPointers;
     }
