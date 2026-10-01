@@ -1161,6 +1161,7 @@ class Neurex {
         let pointer = 0;
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
             const current_layer = this.layers[layer_index];
+            this.pointers = pointer;
 
             // data to dispatch
             const feedforwardData = {
@@ -1176,12 +1177,13 @@ class Neurex {
             const { outputs, z_values, incrementor_value } = current_layer.feedforward(feedforwardData);
 
             pointer += incrementor_value;
-            this.pointers += incrementor_value;
 
             zs.push(z_values);
             current_input = outputs;
             all_layer_outputs.push(current_input);
         }
+
+        this.pointers = pointer;
 
         return {
             predictions: current_input, 
