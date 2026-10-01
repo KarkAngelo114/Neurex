@@ -1129,7 +1129,7 @@ class Neurex {
         const getOutputLayerDeltaObject = {
             predictions: predictions,
             actuals: actuals,
-            pointer: this.pointers,
+            pointer: this.pointers - 1,
             modelID: this.modelID,
             zs: zs,
             loss: loss,
