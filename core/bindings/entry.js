@@ -1018,7 +1018,7 @@ const accumulateBetaGrads = (grads, delta, pointer, modelID) => functions.accumu
 */
 const cacheOutputLayerDelta = (delta, pointer, modelID) => {
 
-    if (addon && BooleanAvailability().hasGPU()) addon.cacheOutputLayerDelta(delta, pointer, modelID);
+    if (addon && BooleanAvailability().hasGPU) addon.cacheOutputLayerDelta(delta, pointer, modelID);
 
 }
 
