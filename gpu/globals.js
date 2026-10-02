@@ -3,8 +3,6 @@ const { BooleanAvailability } = require('./modeSelector');
 const { red, reset } = require('../color-code');
 let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 const paramStore = new Map();
-let isUploaded = false;
-
 
 /**
  * 
@@ -25,6 +23,9 @@ exports.setGlobalParams = (modelID, weights, biases) => {
 
         paramStore.set(modelID, {weights, biases});
 
+        if (BooleanAvailability().hasGPU) {
+            addon.UploadParams(modelID, weights, biases);
+        }
     }
     catch (e) {
         console.log(`${red}Parameter error${reset}`);
