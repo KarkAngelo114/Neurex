@@ -1,4 +1,4 @@
-const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul, computeWeightGradientsForWeightsInConnectedLayer, computeBiasGradsForConnected_Layer } = require("../../core/bindings");
+const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul, computeWeightGradientsForWeightsInConnectedLayer, computeBiasGradsForConnected_Layer, cacheOutputLayerDelta } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -144,6 +144,8 @@ const getOutputLayerDelta = (data) => {
         if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
 
     }
+
+    cacheOutputLayerDelta(dOutputLayer, pointer, modelID);
 
     return dOutputLayer;
    

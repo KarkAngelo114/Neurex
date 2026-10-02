@@ -1010,6 +1010,18 @@ const accumulateBetaGrads = (grads, delta, pointer, modelID) => functions.accumu
     modelID
 );
 
+/**
+ * "✅☑️"
+ * @param {Float32Array} delta 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+*/
+const cacheOutputLayerDelta = (delta, pointer, modelID) => {
+
+    if (addon && BooleanAvailability().hasGPU()) addon.cacheOutputLayerDelta(delta, pointer, modelID);
+
+}
+
 module.exports = {
     getEmbeddings,
     returnEmbeddings,
@@ -1067,6 +1079,7 @@ module.exports = {
     computeLayerNormBackward,
     accumulateGammaGrads,
     accumulateBetaGrads,
+    cacheOutputLayerDelta,
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

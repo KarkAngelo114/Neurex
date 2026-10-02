@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const { transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 
 const initParams = (size, shape, layer_data) => {
@@ -161,6 +161,8 @@ const getOutputLayerDelta = (data) => {
 
     }
 
+    cacheOutputLayerDelta(dOutputLayer, pointer, modelID);
+
     return dOutputLayer;
    
 }
@@ -198,7 +200,6 @@ const applyOwnDerivative = (data) => {
 
     return result;
 }
-
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
