@@ -25,10 +25,6 @@ exports.setGlobalParams = (modelID, weights, biases) => {
 
         paramStore.set(modelID, {weights, biases});
 
-        if (BooleanAvailability().hasGPU && !isUploaded) {
-            addon.UploadParams(modelID, weights, biases);
-            isUploaded = true;
-        }
     }
     catch (e) {
         console.log(`${red}Parameter error${reset}`);
