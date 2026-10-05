@@ -382,12 +382,11 @@ class Layers {
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => simple_attention.initParams(size, shape, layer_data),
             determineInferenceType: (layerObject, lossFunc, trainY) => simple_attention.determineInferenceType(layerObject, lossFunc, trainY),
-            feedforward: (input, current_layer, pointer, modelID) => simple_attention.feedforward(input, current_layer, pointer, modelID),
-            getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => simple_attention.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-            projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => simple_attention.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-            applyOwnDerivative: (delta, z, layer_data) => simple_attention.applyOwnDerivative(delta, z, layer_data),
-            accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => simple_attention.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
-            accumulateBiasGradients: (biasgrads, deltas, layer_data) => simple_attention.accumulateBiasGradients(biasgrads, deltas, layer_data),
+            feedforward: (data) => simple_attention.feedforward(data),
+            getOutputLayerDelta: () => simple_attention.getOutputLayerDelta(),
+            projectDeltaBackward: (data) => simple_attention.projectDeltaBackward(data),
+            applyOwnDerivative: (data) => simple_attention.applyOwnDerivative(data),
+            gradientAccumulation: (data) => simple_attention.gradientAccumulation(data),
         };
     }
 
