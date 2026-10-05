@@ -37,9 +37,12 @@ const initParams = (size, shape, layer_data) => {
     };
 };
 
-const feedforward = (input, current_layer) => {
-    const embeddingDim = current_layer.embeddingDim;
-    const sequenceLength = current_layer.maxSequenceLength;
+const feedforward = (data) => {
+    const layerData = data.layerData;
+    const input = data.input;
+    
+    const embeddingDim = layerData.embeddingDim;
+    const sequenceLength = layerData.maxSequenceLength;
 
     if (input.length !== embeddingDim * sequenceLength) {
         throw new Error(`[SINUSOIDAL ENCODING ERROR] Input size (${input.length}) does not ` + `match embeddingDim * sequenceLength (${embeddingDim * sequenceLength}).`);

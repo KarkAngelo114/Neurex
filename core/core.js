@@ -916,8 +916,15 @@ class Neurex {
 
                     batchLoss /= actualBatchSize;
                     totalepochLoss += batchLoss;
-                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Batch Loss]: ${batchLoss.toFixed(6)} `
-                    process.stdout.write(`\r`+logMessage);
+                    
+                    const progressWidth = 20;
+                    const filledProgress = Math.ceil((currentBatch / totalBatches) * progressWidth);
+                    const progressBar = `${color.lime}${'━'.repeat(filledProgress)}${color.reset}${color.white}${'━'.repeat(progressWidth - filledProgress)}${color.reset}`;
+                    const batchLossMessage = currentBatch < totalBatches
+                        ? ` [Batch Loss]: ${batchLoss.toFixed(6)} `
+                        : '';
+                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Progress] ${progressBar} | ${batchLossMessage}`;
+                    process.stdout.write(`\r\x1b[K${logMessage}`);
 
 
                     // This section is the for updating weights and biases.
@@ -943,7 +950,7 @@ class Neurex {
 
                 previousEpochLoss = AverageEpochLoss;
                 
-                logMessage += `| [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
+                logMessage += ` [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
                 if (lossLower === "mse" || lossLower === "mae") {
                     let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
@@ -1018,7 +1025,7 @@ class Neurex {
                 }
 
 
-                process.stdout.write('\r'+logMessage);
+                process.stdout.write(`\r\x1b[K${logMessage}`);
                 // if the checkpoint is not 0 (assume it was configured), proceed to saving the model after showing the latest training information
                 if (this.checkpoint > 0 && (current_epoch + 1) % this.checkpoint === 0) {
                     console.log();

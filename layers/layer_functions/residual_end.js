@@ -19,8 +19,11 @@ const initParams = (size, shape, layer_data) => {
 }
 
 
-const feedforward = (input, modelID) => {
+const feedforward = (data) => {
     // residualEnd will add the projected output by the previous layers to the stored input in an element-wise manner
+    const input = data.input;
+    const modelID = data.modelID;
+
     const cached = getResidual(modelID); // this must be the cached input by the `residualStart`
 
     const output = element_wise_add(cached, input);
@@ -34,8 +37,10 @@ const feedforward = (input, modelID) => {
     }
 }
 
-const projectDeltaBackward = (delta, modelID) => {
+const projectDeltaBackward = (data) => {
     // if the feedforward does the adding of cached input and the projected transformed output, delta projection does the opposite, it will perform what the `residualStart` do during feedforward
+    const delta = data.delta;
+    const modelID = data.modelID;
     setResidual(modelID, delta); // store the projected delta to be use later by the `residualStart` during backpropagation
 
     return delta; // delta will pass through

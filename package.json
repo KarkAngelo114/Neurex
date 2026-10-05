@@ -1,7 +1,7 @@
 {
   "name": "neurex",
   "version": "1.0.0",
-  "description": "⚡GPU-Accelerated deep learning library in NodeJS⚡",
+  "description": "⚡GPU-Accelerated deep learning framework in NodeJS⚡",
   "keywords": [
     "Neural Networks",
     "ANNs",

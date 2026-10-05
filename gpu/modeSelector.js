@@ -5,6 +5,10 @@ let hasGPU = false;
 let selectedDevice = null;
 let force_Use_Default_JS_Float32_Module = false;
 
+// temporary boolean state: use to force to use any type of GPU (including iGPUs) but this
+// this will be commented or removed after working on GPU works;
+const TRAINING_ON_GPU_DEBUG = true;
+
 // Vendors whose GPUs are shared-memory / integrated by design
 const INTEGRATED_NAME_HINTS = /\b(UHD|Iris|HD Graphics|Radeon\(TM\) Graphics|Vega \d+ Graphics)\b/i;
 
@@ -15,23 +19,39 @@ const INTEGRATED_NAME_HINTS = /\b(UHD|Iris|HD Graphics|Radeon\(TM\) Graphics|Veg
 const isDedicated = (d) => !d.hostUnifiedMemory && !INTEGRATED_NAME_HINTS.test(d.gpu);
 
 /** Returns dedicated GPUs sorted best → worst (VRAM, then compute units, then clock). */
-const rankDedicatedDevices = (devices = []) =>
-    devices
-        .filter(isDedicated)
-        .sort((a, b) => {
+const rankDedicatedDevices = (devices = []) => {
+    // if (TRAINING_ON_GPU_DEBUG) {
+    //     return devices;
+    // }
+
+    return devices.filter(isDedicated).sort((a, b) => {
             if (a.globalMemBytes !== b.globalMemBytes) {
                 return a.globalMemBytes > b.globalMemBytes ? -1 : 1;   // BigInt-safe compare
             }
             if (a.computeUnits !== b.computeUnits) return b.computeUnits - a.computeUnits;
             return b.maxClockMHz - a.maxClockMHz;
         });
+}
+    
 
 /** Detect + rank in one call. Never throws. */
 const resolveBestDevice = () => {
     const data = detectGPU();
-    if (!data?.ok) return { data, best: null, ranked: [] };
+    if (!data?.ok) {
+        return { 
+            data: data, 
+            best: null, 
+            ranked: [] 
+        }
+    };
+
     const ranked = rankDedicatedDevices(data.devices);
-    return { data, best: ranked[0] ?? null, ranked };
+
+    return { 
+        data: data, 
+        best: ranked[0] ?? null, 
+        ranked: ranked
+    };
 };
 
 exports.modeConfiguration = (value) => {

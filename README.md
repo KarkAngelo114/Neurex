@@ -17,17 +17,18 @@ npm install neurex
 
 ```
 
-
 ## Documentation
 Checkout the documentation for full API reference, live demos, and some starter examples [here](https://neurex-documentation.vercel.app/).
 
 # Neurex
-Neurex is a Javascript-based, deep learning for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
+Neurex is a dedicated, Javascript-based, deep learning framework for Node.js. It supports training on CPU and can also utilized GPU with the help of [OpenCL](https://github.com/KhronosGroup/OpenCL-Headers) if available. This library supports:
 
 1. 🧠 Easy model building through sequential stacking ✅
 2. 🛠️ Both CommonJS and ES module importing ✅
 3. 🔃 Retraining and transfer learning ✅
 4. ⚡ GPU acceleration for faster training ✅
+
+This framework allows you to train different model architectures - from classic ANNs to state-of-the-art/modern deep learning model architectures like transformers, enabling you explore different architectures. 
 
 ## Why use Neurex
 1. **Modular** - Built with a modular structure so you can easily extend.

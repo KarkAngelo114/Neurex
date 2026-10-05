@@ -95,7 +95,7 @@ exports.vanillaRNN = (units_per_cell = 3, activation_function = "tanh") => {
 }
 
 
-exports.GPT_trasformer_block = (embedDim, seqLen, numHeads, autoReshape = true) => {
+exports.GPT_Block = (embedDim, seqLen, numHeads, autoReshape = true) => {
     if (
         !embedDim ||
         embedDim <= 0 ||

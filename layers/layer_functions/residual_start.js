@@ -19,8 +19,10 @@ const initParams = (size, shape, layer_data) => {
 }
 
 
-const feedforward = (input, modelID) => {
+const feedforward = (data) => {
     // residual start will just pass through the input, but at the same time, it will cache the input to be use by the `residualEnd()`
+    const input = data.input;
+    const modelID = data.modelID;
     setResidual(modelID, input);
 
     return {
@@ -30,8 +32,11 @@ const feedforward = (input, modelID) => {
     }
 }
 
-const projectDeltaBackward = (delta, modelID) => {
+const projectDeltaBackward = (data) => {
     // if the feedforward does caching the input, delta projection does the opposite, it will perform what the `residualEnd` do during feedforward
+
+    const delta = data.delta;
+    const modelID = data.modelID;
 
     const cached = getResidual(modelID); // this must be the delta stored by the `residualEnd` during delta projection
 

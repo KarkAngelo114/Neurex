@@ -106,12 +106,10 @@ class Layers {
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, current_layer) => spe.feedforward(input, current_layer),
+            feedforward: (data) => spe.feedforward(data),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta) => delta,
-            applyOwnDerivative: (delta) => delta,
-            accumulateWeightGradients: () => {},
-            accumulateBiasGradients: () => {},
+            projectDeltaBackward: (data) => data.delta,
+            applyOwnDerivative: (data) => data.delta,
         }
     }
 
@@ -420,12 +418,11 @@ class Layers {
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => mha.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => mha.determineInferenceType(layerObject, lossFunc, trainY),
-                feedforward: (input, current_layer, pointer, modelID) => mha.feedforward(input, current_layer, pointer, modelID),
-                getOutputLayerDelta: (preds, actuals, zs, lossFunc, tasktype, layerObj) => mha.getOutputLayerDelta(preds, actuals, zs, lossFunc, tasktype, layerObj),
-                projectDeltaBackward: (delta, pointer, targetShape, layer_data, modelID) => mha.projectDeltaBackward(delta, pointer, targetShape, layer_data, modelID),
-                applyOwnDerivative: (delta, z, layer_data) => mha.applyOwnDerivative(delta, z, layer_data),
-                accumulateWeightGradients: (activation_outputs, deltas, weightGrads, layer_data) => mha.accumulateWeightGradients(activation_outputs, deltas, weightGrads, layer_data),
-                accumulateBiasGradients: (biasgrads, deltas, layer_data) => mha.accumulateBiasGradients(biasgrads, deltas, layer_data),
+                feedforward: (data) => mha.feedforward(data),
+                getOutputLayerDelta: (data) => mha.getOutputLayerDelta(data),
+                projectDeltaBackward: (data) => mha.projectDeltaBackward(data),
+                applyOwnDerivative: (data) => mha.applyOwnDerivative(data),
+                gradientAccumulation: (data) => mha.gradientAccumulation(data),
             }
 
         }
@@ -469,10 +466,10 @@ class Layers {
             endConnection: false,
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, _1, _2, modelID) => residual_start.feedforward(input, modelID),
+            feedforward: (data) => residual_start.feedforward(data),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, _1, _2, _3, modelID) => residual_start.projectDeltaBackward(delta, modelID),
-            applyOwnDerivative: (delta, _z, _layerData) => delta,
+            projectDeltaBackward: (data) => residual_start.projectDeltaBackward(data),
+            applyOwnDerivative: (data) => data.delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
         }
@@ -489,10 +486,10 @@ class Layers {
             endConnection: true,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
-            feedforward: (input, _1, _2, modelID) => residual_end.feedforward(input, modelID),
+            feedforward: (data) => residual_end.feedforward(data),
             getOutputLayerDelta: () => {},
-            projectDeltaBackward: (delta, _1, _2, _3, modelID) => residual_end.projectDeltaBackward(delta, modelID),
-            applyOwnDerivative: (delta, ..._) => delta,
+            projectDeltaBackward: (data) => residual_end.projectDeltaBackward(data),
+            applyOwnDerivative: (data) => data.delta,
             accumulateWeightGradients: () => {},
             accumulateBiasGradients: () => {}
         }

@@ -946,7 +946,7 @@ declare module 'neurex' {
         export function vanillaRNN(units_per_cell: Number, activation_function: String): object[];
 
         /**
-        * Generates a Generative Pre-trained Transformer (GPT) style decoder-only architecture boilerplate.
+        * Generates a Generative Pre-trained Transformer (GPT) style decoder-only architecture block boilerplate.
         * 
         * Includes causal multi-head self-attention with residual 
         * connections, layer normalization, and a feed-forward neural network.
@@ -968,7 +968,7 @@ declare module 'neurex' {
         * 
         * @throws {Error} Throws an error if any parameter is zero, negative, null, or undefined.
         */
-        export function GPT_trasformer_block(embedDim: number, seqLen: number, numHeads: number,  autoReshape: boolean): object[];
+        export function GPT_Block(embedDim: number, seqLen: number, numHeads: number,  autoReshape: boolean): object[];
     }
 
     /**

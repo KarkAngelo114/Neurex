@@ -68,25 +68,23 @@ const initParams = (size, shape, layer_data) => {
  * @param {Float32Array} trainY target labels 
  * @returns {string} task type
  */
-const determineInferenceType = (layerObject, lossFunc, trainY) => {
+const determineInferenceType = () => {
     throw new Error('multi-head attention layer cannot be an output layer for now');
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} input input features 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
-const feedforward = (input, current_layer, pointer, modelID) => {
+const feedforward = (data) => {
 
-    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = current_layer;
+    const layerData = data.layerData;
+    const modelID = data.modelID;
+    const pointer = data.pointer;
+    const input = data.input;
+
+
+    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
 
     const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
 
-    current_layer.cache = {
+    layerData.cache = {
         X: input,
         Q: Q, 
         K: K, 
@@ -114,25 +112,21 @@ const feedforward = (input, current_layer, pointer, modelID) => {
  * @param {Object} layerObj layer config object of the last layer
  * @returns {Float32Array} the delta of the output layer
  */
-const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+const getOutputLayerDelta = () => {
+    throw new Error('multi-head attention layer cannot be an output layer for now');
 }
 
-/**
- *
- * @param {Float32Array} delta - incoming delta from the layer ahead (in backprop direction)
- * @param {Number} pointer - weight pointer for layer
- * @param {Array<Number>} targetShape - outputShape of the layer that will *receive* the projected delta
- * @param {Object} layer_data - layer data
- * @param {String} modelID model ID
- * @returns {Float32Array} projected delta (dL/da for the previous layer's activations)
- */
-const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) => {
+const projectDeltaBackward = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const delta = data.delta;
 
-    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layer_data;
+    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
     const { Q, K, V, S_perHead } = cache;
     const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
 
-    layer_data.cache = {
+    layerData.cache = {
         ...cache,
         dQ: dQ,
         dK: dK,
@@ -151,44 +145,32 @@ const projectDeltaBackward = (delta, pointer, targetShape, layer_data, modelID) 
  * @param {Object} layer_data - this layer's own configuration
  * @returns {Float32Array} delta for the layer before this one
  */
-const applyOwnDerivative = (delta) => {
-    return delta;
+const applyOwnDerivative = (data) => {
+    return data.delta;
 }
 
-/**
- * 
- * @param {Float32Array} activation_outputs all outputs during feedforward
- * @param {Float32Array} deltas all outputs during backpropagation 
- * @param {Float32Array} weightGrads initially zeroed accumulators
- * @param {Object} layer_data layer configuration data
- * @returns {Float32Array} Float32Array accumulated gradients
- */
-const accumulateWeightGradients = (activation_outputs, deltas, weightGrads, layer_data) => {
-    const { embedDim, seqLen, cache } = layer_data;
+
+const gradientAccumulation = (data) => {
+    const layerData = data.layerData;
+    const pointer = data.pointer;
+    const modelID = data.modelID;
+    const weightGrads = data.weightGrads;
+    const biasGrads = data.biasGrads;
+    const activation_outputs = data.activation_outputs;
+
+    const { embedDim, seqLen, cache } = layerData;
     const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
 
-    const output = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
+    const accumulatedAttentionWeightGrads = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen);
+    if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
 
-    return output;
-}
+    const accumulatedAttentionBiasGrads = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen);
+    if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
 
-/**
- * 
- * @param {Float32Array} biasgrads initially zeroed gradient accumulators 
- * @param {Float32Array} deltas all outputs during backpropagation
- * @param {Object} layer_data layer configuration data
- * @returns {Float32Array} Float32Array accumulated gradients
- */
-const accumulateBiasGradients = (biasGrads, deltas, layer_data) => {
-    const { embedDim, seqLen, cache } = layer_data;
-    const { dQ, dK, dV, dMhaOutput } = cache;
-
-    const output = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen);
-
-    if (output.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
-    return output;
-
+    return {
+        accumulatedWeightGrads: accumulatedAttentionWeightGrads,
+        accumulatedBiasGrads: accumulatedAttentionBiasGrads
+    }
 }
 
 module.exports = {
@@ -198,6 +180,5 @@ module.exports = {
     getOutputLayerDelta,
     projectDeltaBackward,
     applyOwnDerivative,
-    accumulateWeightGradients,
-    accumulateBiasGradients
+    gradientAccumulation
 }

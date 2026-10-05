@@ -6,6 +6,7 @@ const yellow = `\x1b[33m`;
 const yellow_green = '\x1b[38;5;154m';
 const lime = `\x1b[38;5;10m`;
 const green = `\x1b[32m`;
+const white = `\x1b[37m`;
 const blue_green = `\x1b[38;5;37m`;
 const cyan = `\x1b[36m`;
 const blue = `\x1b[34m`;
@@ -24,6 +25,7 @@ module.exports = {
     yellow_green,
     lime,
     green,
+    white,
     blue_green,
     cyan,
     blue,
