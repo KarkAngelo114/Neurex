@@ -50,11 +50,13 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
 const feedforward = (data) => {
     const layerData = data.layerData;
     const input = data.input;
+    
 
     const inputShape= layerData.inputShape;
     const outputShape = layerData.outputShape;
     const poolsize= layerData.poolSize;
     const strides = layerData.strides;
+    const layerID = layerData.layerID;
                 
     let {output, maxIndices} = MaxPool(input, poolsize, inputShape, outputShape, strides);
 
@@ -83,6 +85,8 @@ const applyOwnDerivative = (data) => {
     const [inputH, inputW, inputD] = layerData.inputShape;
     const indices = layerData.maxIndices;
     const delta = data.delta;
+
+    const layerID = layerData.layerID;
 
     const output = MaxPoolDelta(delta, indices, inputH, inputW, inputD);
     if (output.some(v => Number.isNaN(v))) {

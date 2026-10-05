@@ -13,7 +13,7 @@ import necessary modules
 const fs = require('fs');
 const zlib = require('zlib');
 const path = require('path');
-const UUID = require('crypto')
+const UUID = require('crypto');
 const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
@@ -921,7 +921,7 @@ class Neurex {
                     const filledProgress = Math.ceil((currentBatch / totalBatches) * progressWidth);
                     const progressBar = `${color.lime}${'━'.repeat(filledProgress)}${color.reset}${color.white}${'━'.repeat(progressWidth - filledProgress)}${color.reset}`;
                     const batchLossMessage = currentBatch < totalBatches
-                        ? ` [Batch Loss]: ${batchLoss.toFixed(6)} `
+                        ? `[Batch Loss]: ${batchLoss.toFixed(6)} `
                         : '';
                     logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Progress] ${progressBar} | ${batchLossMessage}`;
                     process.stdout.write(`\r\x1b[K${logMessage}`);
@@ -950,7 +950,7 @@ class Neurex {
 
                 previousEpochLoss = AverageEpochLoss;
                 
-                logMessage += ` [Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
+                logMessage += `[Epoch Loss]: ${setColor} ${AverageEpochLoss.toFixed(7)} ${color.reset}`;
 
                 if (lossLower === "mse" || lossLower === "mae") {
                     let duration = `| [took: ${formatDuration(totalDuration)} to finish]`
@@ -973,7 +973,7 @@ class Neurex {
                                     accuracy >= 75 ? color.yellow :
                                     accuracy >= 60 ? color.orange : color.red;
 
-                    logMessage += ` | [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
+                    logMessage += ` [Accuracy in Training]: ${accuracyColor} ${accuracy.toFixed(2)}% ${color.reset}`;
                     duration = `| [took: ${formatDuration(totalDuration)} to finish]`
                     logMessage += duration;
                 }
@@ -1384,6 +1384,11 @@ class Neurex {
             this.currentSize = H * W * D;
             let prevlayer = null;
             this.layers.forEach((layer_data) => {
+                // each layer must have an UUID
+                if (!layer_data?.layerID) {
+                    console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID`);
+                    throw new Error("ERR_NO_UNIQUE_ID");
+                }
                 
                 if (layer_data.layer_name === "Residual Start") {
                     if (this.insideResidual) {
@@ -1448,6 +1453,12 @@ class Neurex {
     // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
         let prevLayer = this.layers[this.layers.length -1]; // get the last layer from the stack
+
+        // each layer must have an UUID
+        if (!layer_data?.layerID) {
+            console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID`);
+            throw new Error("ERR_NO_UNIQUE_ID");
+        }
 
         if (layer_data.layer_name === "Residual Start") {
             if (this.insideResidual) {

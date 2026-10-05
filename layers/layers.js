@@ -11,6 +11,7 @@
  */
 
 const activation = require('../core/bindings/entry');
+const UUID = require('crypto');
 
 // import modular functions of different layers. 
 const inputConfig = require('./layer_functions/inputLayer');
@@ -56,6 +57,7 @@ class Layers {
             layer_name: 'Reshape',
             targetShape: targetShape,
             isParametric: false,
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => reshaper.initParams(size, shape, layer_data),
             determineInferenceType: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
             feedforward: (data) => reshaper.feedforward(data),
@@ -85,6 +87,7 @@ class Layers {
             isParametric: true,
             useBias: false, // Embedding layer doesn't have a bias
             shapeType: "sequential",
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => embedding.initParams(size, shape, layer_data),
             determineInferenceType: () => embedding.determineInferenceType(),
             feedforward: (data) => embedding.feedforward(data),
@@ -104,6 +107,7 @@ class Layers {
             layer_name:"Sinusoidal Encoding",
             isParametric: false,
             shapeType: "sequential",
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
             feedforward: (data) => spe.feedforward(data),
@@ -145,6 +149,7 @@ class Layers {
                 isParametric: true,
                 useBias: useBias,
                 shapeType: "flat",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => ann.feedforward(data),
@@ -205,6 +210,7 @@ class Layers {
                 isParametric: true,
                 useBias: useBias,
                 shapeType: "spatial",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
                 determineInferenceType: () => cnn.determineInferenceType(),
                 feedforward: (data) => cnn.feedforward(data),
@@ -250,6 +256,7 @@ class Layers {
                 strides: strides,
                 isParametric: false,
                 shapeType: "spatial",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => maxpool.initParams(size, shape, layer_data),
                 determineInferenceType: () => maxpool.determineInferenceType(),
                 feedforward: (data) => maxpool.feedforward(data),
@@ -288,6 +295,7 @@ class Layers {
                 isParametric: true,
                 useBias: useBias,
                 shapeType: "sequential",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => rnn.feedforward(data),
@@ -348,6 +356,7 @@ class Layers {
                 isParametric: true,
                 useBias: useBias,
                 shapeType: "spatial",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => trans.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => trans.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => trans.feedforward(data),
@@ -380,6 +389,7 @@ class Layers {
             isParametric: true,
             useBias: useBias,
             shapeType: "sequential",
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => simple_attention.initParams(size, shape, layer_data),
             determineInferenceType: (layerObject, lossFunc, trainY) => simple_attention.determineInferenceType(layerObject, lossFunc, trainY),
             feedforward: (data) => simple_attention.feedforward(data),
@@ -415,6 +425,7 @@ class Layers {
                 numHeads: numHeads,
                 useCausalMasking: useCausalMasking,
                 shapeType: "sequential",
+                layerID: UUID.randomUUID(),
                 initParams: (size, shape, layer_data) => mha.initParams(size, shape, layer_data),
                 determineInferenceType: (layerObject, lossFunc, trainY) => mha.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => mha.feedforward(data),
@@ -443,6 +454,7 @@ class Layers {
             shapeType: "flat",
             useBias: true, // true by default
             isParametric: true,
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
             feedforward: (data) => normModule.feedforward(data),
@@ -463,6 +475,7 @@ class Layers {
             isParametric: false,
             shapeType: null,
             endConnection: false,
+            layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
             feedforward: (data) => residual_start.feedforward(data),
@@ -482,6 +495,7 @@ class Layers {
             layer_name: "Residual End",
             isParametric: false,
             shapeType: null,
+            layerID: UUID.randomUUID(),
             endConnection: true,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             determineInferenceType: () => {},

@@ -96,6 +96,7 @@ const feedforward = (data) => {
     const input = data.input;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
     
     const inputShape = layerData.inputShape; // [iH, iW, iD]
     const outputShape = layerData.outputShape; // [oH, oW, oD]
@@ -130,6 +131,7 @@ const getOutputLayerDelta = (data) => {
     const lossFunc = data.loss;
     const zs = data.zs;
     const storedOutput = layerObj.cache.layer_output;
+    const layerID = layerObj.layerID;
 
 
     let dActivation = activation.derivatives[layerObj.activation_function.name];
@@ -177,6 +179,7 @@ const projectDeltaBackward = (data) => {
     const weightShape = layerData.weightShape;
     const strides = layerData.strides;
     const filters = layerData.filters;
+    const layerID = layerData.layerID;
 
     const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
     if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
@@ -190,6 +193,7 @@ const applyOwnDerivative = (data) => {
     const z = data.z_value;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
@@ -209,6 +213,7 @@ const gradientAccumulation = (data) => {
     const activation_outputs = data.activation_outputs;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
+    const layerID = layerData.layerID;
 
     const strides = layerData.strides;
     const filters = layerData.filters;

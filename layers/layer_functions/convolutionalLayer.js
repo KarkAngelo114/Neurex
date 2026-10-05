@@ -1,6 +1,6 @@
 const activation = require('../../core/bindings')
 const { applyPadding, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
-const { XavierInitialization, calculateTensorShape, getPaddingSizes, createTensorBuffer } = require("../../utils/utils");
+const {  calculateTensorShape, getPaddingSizes, createTensorBuffer } = require("../../utils/utils");
 
 
 
@@ -80,6 +80,7 @@ const feedforward = (data) => {
     const input = data.input;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const totalSize = layerData.inputShape.reduce((acc, val) => acc * val, 1);
 
@@ -136,6 +137,7 @@ const projectDeltaBackward = (data) => {
     const targetShape = data.inputShape;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const [Fn, KHn, KWn, KCn] = layerData.weightShape;
     const [oHn, oWn, oDn]= layerData.outputShape;
@@ -184,6 +186,7 @@ const applyOwnDerivative = (data) => {
     const z = data.z_value;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
@@ -207,6 +210,7 @@ const gradientAccumulation = (data) => {
     const biasGrads = data.biasGrads;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const [filters, kH, kW, inDepth] = layerData.weightShape
     const [inH, inW] = layerData.inputShape

@@ -82,6 +82,7 @@ const feedforward = (data) => {
     const layerData = data.layerData; // data.LayerData holds the metadata object of a layer during init params and build time
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const [inputSize, outputSize] = layerData.weightShape;
     const z_values = MatMul(input, inputSize, outputSize, pointer, modelID);
@@ -114,6 +115,7 @@ const getOutputLayerDelta = (data) => {
     const lossFunc = data.loss;
     const zs = data.zs;
     const storedOutput = layerObj.cache.layer_output;
+    const layerID = layerObj.layerID;
 
 
     let dActivation = activation.derivatives[layerObj.activation_function.name];
@@ -156,6 +158,7 @@ const projectDeltaBackward = (data) => {
     const pointer = data.pointer;
     const modelID = data.modelID;
     const delta = data.delta;
+    const layerID = layerData.layerID;
 
     const [inputSize, outputSize] = layerData.weightShape;
 
@@ -175,6 +178,7 @@ const applyOwnDerivative = (data) => {
     const modelID = data.modelID;
     const delta = data.delta;
     const z = data.z_value;
+    const layerID = layerData.layerID;
 
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
@@ -199,6 +203,7 @@ const gradientAccumulation = (data) => {
     const biasGrads = data.biasGrads;
     const activation_outputs = data.activation_outputs;
     const deltas = data.deltas;
+    const layerID = layerData.layerID;
 
     const [inputSize, outputSize] = layerData.weightShape;
 

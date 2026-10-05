@@ -116,20 +116,13 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     throw new Error(`${red}[ERROR]------- Using ${lossFunc} having output unit size of ${layer_size} and an ${activation_function} function in the output layer is currently unavailable.${reset}`);
 }
 
-/**
- * The feedforward logic of this layer
- * @param {Float32Array} inputSequence input sequence data 
- * @param {Object} current_layer current layer object coonfiguration
- * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
- * @param {String} modelID model ID
- * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
- */
 const feedforward = (data) => {
 
     const inputSequence = data.input;
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const units = layerData.units;
 
@@ -208,6 +201,7 @@ const getOutputLayerDelta = (data) => {
     const lossFunc = data.loss;
     const zs = data.zs;
     const storedOutput = layerObj.cache.storedOutput;
+    const layerID = layerObj.layerID;
 
 
     let dActivation = activation.derivatives[layerObj.activation_function.name];
@@ -250,6 +244,7 @@ const projectDeltaBackward = (data) => {
     const delta = data.delta;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layer_data.layerID;
 
     const sequenceLength = layer_data.maxSequenceLength;
     const units = layer_data.units;
@@ -309,6 +304,7 @@ const gradientAccumulation = (data) => {
     const modelID = data.modelID;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
+    const layerID = layer_data.layerID;
 
     const units = layer_data.units;
     const weightShape = layer_data.weightShape;

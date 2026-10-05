@@ -78,6 +78,7 @@ const feedforward = (data) => {
     const modelID = data.modelID;
     const pointer = data.pointer;
     const input = data.input;
+    const layerID = layerData.layerID;
 
 
     const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
@@ -121,6 +122,7 @@ const projectDeltaBackward = (data) => {
     const pointer = data.pointer;
     const modelID = data.modelID;
     const delta = data.delta;
+    const layerID = layerData.layerID;
 
     const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
     const { Q, K, V, S_perHead } = cache;
@@ -157,6 +159,7 @@ const gradientAccumulation = (data) => {
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
     const activation_outputs = data.activation_outputs;
+    const layerID = layerData.layerID;
 
     const { embedDim, seqLen, cache } = layerData;
     const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 

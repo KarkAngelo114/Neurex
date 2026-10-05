@@ -31,6 +31,7 @@ const feedforward = (data) => {
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const eps = layerData.eps || 1e-5;
     const D = input.length;
@@ -62,6 +63,7 @@ const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
     const eps = layerData.eps || 1e-5;
 
     const X = layerData.cache.X;
@@ -84,6 +86,7 @@ const gradientAccumulation = (data) => {
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
     const gammaGrads = data.weightGrads;
     const betaGrads = data.biasGrads;
 

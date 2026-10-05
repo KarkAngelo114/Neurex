@@ -80,6 +80,7 @@ const feedforward = (data) => {
     const input = data.input;
     const pointer = data.pointer;
     const modelID = data.modelID;
+    const layerID = layerData.layerID;
 
     const output = getEmbeddings(input, embeddingDim, pointer, modelID);
 
@@ -110,6 +111,7 @@ const gradientAccumulation = (data) => {
     const biasGrads = data.biasGrads;
     const activation_outputs = data.activation_outputs;
     const deltas = data.deltas;
+    const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;
 
     const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, pointer, modelID);
