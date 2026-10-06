@@ -36,7 +36,7 @@ const feedforward = (data) => {
     const eps = layerData.eps || 1e-5;
     const D = input.length;
 
-    const outputs = computeLayerNorm(input, D, eps, pointer, modelID);
+    const outputs = computeLayerNorm(input, D, eps, pointer, modelID, layerID);
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after normalization operation on layerNorm");
@@ -69,7 +69,7 @@ const applyOwnDerivative = (data) => {
     const X = layerData.cache.X;
     const size = delta.length;
 
-    const { dX, dGamma, dBeta } = computeLayerNormBackward(delta, X, size, eps, pointer, modelID);
+    const { dX, dGamma, dBeta } = computeLayerNormBackward(delta, X, size, eps, pointer, modelID, layerID);
 
     layerData.cache.dGamma = dGamma;
     layerData.cache.dBeta = dBeta;
@@ -91,7 +91,7 @@ const gradientAccumulation = (data) => {
     const betaGrads = data.biasGrads;
 
     const dGamma = layerData.cache.dGamma;
-    const accumulatedGammaGrads = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID);
+    const accumulatedGammaGrads = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID, layerID);
 
     if (accumulatedGammaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating gamma grads");
@@ -99,7 +99,7 @@ const gradientAccumulation = (data) => {
     }
     
     const dBeta = layerData.cache.dBeta;
-    const accumulatedBetaGrads = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID);
+    const accumulatedBetaGrads = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID, layerID);
 
     if (accumulatedBetaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating beta grads");

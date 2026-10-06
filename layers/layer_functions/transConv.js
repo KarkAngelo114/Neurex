@@ -105,10 +105,10 @@ const feedforward = (data) => {
     const filters = layerData.filters;
     const activation_function = activation[layerData.activation_function.name];
 
-    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
+    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
     if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
 
-    const output = activation_function(transConvOutput, pointer, modelID);
+    const output = activation_function(transConvOutput, modelID, layerID);
     if (output.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after applying activation");
 
     layerData.cache = {
@@ -155,7 +155,7 @@ const getOutputLayerDelta = (data) => {
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs, storedOutput, pointer, modelID); 
+        const dAct = dActivation(lastLayerZs, storedOutput, modelID, layerID); 
 
         dOutputLayer = scaleDiff(preds, actuals, dAct);
 
@@ -163,7 +163,7 @@ const getOutputLayerDelta = (data) => {
 
     }
 
-    cacheOutputLayerDelta(dOutputLayer, pointer, modelID);
+    cacheOutputLayerDelta(dOutputLayer, modelID, layerID);
 
     return dOutputLayer;
    
@@ -181,7 +181,7 @@ const projectDeltaBackward = (data) => {
     const filters = layerData.filters;
     const layerID = layerData.layerID;
 
-    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID);
+    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
     
     return result;
@@ -198,8 +198,8 @@ const applyOwnDerivative = (data) => {
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
 
-    const dAct = dActivation(z, storedOutput, pointer, modelID)
-    const result = element_wise_mul(dAct, delta, pointer, modelID);
+    const dAct = dActivation(z, storedOutput, modelID, layerID);
+    const result = element_wise_mul(dAct, delta, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
 
     return result;
@@ -221,11 +221,11 @@ const gradientAccumulation = (data) => {
     const outputShape = layerData.outputShape; // [oH, oW, oD]
     const weightShape = layerData.weightShape; // [f, kh, kw, d]
 
-    const kernelWeightGrads = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape, pointer, modelID);
+    const kernelWeightGrads = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape, pointer, modelID, layerID);
     if (kernelWeightGrads.some(v => Number.isNaN(v))) throw new Error("weight gradient accumulation outputs NaNs (trans conv)");
     
     const [outH, outW] = layerData.outputShape;
-    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID);
+    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID, layerID);
     
     if (kernelBiasGrads.some(v => Number.isNaN(v))) throw new Error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
 

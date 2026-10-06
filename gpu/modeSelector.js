@@ -20,9 +20,9 @@ const isDedicated = (d) => !d.hostUnifiedMemory && !INTEGRATED_NAME_HINTS.test(d
 
 /** Returns dedicated GPUs sorted best → worst (VRAM, then compute units, then clock). */
 const rankDedicatedDevices = (devices = []) => {
-    // if (TRAINING_ON_GPU_DEBUG) {
-    //     return devices;
-    // }
+    if (TRAINING_ON_GPU_DEBUG) {
+        return devices;
+    }
 
     return devices.filter(isDedicated).sort((a, b) => {
             if (a.globalMemBytes !== b.globalMemBytes) {

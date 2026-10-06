@@ -923,7 +923,7 @@ class Neurex {
                     const batchLossMessage = currentBatch < totalBatches
                         ? `[Batch Loss]: ${batchLoss.toFixed(6)} `
                         : '';
-                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Progress] ${progressBar} | ${batchLossMessage}`;
+                    logMessage = `[Epoch] ${current_epoch + 1}/${epoch} ` +`| [Batch] ${currentBatch}/${totalBatches} ` +`| [Progress] ${progressBar} ${batchLossMessage}`;
                     process.stdout.write(`\r\x1b[K${logMessage}`);
 
 

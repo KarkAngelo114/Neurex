@@ -99,7 +99,7 @@ const feedforward = (data) => {
     const {data: paddedTensor, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
     // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = Convolve(paddedTensor, strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID);
+    const convolve_result = Convolve(paddedTensor, strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID, layerID);
 
     if (convolve_result.some(Number.isNaN)) {
         console.error("NaN detected after Convolve operation during feedforward in convolutional layer");
@@ -108,7 +108,7 @@ const feedforward = (data) => {
 
     // 5. activate each depth input using the given activation function
     const activation_function = activation[layerData.activation_function.name];
-    const outputs = activation_function(convolve_result, pointer, modelID);
+    const outputs = activation_function(convolve_result, modelID,layerID);
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after activation function during feedforward in convolutional layer");
@@ -126,7 +126,7 @@ const feedforward = (data) => {
     };
 }
 
-const getOutputLayerDelta = (preds, actuals, zs, lossFunc, tasktype, layerObj) => {
+const getOutputLayerDelta = () => {
     throw new Error('Convolutional layer cannot be an output layer for now. Consider use a connected layer as its classifier head');
 }
 
@@ -171,7 +171,7 @@ const projectDeltaBackward = (data) => {
     const { data: paddedInput, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
 
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
-    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID);
+    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in convolutional layer");
         throw new Error("ERR_NAN_DETECTED");
@@ -190,9 +190,9 @@ const applyOwnDerivative = (data) => {
 
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
-    const dAct = dActivation(z, storedOutput, pointer, modelID);
+    const dAct = dActivation(z, storedOutput, modelID, layerID);
     
-    const result = element_wise_mul(dAct, delta, pointer, modelID);
+    const result = element_wise_mul(dAct, delta, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected after applying derivative activation in convolutional layer");
@@ -226,7 +226,8 @@ const gradientAccumulation = (data) => {
         [kH, kW],
         1,
         pointer, 
-        modelID
+        modelID,
+        layerID
     );
 
     if (kernelWeightGrads.some(v => Number.isNaN(v))) {
@@ -235,7 +236,7 @@ const gradientAccumulation = (data) => {
     }
 
 
-    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID);
+    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID, layerID);
 
     if (kernelBiasGrads.some(Number.isNaN)) {
         console.error("NaN detected after kernel biasGrads accumulation in convolutional layer");

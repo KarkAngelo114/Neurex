@@ -131,16 +131,17 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functio
  * @param {Number} outputSize - the layer size of this layer
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @param {String} modelID model ID
- * @returns 1D array of output
+ * @param {String} layerID 
  */
-const MatMul = (inputs, inputSize, outputSize, pointer, modelID) => functions.MatMul(
+const MatMul = (inputs, inputSize, outputSize, pointer, modelID, layerID) => functions.MatMul(
     inputs, 
     inputSize, 
     outputSize, 
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer], 
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -152,98 +153,103 @@ const MatMul = (inputs, inputSize, outputSize, pointer, modelID) => functions.Ma
  * @param {Number} outputSize - the layer size of this layer
  * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
  * @param {String} modelID model ID
- * @returns 1D array of output deltas of the current layer to be use to the next layer during backpropagation
+ * @param {String} layerID
  */
-const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID) => functions.DeltaMatMul(
+const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) => functions.DeltaMatMul(
     deltas, 
     inputSize, 
     outputSize, 
     getGlobalParams(modelID).globalWeights[pointer],
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const relu = (input, pointer, modelID) => functions.Relu(input, pointer, modelID);
+const relu = (input, modelID, layerID) => functions.Relu(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const sigmoid = (input, pointer, modelID) => functions.Sigmoid(input, pointer, modelID);
+const sigmoid = (input, modelID, layerID) => functions.Sigmoid(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
- * @param {String} modelID 
+ * @param {String} modelID
+ * @param {String} layerID 
  * @returns 
  */
-const tanh = (input, pointer, modelID) => functions.Tanh(input, pointer, modelID);
+const tanh = (input, modelID, layerID) => functions.Tanh(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const softmax = (input, pointer, modelID) => functions.Softmax(input, pointer, modelID);
+const softmax = (input, modelID, layerID) => functions.Softmax(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const linear = (input, pointer, modelID) => functions.Linear(input, pointer, modelID); 
+const linear = (input, modelID, layerID) => functions.Linear(input, modelID, layerID); 
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
+ * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const drelu = (input, _, pointer, modelID) => functions.DReLu(input, pointer, modelID);
+const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
+ * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const dsigmoid = (input, _, pointer, modelID) => functions.DSigmoid(input, pointer, modelID);
+const dsigmoid = (input, _, modelID, layerID) => functions.DSigmoid(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
+ * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const dtanh = (input, _, pointer, modelID) => functions.DTanh(input, pointer, modelID);
+const dtanh = (input, _, modelID, layerID) => functions.DTanh(input, modelID, layerID);
 
 /**
  *  "✅☑️"
  * @param {Float32Array} arr1 
  * @param {Float32Array} arr2 
- * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const dsoftmax = (arr1, arr2, pointer, modelID) => functions.DSoftmax(arr1, arr2, pointer, modelID);
+const dsoftmax = (arr1, arr2, modelID, layerID) => functions.DSoftmax(arr1, arr2, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
- * @param {Number} pointer 
+ * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const dlinear = (input, _, pointer, modelID) => functions.DLinear(input, pointer, modelID);
+const dlinear = (input, _, modelID, layerID) => functions.DLinear(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} p 
@@ -304,9 +310,10 @@ const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLef
  * @param {Array<Number>} inputShape 
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, modelID) => functions.Convolve(
+const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, modelID, layerID) => functions.Convolve(
     input, 
     strides, 
     outputShape, 
@@ -315,7 +322,8 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer,
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -336,9 +344,10 @@ const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(inpu
  * @param {Number} pointer 
  * @param {Number} stride 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1, modelID) => functions.ConvolveDelta(
+const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1, modelID, layerID) => functions.ConvolveDelta(
     input, 
     deltaShape, 
     kernel_shape, 
@@ -346,7 +355,8 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
     getGlobalParams(modelID).globalWeights[pointer],
     stride,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -407,16 +417,18 @@ const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, par
  * @param {*} outputSize 
  * @param {*} pointer 
  * @param {*} modelID 
+ * @param {*} layerID
  * @returns 
  */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID) => functions.computeWeightGradientsForWeightsInConnectedLayer(
+const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID, layerID) => functions.computeWeightGradientsForWeightsInConnectedLayer(
     activations, 
     delta, 
     weightGrads, 
     inputSize, 
     outputSize, 
     pointer, 
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -425,13 +437,15 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
  * @param {Float32Array} delta 
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID
  * @returns 
  */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) => functions.computeBiasGradsForConnected_Layer(
+const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID, layerID) => functions.computeBiasGradsForConnected_Layer(
     biasGrads, 
     delta, 
     pointer, 
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -445,9 +459,10 @@ const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID) 
  * @param {Number} stride stride value. Default value is `1`
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns accumulated gradients
  */
-const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1, pointer, modelID) => functions.computeKernelGradients(
+const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1, pointer, modelID, layerID) => functions.computeKernelGradients(
     input, 
     delta, 
     ZeroedGrads, 
@@ -455,7 +470,8 @@ const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, output
     kernelSize, 
     stride,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -467,16 +483,18 @@ const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, output
  * @param {Number} num_filters 
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters, pointer, modelID) => functions.computeBiasGradsForConv(
+const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters, pointer, modelID, layerID) => functions.computeBiasGradsForConv(
     grads, 
     deltas, 
     oh, 
     ow, 
     num_filters,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -495,11 +513,11 @@ const scale = (input, scalingValue) => functions.scale(input, scalingValue);
  * @param {*} modelID 
  * @returns 
  */
-const element_wise_mul = (flat_arr_1, flat_arr_2, pointer, modelID) => {
+const element_wise_mul = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
     
-    return functions.element_wise_mul(flat_arr_1, flat_arr_2, pointer, modelID);
+    return functions.element_wise_mul(flat_arr_1, flat_arr_2, modelID, layerID);
 }
 
 /**
@@ -661,9 +679,10 @@ const gradientClipping = (grads, threshold) => functions.gradientClipping(grads,
  * @param {Array<Number>} weightShape 
  * @param {Number} pointer 
  * @param {String} modelID model ID
+ * @param {String} layerID 
  * @returns {Float32Array} trans conv output.
  */
-const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID) => functions.transConv(
+const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConv(
     input, 
     inputShape, 
     outputShape, 
@@ -673,7 +692,8 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -686,9 +706,10 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
  * @param {Array<Number>} weightShape 
  * @param {pointer} pointer 
  * @param {String} modelID
+ * @param {String} layerID
  * @returns {Float32Array}
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID) => functions.transConvBackward(
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConvBackward(
     input,
     inputShape,
     outputShape,
@@ -697,7 +718,8 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
     weightShape,
     getGlobalParams(modelID).globalWeights[pointer],
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -712,9 +734,10 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
  * @param {*} weightShape 
  * @param {pointer} pointer 
  * @param {String} modelID
+ * @param {String} layerID
  * @returns 
  */
-const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape, pointer, modelID) => functions.accumulateKernelGradsForTransConv(
+const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape, pointer, modelID, layerID) => functions.accumulateKernelGradsForTransConv(
     activation_outputs,
     delta, 
     zeroGradAccumulator,
@@ -724,7 +747,8 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
     outputShape, 
     weightShape,
     pointer, 
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -733,17 +757,19 @@ const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAc
  * @param {number} size 
  * @param {number} eps
  * @param {number} pointer 
- * @param {String} modelID model ID
+ * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.computelayerNorm(
+const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functions.computelayerNorm(
     input, 
     size, 
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer], 
     eps,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -753,16 +779,18 @@ const computeLayerNorm = (input, size, eps, pointer, modelID) => functions.compu
  * @param {Number} size feature size 
  * @param {number} pointer 
  * @param {String} modelID
+ * @param {String} layerID 
  * @returns {{ dX: Float32Array, dGamma: Float32Array, dBeta: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, size, eps, pointer, modelID) => functions.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, size, eps, pointer, modelID, layerID) => functions.computeLayerNormBackward(
     dY,
     X,
     getGlobalParams(modelID).globalWeights[pointer],
     size, 
     eps,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -986,13 +1014,15 @@ const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seq
  * @param {Float32Array} delta 
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const accumulateGammaGrads = (grads, delta, pointer, modelID) => functions.accumulateGammaGrads(
+const accumulateGammaGrads = (grads, delta, pointer, modelID, layerID) => functions.accumulateGammaGrads(
     grads,
     delta,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -1001,24 +1031,26 @@ const accumulateGammaGrads = (grads, delta, pointer, modelID) => functions.accum
  * @param {Float32Array} delta 
  * @param {Number} pointer 
  * @param {String} modelID 
+ * @param {String} layerID 
  * @returns 
  */
-const accumulateBetaGrads = (grads, delta, pointer, modelID) => functions.accumulateBetaGrads(
+const accumulateBetaGrads = (grads, delta, pointer, modelID, layerID) => functions.accumulateBetaGrads(
     grads,
     delta,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
  * "✅☑️"
  * @param {Float32Array} delta 
- * @param {Number} pointer 
- * @param {String} modelID 
+ * @param {String} modelID  
+ * @param {String} layerID 
 */
-const cacheOutputLayerDelta = (delta, pointer, modelID) => {
+const cacheOutputLayerDelta = (delta, modelID, layerID) => {
 
-    if (addon && BooleanAvailability().hasGPU) addon.cacheOutputLayerDelta(delta, pointer, modelID);
+    if (addon && BooleanAvailability().hasGPU) addon.cacheOutputLayerDelta(delta, modelID, layerID);
 
 }
 

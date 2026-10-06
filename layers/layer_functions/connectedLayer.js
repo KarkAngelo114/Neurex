@@ -85,10 +85,10 @@ const feedforward = (data) => {
     const layerID = layerData.layerID;
 
     const [inputSize, outputSize] = layerData.weightShape;
-    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID);
+    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID, layerID);
 
     const activation_function = activation[layerData.activation_function.name];
-    let outputs = activation_function(z_values, pointer, modelID);
+    let outputs = activation_function(z_values, modelID, layerID);
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in connected layer");
@@ -139,7 +139,7 @@ const getOutputLayerDelta = (data) => {
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs, storedOutput, pointer, modelID); 
+        const dAct = dActivation(lastLayerZs, storedOutput, modelID, layerID); 
 
         dOutputLayer = scaleDiff(preds, actuals, dAct);
 
@@ -147,7 +147,7 @@ const getOutputLayerDelta = (data) => {
 
     }
 
-    cacheOutputLayerDelta(dOutputLayer, pointer, modelID);
+    cacheOutputLayerDelta(dOutputLayer, modelID, layerID);
 
     return dOutputLayer;
    
@@ -162,7 +162,7 @@ const projectDeltaBackward = (data) => {
 
     const [inputSize, outputSize] = layerData.weightShape;
 
-    const result = DeltaMatMul(delta, inputSize, outputSize, pointer, modelID);
+    const result = DeltaMatMul(delta, inputSize, outputSize, pointer, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in connected layer");
@@ -174,7 +174,6 @@ const projectDeltaBackward = (data) => {
 
 const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const delta = data.delta;
     const z = data.z_value;
@@ -183,9 +182,9 @@ const applyOwnDerivative = (data) => {
     const dActivation = activation.derivatives[layerData.activation_function.name];
     const storedOutput = layerData.cache.layer_output;
 
-    const dAct = dActivation(z, storedOutput, pointer, modelID);
+    const dAct = dActivation(z, storedOutput, modelID, layerID);
 
-    const result = element_wise_mul(dAct, delta, pointer, modelID);
+    const result = element_wise_mul(dAct, delta, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in connected layer");
@@ -214,7 +213,8 @@ const gradientAccumulation = (data) => {
         inputSize,
         outputSize,
         pointer,
-        modelID
+        modelID,
+        layerID
     );
 
     if (accumulatedWeightGrads.some(v => Number.isNaN(v))) {
@@ -226,7 +226,8 @@ const gradientAccumulation = (data) => {
         biasGrads,
         deltas,
         pointer,
-        modelID
+        modelID,
+        layerID
     );
 
     if (accumulatedBiasGrads.some(v => Number.isNaN(v))) {
