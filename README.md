@@ -147,16 +147,36 @@ layer.residualEnd()
 
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 
+### Setting compute backend
+Neurex uses global-scoped backend computation. Meaning, no matter how many model training instances you make, it'll use the same backend compute across trainings. Say if you train using `cpu`, all training instances will be executed on CPU functions.
+
+To set compute backend, you can use `setComputeBackend` function under `backend` namespace.
+
+```JavaScript
+const nrx = require('neurex');
+
+nrx.backend.setComputeBackend("cpu"); // cpu by default
+
+```
+
+| <p style = "text-align: center">Type</p> | <p style = "text-align: center">Is Supported</p> |
+| :--- | :--- |
+| `cpu` | Yes (by default) |
+|`pure-js`| Yes (by default) |
+|`opencl`| Yes |
+|`cuda`| Not yet |
+
 
 ## Sample usage - training a XOR 
 Here's an example on how you can use `Neurex` to train on XOR problem.
 
 ```Javascript
-const {Neurex, Layers, optimizers, schedulers, gradientNormalizers, modelVisualizer, lossVisualizer, lossLandscapeVisualizer} = require('neurex');
+import * as nrx from 'neurex';
 
-const nrx = new Neurex();
-const layer = new Layers();
+const model = new nrx.Neurex();
+const layer = new nrx.Layers();
 
+nrx.backend.setComputeBackend("cpu");
 
 (async () => {
     const trainX = [
@@ -173,53 +193,33 @@ const layer = new Layers();
         [0]
     ];
 
-    // configurations.  (Note: most of these options are just optional. This is to show the full option object only)
-    nrx.configure({
-        optimizer: optimizers.Adam(), // use built-in optimizers or plug your own optimizer function here!
+    model.configure({
+        optimizer: nrx.optimizers.Adam(), // use built-in optimizers or plug your own optimizer function here!
         learning_rate: 0.001, // learning rate value
-        mode: "cpu", // "gpu" or "auto"
-        onFLoat32Module: true, // if set to true, the underlying core engine will use pure JS ops and no need to use "mode"
-
-        visualizerPlugins: [ // visualizer plugins
-            modelVisualizer(),
-            lossVisualizer(),
-            lossLandscapeVisualizer()
-        ],
-
-        onChange_optimizer: { // on change optimizer mechanism
-            optimizer: optimizers.SGD(), // optimizer to use. Use built-in optimizers or plug your own optimizer function here!
-            targetEpoch: 50 // target epoch
-        },
-
-        lr_scheduler: schedulers.stepDecay(), // built-in learning rate schedulers or plug your own schedulers
-
-        // gradient normalizers
-        gradient_normalizers: [
-            gradientNormalizers.clipGradient()
-        ]
     });
 
 
     // stack layers in sequential order
-    nrx.sequentialBuild([
+    model.sequentialBuild([
         layer.inputShape({ features:2 }),
-        layer.connectedLayer(4), // layer size: 4, activation: relu (by default)
+        layer.connectedLayer(5), // layer size: 5, activation: relu (by default)
+        layer.connectedLayer(5), // layer size: 5, activation: relu (by default)
         layer.connectedLayer(1, 'sigmoid')
     ]);
 
 
     // you can show the summary of your model by calling modelSummary()
-    nrx.modelSummary();
+    model.modelSummary();
 
     // train the model
-    await nrx.train(trainX, trainY, 'binary_cross_entropy', 1000, 2);
+    await model.train(trainX, trainY, 'binary_cross_entropy', 10000, 1);
 
     // save model
-    nrx.saveModel('model'); // this will be saved as model.nrx
+    await model.saveModel('model'); // this will be saved as model.nrx
 
     // predict
-    const predictions = await nrx.predict(trainX);
-    console.log(pedictions); // predicted outputs are in float32array. You may convert it to normal JS array if you need
+    const predictions = await model.predict(trainX);
+    console.log(predictions); // predicted outputs are in float32array. You may convert it to normal JS array if you need
     /*
     * Example:
     * [
@@ -238,18 +238,19 @@ While `train()` existed as a high-level API for convenience, `Neurex` exposes lo
 
 ```JavaScript
 
-const {Neurex, Layers} = require('neurex');
+const nrx = require('neurex');
 
-const nrx = new Neurex();
+const model = new Neurex();
 const layer = new Layers();
 
+nrx.backend.setComputeBackend("cpu");
 
 (async () => {
 
-    /** ... data preparation, dataset splitting, model construction and configuration ... */
+    /** ... data preparation, dataset splitting, model stacking and configuration ... */
 
 
-    nrx.setParams(); // <- this is a MUST!
+    model.setParams(); // <- this is a MUST!
 
     let batchSize = 12;
     let totalEpoch = 10000;
@@ -270,15 +271,15 @@ const layer = new Layers();
                 let label = trainY[j];
 
                 // feedforward:
-                const {predictions, activations, zs} = nrx.feedforward(new Float32Array(input));
+                const {predictions, activations, zs} = model.feedforward(new Float32Array(input));
 
                 // get output layer delta:
-                const { outputLayerDelta, loss } = nrx.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
+                const { outputLayerDelta, loss } = model.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
                 batchLoss += loss;
 
                 // backprop:
                 // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally before returnig the accumulated gradients.
-                const {accumulatedWeightGrads, accumulatedBiasGrads} = nrx.backpropagation(activations, zs, outputLayerDelta);
+                const {accumulatedWeightGrads, accumulatedBiasGrads} = model.backpropagation(activations, zs, outputLayerDelta);
 
                 weightGrads = accumulatedWeightGrads;
                 biasGrads = accumulatedBiasGrads;
@@ -288,7 +289,7 @@ const layer = new Layers();
             // model param update:
             // model parameter update must be placed outside mini-batch loop to get the accumulated gradients across batches
             // internally, this method do scaling gradients and normalizing gradients before updating them using an optimizer.
-            nrx.updateParams(weightGrads, biasGrads);
+            model.updateParams(weightGrads, biasGrads);
         }
 
         console.log(`Epoch ${epoch+1} finished... Loss: ${((batchLoss /= batchSize).toFixed(7))}`);
@@ -297,7 +298,7 @@ const layer = new Layers();
     // await nrx.train(trainX, trainY, 'binary_cross_entropy', 10000, 12); // commented out to demonstrate custom training loop
 
     // predict
-    const predictions = await nrx.predict(trainX);
+    const predictions = await model.predict(testX);
 
     console.log(predictions);
 })();
@@ -380,7 +381,9 @@ Want to train a model immediately? The `templates` module offers curated templat
 
 ```Javascript
 
-const { Neurex, Layers, templates } = require('neurex');
+const { Neurex, Layers, templates, backend } = require('neurex');
+
+backend.setComputeBackend("opencl");
 
 (() => {
     const nrx = new Neurex();
@@ -396,7 +399,9 @@ const { Neurex, Layers, templates } = require('neurex');
 ``` 
 
 ```Javascript
-const { Neurex, Layers, templates } = require('neurex');
+const { Neurex, Layers, templates, backend } = require('neurex');
+
+backend.setComputeBackend("cpu");
 
 (() => {
     const nrx = new Neurex();
@@ -416,7 +421,9 @@ const { Neurex, Layers, templates } = require('neurex');
 
 
 ```Javascript
-const { Neurex, Layers, templates } = require('neurex');
+const { Neurex, Layers, templates, backend } = require('neurex');
+
+backend.setComputeBackend("cpu");
 
 (() => {
     const nrx = new Neurex();

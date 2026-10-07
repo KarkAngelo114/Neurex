@@ -1,5 +1,5 @@
 const path = require('path');
-const { BooleanAvailability } = require('./modeSelector');
+const { globalState } = require('./modeSelector');
 const { red, reset } = require('../color-code');
 let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 const paramStore = new Map();
@@ -23,14 +23,14 @@ exports.setGlobalParams = (modelID, weights, biases) => {
 
         paramStore.set(modelID, {weights, biases});
 
-        if (BooleanAvailability().hasGPU) {
-            addon.UploadParams(modelID, weights, biases);
+        if (globalState().computeBackend !== "pure-js") {
+            addon.UploadParams(modelID, weights, biases, globalState().computeBackend);
         }
+
     }
     catch (e) {
-        console.log(`${red}Parameter error${reset}`);
-        console.error(e);
-        process.exit(1);
+        console.error(`${red}[GLOBAL STORE ERROR]${reset} Failed to store model parameters:`, e);
+        throw e;
     }
 }
 
@@ -58,9 +58,8 @@ exports.getGlobalParams = (modelID) => {
         }
     }
     catch (e) {
-        console.log(`\n[GLOBAL STORE ERROR]`);
-        console.error(e);
-        process.exit(1);
+        console.error(`\n[GLOBAL STORE ERROR]`, e);
+        throw e;
     }
     
 }

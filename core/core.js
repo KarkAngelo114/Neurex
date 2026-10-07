@@ -19,7 +19,6 @@ const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
-const { onFloat32Module, modeConfiguration } = require('../gpu/modeSelector');
 const { init, scale, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
@@ -94,16 +93,10 @@ class Neurex {
 
         if (configs?.checkpoint_per_epoch < 0) {
             this.isfailed = true;
-            throw new Error(`${color.red}[Error]------- checkpoint cannot be less than 0. ${color.reset}`)
+            throw new Error(`${color.red}[Error]${color.reset} checkpoint cannot be less than 0.`)
         }
 
         if (configs?.checkpoint_per_epoch !== undefined) this.checkpoint = configs?.checkpoint_per_epoch;
-
-        // mode: gpu | cpu | auto
-        // onFLoat32Module: true | false
-
-        modeConfiguration(configs?.mode || "cpu");
-        onFloat32Module(configs?.onFLoat32Module || false);
 
         this.optimizer = configs?.optimizer || optimizers.SGD();
         
@@ -1048,8 +1041,9 @@ class Neurex {
             
         }
         catch (error) {
-            console.log(error);
-            process.exit(1);
+            this.isfailed = true;
+            console.error(`${color.red}[TRAIN ERROR]${color.reset} Training failed:`, error);
+            throw error;
         }
     }
 

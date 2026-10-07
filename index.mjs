@@ -19,4 +19,5 @@ export const {
     datasets, // datasets namespace
     tensors, // tensor namespace
     utils, // utils namespace
+    backend, // backend namespace
 } = pkg;

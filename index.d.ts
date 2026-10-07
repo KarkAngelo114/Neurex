@@ -232,10 +232,6 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function;
         /** Set a checkpoint per N epochs. Every N epochs will save the model. (example: if you enter 10, then every 10 epochs will save the model)*/
         checkpoint_per_epoch?: number;
-        /** if set to true, it won't use the compiled binaries, but instead uses the JS modules */
-        onFLoat32Module?: true | false;
-        /** set mode to `cpu`, `gpu` or `auto`. Default is `cpu`*/
-        mode?: "cpu" | "gpu" | "auto";
         /** Learning rate scheduler function (`stepDecay()`, `exponentialDecay(), cosineAnnealing(), reduceOnPlateau()`)*/
         lr_scheduler?: (params: any) => Function;
         /** on change config to automate changing of optimizer mid-training.*/
@@ -1107,9 +1103,7 @@ declare module 'neurex' {
     /** namespace for utility functions */
     export namespace utils {
        /**
-        * @function detectGPU() 
-        
-        * - Runs a quick detection test for GPU availability. This is also used internally for CPU/GPU branching
+        * - Runs a quick detection test for GPU availability using OpenCL
         * 
         * Example output:
         * ```bash
@@ -1134,6 +1128,17 @@ declare module 'neurex' {
         *   }
         *```
         */
-        export function detectGPU(): object;
+        export function OpenCL_detectGPU(): object;
+    }
+
+    export type backendType = "cpu" | "pure-js" | "opencl"
+    
+    export namespace backend {
+        /**
+         * This function sets the compute backend. The backend you set will determine what will be use across training. 
+         * @param {string} type sets the compute backend shared across all trainings. `cpu`, `pure-js`, `opencl`. Deault is `cpu`.
+         * @param {boolean} findBestDevice lets you find the best compute device. Default value is `true`. Applies only for vendor-agnostic platforms (like `OpenCL`). Setting this to `false` will use the first detected device by the platform provider in it's device list. This means that it can use an iGPU for compute, which is not recommended.
+         */
+        export function setComputeBackend(type: backendType, findBestDevice: boolean): void;
     }
 }

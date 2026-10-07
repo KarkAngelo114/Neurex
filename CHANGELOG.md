@@ -14,6 +14,7 @@
 - Added plugins for visualizer tools. Built-in visualizers are `lossVisualizer()`, `lossLandscapeVisualizer()`, and `modelVisualizer()`
 - Exposed core training primitives methods that makes up the existing high-level API `train()` method: `setParams()`, `feedforward()`, `getOutputLayerDelta()`, `backpropagation()`, and `updateParams()`. With these exposed methods. Writing custom training loops is now possible for advance users. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Now can export trained `nrx` models to ONNX (`.onnx`) via `export_to_ONNX()` method. (_Note: Not all layer types might get supported._)
+- manual setting of compute backend via `backend.setComputeBackend()` instead of configuring via model
 
 ### Fixes
 - fixed all derivative activation functions.
@@ -23,16 +24,20 @@
 - when using `load_images_from_directory()`, you can pass a string value in the `label_mode` argument. The label mode to use depends on the loss function you will going to use for training. See the updated documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#load_images_from_directory).
 - in the `optimizer` property when setting config, it can only now accepts factory functions rather than string name of an optimizer allowing you to plug your own custom optimizer.
 - functions exported are now grouped based on their purpose under specific namespaces. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
+- removed `mode` attribute on `configure` in Neurex class.
 
 | <p style = "text-align: center">Namespace</p> | <p style = "text-align: center">Contains</p> |
 | :--- | :--- |
-| `templates` | `simpleNeuralNetwork`, `simpleCNN`, `vanillaRNN` and the `GPT` style architecture |
+| `templates` | `simpleNeuralNetwork`, `simpleCNN`, `vanillaRNN` and the `GPT_Block` architecture |
 |`gradientNormalizers`|`clipGradient`|
 |`optimizers`|`Adam`, `SGD`, and `RMSprop` |
 |`schedulers`|`stepDecay`, `exponentialDecay`, `cosineAnnealing`, and `reduceOnPlateau`|
 |`metrics`|`RegressionMetrics` and  `ClassificationMetrics`|
 |`preprocesors`|`OneHotEncoded`, `IntegerLabeling`, `BinaryLabeling`, `split_dataset`, `load_images_from_directory`, `load_single_image`, `load_multiple_images`, `tokenize`, `buildWord2Id`, `buildVocab`, and  `Encode`|
-|`math`|`element_wise_mul`, `element_wise_sub`, `scaleDiff`, `relu`, `sigmoid`, `tanh`, `softmax`, and `linear`|
+|`math`|`element_wise_mul`, `element_wise_sub`, `scaleDiff`, `relu`, `sigmoid`, `tanh`, `softmax`, `jaccard`, and `linear`|
+|`utils`|`OpenCL_detectGPU`|
+|`backend`|`setComputeBackend`|
+|`tensors`|`createTensorBuffer`|
 
 
 ### Breaking Changes

@@ -1,15 +1,15 @@
 /**
 
  These are collection of functions from the precompiled binary addon. 
- The function that has "✅" means it uses the function from the addon. Where as if the function has also a ☑️ means it uses float32array.
+ The function that has "✅" means it uses the function from the addon. Where as if the function has also a ☑️ means it uses float32array in JS.
  Having both ✅ and ☑️ means that it uses the function from the addon and operates on float32
 
  */
 
 let path = require('path');
-const {BooleanAvailability} = require('../../gpu/modeSelector'); 
-const { red, reset, yellow } = require('../../color-code');
 const float32_Modules = require('./float32Ops');
+const { globalState } = require('../../gpu/modeSelector'); 
+const { red, reset, yellow } = require('../../color-code');
 const { getGlobalParams } = require('../../gpu/globals');
 
 let addon;
@@ -19,27 +19,24 @@ const init = () => {
 
     try {
 
-        /* 
-        * This library might support GPU acceleration soon so we need proper branching of exposed functions. The default fallback are the functions from "float32Ops" module where everything is written in Javascript.
-        * Ideal if on different environment and setup like:
-        * 
-        * - on different OS but the prebuilt binaries are not compiled to the target OS environment, so default to use "float32_Modules"
-        * - on OSes where the prebuilt binaries are compatible, but no GPU available, use the "CPU_Based_addon"
-        * - on OSes where the prebuilt binaries are compatible, and has GPU available, then use the GPU based addon 
-        */
+        const {computeBackend, device} = globalState();
 
-
-        const {hasGPU, force_Use_Default_JS_Float32_Module, device} = BooleanAvailability();
-
-        if (force_Use_Default_JS_Float32_Module) {
-            console.log(`${yellow}[INFO]${reset} Defaulting to pure JS implementation. To speed things up, consider using native C++ bindigs by enabling mode:"cpu" or mode:"auto".`);
+        if (computeBackend === "pure-js") {
+            console.log(`${yellow}[INFO]${reset} Defaulting to pure JS implementation. To speed things up, consider using native C++ bindigs by setting your compute backend to "cpu" if you have dedicated GPUs, consider using "opencl"`);
             functions = float32_Modules;
             return;
         }
 
         addon = require(path.join(__dirname, 'prebuilds', `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
 
-        if (hasGPU && device) {
+        if (computeBackend === "cpu") {
+            console.log(`${yellow}[INFO]${reset} Neurex will use native binaries optimized for CPU-based functions`);
+            addon.setComputeBackendType(computeBackend);
+            functions = addon;
+            return;
+        }
+
+        if (computeBackend === "opencl" && device) {
             const vramGB = (Number(device.globalMemBytes) / (1024 ** 3)).toFixed(2);
 
             console.log(
@@ -54,27 +51,24 @@ const init = () => {
             const kernelSource = path.join(__dirname, "..", "..", "gpu", "kernels");
 
             console.log("Compiling kernels...");
-            const res = addon.Init_GPU(kernelSource, device.index);
+            const res = addon.Init_GPU(kernelSource, device.index); // to compile OpenCL kernels
 
             if (!res.ok) {
                 console.warn(`\n${yellow}[WARN]${reset} GPU kernel initialization failed. Falling back to CPU.`);
                 console.warn(res.error);
-                addon.setOnGPU(false);
+                addon.setComputeBackendType("cpu"); // force to cpu if kernel compilation failed even OpenCL successfully detect GPU
                 functions = addon;
                 return;
             }
 
             console.log(`${yellow}[INFO]${reset} Kernels successfully compiled on ${device.gpu}.`);
-            addon.setOnGPU(true);
+            addon.setComputeBackendType(computeBackend); // pass device type on C++ addon if "opencl"
             functions = addon;
             return;
         }
 
-        if (!hasGPU && !force_Use_Default_JS_Float32_Module) {
-            console.log(`${yellow}[INFO]${reset} Neurex will use native binaries optimized for CPU-based functions`);
-            addon.setOnGPU(false);
-            functions = addon;
-            return;
+        if (computeBackend === "cuda") {
+            // coming soon..
         }
 
         
@@ -1050,7 +1044,7 @@ const accumulateBetaGrads = (grads, delta, pointer, modelID, layerID) => functio
 */
 const cacheOutputLayerDelta = (delta, modelID, layerID) => {
 
-    if (addon && BooleanAvailability().hasGPU) addon.cacheOutputLayerDelta(delta, modelID, layerID);
+    if (addon && globalState().computeBackend === "opencl") addon.cacheOutputLayerDelta(delta, modelID, layerID);
 
 }
 
