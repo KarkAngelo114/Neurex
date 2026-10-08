@@ -118,7 +118,7 @@ const feedforward = (data) => {
 
     // 5. activate each depth input using the given activation function
     const activation_function = activation[layerData.activation_function.name];
-    const outputs = activation_function(convolve_result, modelID,layerID);
+    const outputs = activation_function(convolve_result, modelID, layerID);
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after activation function during feedforward in convolutional layer");
@@ -209,7 +209,6 @@ const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
     const delta = data.delta;
     const z = data.z_value;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 

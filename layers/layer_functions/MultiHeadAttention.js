@@ -83,7 +83,7 @@ const feedforward = (data) => {
 
     const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
 
-    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
+    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
     layerData.cache = {
         X: input,
@@ -126,7 +126,7 @@ const projectDeltaBackward = (data) => {
 
     const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
     const { Q, K, V, S_perHead } = cache;
-    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID);
+    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
     layerData.cache = {
         ...cache,
@@ -164,10 +164,10 @@ const gradientAccumulation = (data) => {
     const { embedDim, seqLen, cache } = layerData;
     const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
 
-    const accumulatedAttentionWeightGrads = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen);
+    const accumulatedAttentionWeightGrads = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID);
     if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
 
-    const accumulatedAttentionBiasGrads = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen);
+    const accumulatedAttentionBiasGrads = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen,  modelID, layerID);
     if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
 
     return {

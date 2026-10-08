@@ -1298,11 +1298,12 @@ class Neurex {
                 continue;
             }
 
+            const layerID = layer_data_obj.layerID;
             // scale weight gradients
-            weightGrads[pointer] = scale(weightGrads[pointer], batchSize, layer_data_obj);
+            weightGrads[pointer] = scale(weightGrads[pointer], batchSize, this.modelID, layerID);
 
             // scale bias gradients
-            biasGrads[pointer] = scale(biasGrads[pointer], batchSize);
+            biasGrads[pointer] = scale(biasGrads[pointer], batchSize, this.modelID, layerID);
 
             
             if (this.gradient_normalizers.length > 0) {

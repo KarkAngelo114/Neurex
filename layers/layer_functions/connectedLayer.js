@@ -122,7 +122,7 @@ const getOutputLayerDelta = (data) => {
     let dOutputLayer = new Float32Array(preds.length); 
 
     if (lossFunc === "categorical_cross_entropy" || lossFunc === "binary_cross_entropy") {
-        dOutputLayer = element_wise_sub(preds, actuals);
+        dOutputLayer = element_wise_sub(preds, actuals, modelID, layerID);
     }
     else if (lossFunc === "sparse_categorical_cross_entropy") {
         dOutputLayer.set(preds);
@@ -141,7 +141,7 @@ const getOutputLayerDelta = (data) => {
         const lastLayerZs = zs[zs.length - 1]; 
         const dAct = dActivation(lastLayerZs, storedOutput, modelID, layerID); 
 
-        dOutputLayer = scaleDiff(preds, actuals, dAct);
+        dOutputLayer = scaleDiff(preds, actuals, dAct, modelID, layerID);
 
         if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
 

@@ -59,7 +59,7 @@ const feedforward = (data) => {
 
     const { embedDim, dkRoot, seqLen } = layerData;
 
-    const {X, Q, K, V, S, output} = CoreAttention(input, embedDim, seqLen, dkRoot, pointer, modelID);
+    const {X, Q, K, V, S, output} = CoreAttention(input, embedDim, seqLen, dkRoot, pointer, modelID, layerID);
 
     layerData.cache = {
         X: X,
@@ -91,7 +91,7 @@ const projectDeltaBackward = (data) => {
 
     const {cache, embedDim, seqLen, dkRoot} = layerData;
     const {Q, K, V, S } = cache;
-    const { dQ, dK, dV, dX} = CoreAttentionBackward(delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID);
+    const { dQ, dK, dV, dX} = CoreAttentionBackward(delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID, layerID);
 
     layerData.cache = {
         ...cache,
@@ -121,10 +121,10 @@ const gradientAccumulation = (data) => {
     const { embedDim, seqLen, cache } = layerData;
     const { dQ, dK, dV } = cache;
     
-    const accumulatedAttentionWeightGrads = accumulateSimpleAttentionWeightGrads(dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen);
+    const accumulatedAttentionWeightGrads = accumulateSimpleAttentionWeightGrads(dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID);
     if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during weight gradient accumulation)");
 
-    const accumulatedAttentionBiasGrads = accumulateSimpleAttentionBiasGrads(dQ, dK, dV, biasGrads, embedDim, seqLen);
+    const accumulatedAttentionBiasGrads = accumulateSimpleAttentionBiasGrads(dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID);
     if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during bias gradient accumulation)");
 
     return {

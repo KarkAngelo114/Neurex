@@ -57,8 +57,8 @@ const feedforward = (data) => {
     const poolsize= layerData.poolSize;
     const strides = layerData.strides;
     const layerID = layerData.layerID;
-                
-    let {output, maxIndices} = MaxPool(input, poolsize, inputShape, outputShape, strides);
+    const modelID = data.modelID;
+    let {output, maxIndices} = MaxPool(input, poolsize, inputShape, outputShape, strides, modelID, layerID);
 
     layerData.maxIndices = maxIndices;
 
@@ -85,10 +85,10 @@ const applyOwnDerivative = (data) => {
     const [inputH, inputW, inputD] = layerData.inputShape;
     const indices = layerData.maxIndices;
     const delta = data.delta;
-
+    const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const output = MaxPoolDelta(delta, indices, inputH, inputW, inputD);
+    const output = MaxPoolDelta(delta, indices, inputH, inputW, inputD, modelID, layerID);
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected after unpooling operation in maxpooling during delta projection");
         throw new Error("ERR_NAN_DETECTED");

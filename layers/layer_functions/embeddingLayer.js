@@ -82,7 +82,7 @@ const feedforward = (data) => {
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const output = getEmbeddings(input, embeddingDim, pointer, modelID);
+    const output = getEmbeddings(input, embeddingDim, pointer, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in embedding layer");
@@ -114,7 +114,7 @@ const gradientAccumulation = (data) => {
     const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;
 
-    const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, pointer, modelID);
+    const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, pointer, modelID, layerID);
 
     if (accumulatedGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during weight grads accumulation in embedding layer");

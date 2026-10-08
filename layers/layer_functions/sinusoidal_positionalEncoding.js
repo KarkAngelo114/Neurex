@@ -40,6 +40,8 @@ const initParams = (size, shape, layer_data) => {
 const feedforward = (data) => {
     const layerData = data.layerData;
     const input = data.input;
+    const modelID = data.modelID;
+    const layerID = layerData.layerID;
     
     const embeddingDim = layerData.embeddingDim;
     const sequenceLength = layerData.maxSequenceLength;
@@ -48,7 +50,7 @@ const feedforward = (data) => {
         throw new Error(`[SINUSOIDAL ENCODING ERROR] Input size (${input.length}) does not ` + `match embeddingDim * sequenceLength (${embeddingDim * sequenceLength}).`);
     }
 
-    const output = sinusoidalPE(input, embeddingDim, sequenceLength);
+    const output = sinusoidalPE(input, embeddingDim, sequenceLength, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) {
         throw new Error("Error - output array has NaNs on Sinusoidal Encoding layer (feedforward)");

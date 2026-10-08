@@ -93,17 +93,25 @@ const shutdown = (modelID) => {
  * @param {Number} embeddingDim embedding dim value
  * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases
  * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID) => functions.getEmbeddings(
+const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID, layerID) => functions.getEmbeddings(
     Array.from(tokenVector), 
     embeddingDim, 
     getGlobalParams(modelID).globalWeights[pointer], 
     pointer,
-    modelID
+    modelID,
+    layerID
 )
 
-const sinusoidalPE = (input, embeddingDim, sequenceLength) => functions.SinusoidalPositionalEncoding(input, embeddingDim, sequenceLength);
+const sinusoidalPE = (input, embeddingDim, sequenceLength, modelID, layerID) => functions.SinusoidalPositionalEncoding(
+    input, 
+    embeddingDim, 
+    sequenceLength,
+    modelID,
+    layerID
+);
 
 /**
  * "✅☑️"
@@ -111,9 +119,18 @@ const sinusoidalPE = (input, embeddingDim, sequenceLength) => functions.Sinusoid
  * @param {Float32Array} delta float32array delta 
  * @param {Float32Array} weightGrads initialized 0s
  * @param {Number} dim - Embedding Dim
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns {Float32Array} 
  */
-const returnEmbeddings = (activated_outputs, delta, weightGrads, dim) => functions.returnEmbeddings(Array.from(activated_outputs), delta, weightGrads, dim);
+const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, layerID) => functions.returnEmbeddings(
+    Array.from(activated_outputs), 
+    delta, 
+    weightGrads, 
+    dim,
+    modelID,
+    layerID
+);
 
 /**
  * "✅☑️"
@@ -495,9 +512,11 @@ const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters, pointer, mo
  * "✅☑️" performs X[i] /= scaling_value
  * @param {Float32Array} input - float32Array input
  * @param {Number} scalingValue - scaling value
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns A float32 array of scaled outpur
  */
-const scale = (input, scalingValue) => functions.scale(input, scalingValue);
+const scale = (input, scalingValue, modelID, layerID) => functions.scale(input, scalingValue, modelID, layerID);
 
 /**
  * "✅☑️"
@@ -520,13 +539,15 @@ const element_wise_mul = (flat_arr_1, flat_arr_2, modelID, layerID) => {
  * @function
  * @param {Array<Number>} flat_arr_1 - a flat array input
  * @param {Array<Number>} flat_arr_2 - a flat array input
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns A flat array output after subtracting input_array_1[i] to the values of input_array_2[i]
  * @throws am error will occured if both array are not equal in length
  */
-const element_wise_sub = (flat_arr_1, flat_arr_2) => {
+const element_wise_sub = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 
     if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
-    return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2));
+    return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2), modelID, layerID);
 }
 
 /**
@@ -535,13 +556,15 @@ const element_wise_sub = (flat_arr_1, flat_arr_2) => {
  * @function
  * @param {Array<Number>} arr1 - a flat array input
  * @param {Array<Number>} arr2- a flat array input
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns A flat array output after adding input_array_1[i] to the values of input_array_2[i]
  * @throws am error will occured if both array are not equal in length
  */
-const element_wise_add = (arr1, arr2) => {
+const element_wise_add = (arr1, arr2, modelID, layerID) => {
     if (arr1.length != arr2.length) throw new Error(`[ERROR] Error: Both arrays are not equal in length. array1: ${arr1.length} | array2:${arr2.length}`);
 
-    return functions.element_wise_add(arr1, arr2);
+    return functions.element_wise_add(arr1, arr2, modelID, layerID);
 }
 
 /**
@@ -549,15 +572,17 @@ const element_wise_add = (arr1, arr2) => {
  * @param {Foat32Array} arr1 a flat array input
  * @param {Foat32Array} arr2 a flat array input
  * @param {Foat32Array} arr3 a flat array input
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns a flat array after performing `(arr1[i] - arr2[i]) * arr3[i]`
  * @throws {Error} - if any of the input array are not equal in length
  */
-const scaleDiff = (arr1, arr2, arr3) => {
+const scaleDiff = (arr1, arr2, arr3, modelID, layerID) => {
     if (arr1.length !== arr2.length || arr2.length !== arr3.length || arr1.length !== arr3.length) {
         throw new Error(`${red}[ERROR]------- Error: All arrays must be equal in length. array1: ${arr1.length} | array2: ${arr2.length} | array3: ${arr3.length} ${reset}`);
     }
 
-    return functions.scaleDiff(new Float32Array(arr1), new Float32Array(arr2), new Float32Array(arr3));
+    return functions.scaleDiff(new Float32Array(arr1), new Float32Array(arr2), new Float32Array(arr3), modelID, layerID);
 }
 
 /**
@@ -568,8 +593,18 @@ const scaleDiff = (arr1, arr2, arr3) => {
  * @param {Array<Number>} inputShape - input shape of the current tensor
  * @param {Array<Number>} outputShape - output shape of the tensor
  * @param {Number} strides - determines how many pixels it will skipped
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  */
-const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions.MaxPooling(input, poolSize, inputShape, outputShape, strides);
+const MaxPool = (input, poolSize, inputShape, outputShape, strides, modelID, layerID) => functions.MaxPooling(
+    input, 
+    poolSize, 
+    inputShape, 
+    outputShape, 
+    strides,
+    modelID, 
+    layerID
+);
 
 /**
  * "✅☑️"
@@ -578,9 +613,20 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides) => functions
  * @param {Number} h height of the input tensor
  * @param {*} w width of the input tensor
  * @param {*} d depth of the input tensor
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns 
  */
-const MaxPoolDelta = (delta, indices, h, w, d) => functions.MaxPoolDelta(delta, indices, h, w, d);
+const MaxPoolDelta = (delta, indices, h, w, d, modelID, layerID) => functions.MaxPoolDelta(
+    delta, 
+    indices, 
+    h, 
+    w, 
+    d,
+    modelID,
+    layerID
+);
+
 
 /**
  * "✅☑️"
@@ -659,9 +705,16 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
  * "✅☑️"
  * @param {Float32Array} grads 
  * @param {Number} threshold 
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns {Float32Array}
  */
-const gradientClipping = (grads, threshold) => functions.gradientClipping(grads, threshold);
+const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradientClipping(
+    grads, 
+    threshold,
+    modelID, 
+    layerID
+);
 
 /**
  * "✅☑️"
@@ -812,10 +865,11 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
- * @param {String} modelID string value to reference model's unique parameters
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns {{ X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, S: Float32Array, output: Float32Array}}
  */
-const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => functions.CoreAttention(
+const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID, layerID) => functions.CoreAttention(
     input, 
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
@@ -823,7 +877,8 @@ const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => fun
     seqLen,
     dkRoot,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -837,10 +892,11 @@ const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID) => fun
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention delta scores
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
- * @param {String} modelID string value to reference model's unique parameters
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dX: Float32Array}}
  */
-const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID) => functions.CoreAttentionBackward(
+const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID, layerID) => functions.CoreAttentionBackward(
     delta, 
     Q, 
     K,
@@ -851,7 +907,8 @@ const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, poin
     seqLen,
     dkRoot,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -865,9 +922,10 @@ const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, poin
  * @param {Boolean} useCausalMasking causal masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
+ * @param {String} layerID string value to reference model's unique parameters
  * @returns {{X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, mhaOutput: Float32Array, S_perHead: Float32Array, finalOutput: Float32Array}}
  */
-const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttention(
+const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => functions.CoreMultiHeadAttention(
     input,
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
@@ -878,7 +936,8 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
     dkRoot,
     useCausalMasking,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -896,9 +955,10 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
  * @param {Boolean} useCasualMasking casual masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
+ * @param {String} layerID string value to reference model's unique parameters
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dMhaOutput: Float32Array, dX: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => float32_Modules.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => functions.CoreMultiHeadAttentionBackward(
     delta,
     getGlobalParams(modelID).globalWeights[pointer],
     Q,
@@ -912,7 +972,8 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     dkRoot,
     useCausalMasking,
     pointer,
-    modelID
+    modelID,
+    layerID
 );
 
 /**
@@ -926,9 +987,11 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
  * @param {Float32Array} weightGrads 
  * @param {Number} embedDim 
  * @param {Number} seqLen 
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns 
  */
-const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, activation_outputs, weightGrads, embedDim, seqLen) => functions.accumulateAttentionWeightsGradients(
+const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateAttentionWeightsGradients(
     dQ,
     dK,
     dV,
@@ -937,7 +1000,9 @@ const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, a
     activation_outputs,
     weightGrads,
     embedDim,
-    seqLen
+    seqLen,
+    modelID, 
+    layerID
 );
 
 
@@ -950,16 +1015,20 @@ const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, a
  * @param {Float32Array} biasGrads 
  * @param {Number} embedDim 
  * @param {Number} seqLen 
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns 
  */
-const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen) => functions.accumulateAttentionBiasGrads(
+const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen,  modelID, layerID) => functions.accumulateAttentionBiasGrads(
     dQ,
     dK,
     dV,
     dMhaOutput,
     biasGrads,
     embedDim,
-    seqLen
+    seqLen,
+    modelID, 
+    layerID
 );
 
 /**
@@ -971,16 +1040,20 @@ const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDi
  * @param {Float32Array} weightGrads 
  * @param {Number} embedDim 
  * @param {Number} seqLen 
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionWeightGrads(
+const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionWeightGrads(
     dQ,
     dK,
     dV,
     activation_outputs,
     weightGrads,
     embedDim,
-    seqLen
+    seqLen,
+    modelID,
+    layerID
 );
 
 /**
@@ -991,15 +1064,19 @@ const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, we
  * @param {Float32Array} biasGrads 
  * @param {Number} embedDim 
  * @param {Number} seqLen 
+ * @param {String} modelID model ID
+ * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen) => float32_Modules.accumulateSimpleAttentionBiasGrads(
+const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionBiasGrads(
     dQ,
     dK,
     dV,
     biasGrads,
     embedDim,
-    seqLen
+    seqLen,
+    modelID,
+    layerID
 );
 
 /**
