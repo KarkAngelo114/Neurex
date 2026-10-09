@@ -175,6 +175,29 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
     modelID,
     layerID
 );
+
+/**
+ * 
+ * @param {Float32Array} activations 
+ * @param {Float32Array} deltas 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biasGrads 
+ * @param {Array<Number>} weightShape
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{ weightGrads: Float32Array, biasGrads: Float32Array }}
+ */
+const accumulateWeightsAndBiasGradsForConnectedLayer  = (activations, deltas, weightGrads, biasGrads, weightShape, modelID, layerID) => functions.accumulateWeightsAndBiasGradsForConnectedLayer(
+    activations,
+    deltas,
+    weightGrads,
+    biasGrads,
+    weightShape,
+    modelID,
+    layerID
+);
+
+
 /**
  * "✅☑️"
  * @param {Float32Array} input 
@@ -301,7 +324,7 @@ const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modu
 const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 
 /**
- * 
+ * "✅☑️"
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
@@ -323,6 +346,17 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, pointer, m
     layerID
 );
 
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} OutputProjectionShape 
+ * @param {Array<Number>} deltaInputShape 
+ * @param {Array<Number>} kernelShape 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
 const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, pointer, modelID, layerID) => functions.ConvolveBackward(
     input,
     OutputProjectionShape,
@@ -386,46 +420,6 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2,
  * @returns {{ params: Float32Array, sqAvg: Float32Array }}
  */
 const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID);
-
-/**
- * "✅☑️"
- * @param {*} activations 
- * @param {*} delta 
- * @param {*} weightGrads 
- * @param {*} inputSize 
- * @param {*} outputSize 
- * @param {*} pointer 
- * @param {*} modelID 
- * @param {*} layerID
- * @returns 
- */
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize, pointer, modelID, layerID) => functions.computeWeightGradientsForWeightsInConnectedLayer(
-    activations, 
-    delta, 
-    weightGrads, 
-    inputSize, 
-    outputSize, 
-    pointer, 
-    modelID,
-    layerID
-);
-
-/**
- * "✅☑️"
- * @param {Float32Array} biasGrads 
- * @param {Float32Array} delta 
- * @param {Number} pointer 
- * @param {String} modelID 
- * @param {String} layerID
- * @returns 
- */
-const computeBiasGradsForConnected_Layer = (biasGrads, delta, pointer, modelID, layerID) => functions.computeBiasGradsForConnected_Layer(
-    biasGrads, 
-    delta, 
-    pointer, 
-    modelID,
-    layerID
-);
 
 /**
  * "✅☑️"
@@ -1098,6 +1092,7 @@ module.exports = {
     returnEmbeddings,
     MatMul,
     DeltaMatMul,
+    accumulateWeightsAndBiasGradsForConnectedLayer,
     relu,
     sigmoid,
     tanh,
@@ -1107,10 +1102,8 @@ module.exports = {
     ConvolveBackward,
     transConv,
     transConvBackward,
-    computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,
     accumulateKernelGradsForTransConv,
-    computeBiasGradsForConnected_Layer,
     computeBiasGradsForConv,
     scale,
     ApplySGD,

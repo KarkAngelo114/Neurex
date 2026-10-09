@@ -174,8 +174,13 @@ const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
 
     return prevDelta;
 }
+const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weightGrads, biasGrads, weightShape) => {
+    const [inputSize, outputSize] = weightShape;
 
-const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, weightGrads, inputSize, outputSize) => {
+    for (let i = 0; i < delta.length; i++) {
+        biasGrads[i] += delta[i];
+    }
+
     for (let i = 0; i < inputSize; i++) {
         const inputVal = activations[i];
 
@@ -188,17 +193,10 @@ const computeWeightGradientsForWeightsInConnectedLayer = (activations, delta, we
         }
     }
 
-    return weightGrads;
-}
-
-const computeBiasGradsForConnected_Layer = (biasGrads, delta) => {
-    const output = biasGrads;
-
-    for (let i = 0; i < delta.length; i++) {
-        output[i] += delta[i];
+    return {
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
-
-    return output;
 }
 
 const scale = (input, scalingValue) => {
@@ -930,10 +928,7 @@ const transConvBackward = (delta, inputShape, outputShape, strides, filters, wei
     const padTop = Math.floor(padH / 2);
     const padLeft = Math.floor(padW / 2);
 
-    const deltaInputIndex = (y, x, c) => (y * iW + x) * iD + c;
     const deltaOutputIndex = (y, x, f) => (y * oW + x) * oD + f;
-
-    const weightIndex = (f, ky, kx, c) => (((f * kh) + ky) * kw + kx) * d + c;
 
     for (let iy = 0; iy < iH; iy++) {
         for (let ix = 0; ix < iW; ix++) {
@@ -1613,8 +1608,7 @@ module.exports = {
     returnEmbeddings,
     MatMul,
     DeltaMatMul,
-    computeWeightGradientsForWeightsInConnectedLayer,
-    computeBiasGradsForConnected_Layer,
+    accumulateWeightsAndBiasGradsForConnectedLayer,
     scale,
     SGD,
     Adam,

@@ -143,8 +143,6 @@ residualEnd()
 layer.residualEnd()
 ```
 
-
-
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 
 ### Setting compute backend
@@ -165,6 +163,8 @@ nrx.backend.setComputeBackend("cpu"); // cpu by default
 |`pure-js`| Yes (by default) |
 |`opencl`| Yes |
 |`cuda`| Not yet |
+
+Setting up the backend compute is a must before running any operations as it let's you decide where to run the computations for every operators. If you haven't set yet, an error will trigger before you even start the training loop.
 
 
 ## Sample usage - training a XOR 

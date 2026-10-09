@@ -15,6 +15,7 @@
 - Exposed core training primitives methods that makes up the existing high-level API `train()` method: `setParams()`, `feedforward()`, `getOutputLayerDelta()`, `backpropagation()`, and `updateParams()`. With these exposed methods. Writing custom training loops is now possible for advance users. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - Now can export trained `nrx` models to ONNX (`.onnx`) via `export_to_ONNX()` method. (_Note: Not all layer types might get supported._)
 - manual setting of compute backend via `backend.setComputeBackend()` instead of configuring via model
+- optimized native bindings.
 
 ### Fixes
 - fixed all derivative activation functions.
@@ -23,8 +24,9 @@
 - arguments on `connectedLayer()` has been flipped. Instead of `connectedLayer(activation_func, layer_size)`, it's now `connectedLayer(layer_size, activation_func)`. See the updated the documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 - when using `load_images_from_directory()`, you can pass a string value in the `label_mode` argument. The label mode to use depends on the loss function you will going to use for training. See the updated documentation [here](https://neurex-documentation.vercel.app/javascript-nodejs#load_images_from_directory).
 - in the `optimizer` property when setting config, it can only now accepts factory functions rather than string name of an optimizer allowing you to plug your own custom optimizer.
-- functions exported are now grouped based on their purpose under specific namespaces. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info.
 - removed `mode` attribute on `configure` in Neurex class.
+- functions exported are now grouped based on their purpose under specific namespaces. See [index.d.ts](https://github.com/KarkAngelo114/Neurex/blob/main/index.d.ts) for more info. The table below shows a summary of namespaces
+
 
 | <p style = "text-align: center">Namespace</p> | <p style = "text-align: center">Contains</p> |
 | :--- | :--- |

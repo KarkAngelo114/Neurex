@@ -1,4 +1,4 @@
-const { MatMul, element_wise_sub, element_wise_mul, scaleDiff, DeltaMatMul, computeWeightGradientsForWeightsInConnectedLayer, computeBiasGradsForConnected_Layer, cacheOutputLayerDelta } = require("../../core/bindings");
+const { MatMul, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -204,31 +204,14 @@ const gradientAccumulation = (data) => {
     const deltas = data.deltas;
     const layerID = layerData.layerID;
 
-    const [inputSize, outputSize] = layerData.weightShape;
+    const weightShape = layerData.weightShape;
 
-    const accumulatedWeightGrads = computeWeightGradientsForWeightsInConnectedLayer(
-        activation_outputs,
-        deltas,
-        weightGrads,
-        inputSize,
-        outputSize,
-        pointer,
-        modelID,
-        layerID
-    );
+    const {weightGrads: accumulatedWeightGrads, biasGrads: accumulatedBiasGrads } = accumulateWeightsAndBiasGradsForConnectedLayer(activation_outputs, deltas, weightGrads, biasGrads, weightShape, modelID, layerID);
 
     if (accumulatedWeightGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during weightGrads accumulation in connected layer");
         throw new Error("ERR_NAN_DETECTED");
     };
-
-    const accumulatedBiasGrads = computeBiasGradsForConnected_Layer(
-        biasGrads,
-        deltas,
-        pointer,
-        modelID,
-        layerID
-    );
 
     if (accumulatedBiasGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during biasGrads accumulation in connected layer");
