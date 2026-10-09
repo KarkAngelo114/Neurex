@@ -283,118 +283,114 @@ const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => {
     }
 }
 
-const ApplyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => {
-    const newH = inputH + padTop + padBottom;
-    const newW = inputW + padLeft + padRight;
-    const output = new Float32Array(newH * newW * channels);
 
-    for (let i = 0; i < inputH; i++) {
-        for (let j = 0; j < inputW; j++) {
-            for (let c = 0; c < channels; c++) {
-                const oldIdx = (i * inputW + j) * channels + c;
-                const newIdx = ((i + padTop) * newW + (j + padLeft)) * channels + c;
-                output[newIdx] = input[oldIdx];
-            }
-        }
+const ConvolveForward = (input, inputShape, outputShape, kernelShape, weights, biases) => {
+    const [f, kh, kw, d] = kernelShape;
+    const [iH, iW, iD] = inputShape;
+    const [oH, oW, oD] = outputShape;
+
+    if (d !== iD) {
+        throw new Error(`ConvolveForward: kernel input depth (${d}) != input depth (${iD})`);
     }
-    return {
-        data: output,
-        shape: [newH, newW, channels]
-    };
-};
+    if (f !== oD) {
+        throw new Error(`ConvolveForward: number of filters (${f}) != output depth (${oD})`);
+    }
+    if (weights.length !== f * kh * kw * d) {
+        throw new Error(`ConvolveForward: expected ${f * kh * kw * d} weights, received ${weights.length}`);
+    }
 
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => {
+    const output = new Float32Array(oH * oW * oD);
 
-    
-    const [numFilters, kernelH, kernelW, depth] = kernelShape;
-    const [inputH, inputW] = inputShape;
-    const [outputH, outputW] = outputShape;
+    for (let h = 0; h < oH; h++) {
+        for (let w = 0; w < oW; w++) {
+            for (let filter = 0; filter < f; filter++) {
+                let sum = biases ? biases[filter] : 0;
 
-    const output = new Float32Array(outputH * outputW * numFilters);
+                for (let kernelH = 0; kernelH < kh; kernelH++) {
+                    const inputH = h + kernelH;
+                    if (inputH >= iH) continue;
 
-    const kernelSize = kernelH * kernelW * depth;
+                    for (let kernelW = 0; kernelW < kw; kernelW++) {
+                        const inputW = w + kernelW;
+                        if (inputW >= iW) continue;
 
-    for (let y = 0; y < outputH; y++) {
+                        const inputBase = (inputH * iW + inputW) * iD;
+                        const weightBase = ((filter * kh + kernelH) * kw + kernelW) * d;
+                        const channelLimit = d - (d % 4);
 
-        const baseY = y * strides;
-
-        for (let x = 0; x < outputW; x++) {
-
-            const baseX = x * strides;
-
-            const outBase = (y * outputW + x) * numFilters;
-
-            for (let f = 0; f < numFilters; f++) {
-
-                let sum = biases[f];
-
-                const filterOffset = f * kernelSize;
-
-                for (let ky = 0; ky < kernelH; ky++) {
-
-                    const inY = baseY + ky;
-
-                    if (inY >= inputH) continue;
-
-                    for (let kx = 0; kx < kernelW; kx++) {
-
-                        const inX = baseX + kx;
-
-                        if (inX >= inputW) continue;
-
-                        const inputBase = (inY * inputW + inX) * depth;
-
-                        const kernelBase = filterOffset + (ky * kernelW + kx) * depth;
-
-                        let c = 0;
-
-                        for (; c <= depth - 4; c += 4) {
-                            sum += input[inputBase + c] * weights[kernelBase + c];
-                            sum += input[inputBase + c + 1] * weights[kernelBase + c + 1];
-                            sum += input[inputBase + c + 2] * weights[kernelBase + c + 2];
-                            sum += input[inputBase + c + 3] * weights[kernelBase + c + 3];
+                        for (let channel = 0; channel < channelLimit; channel += 4) {
+                            sum += input[inputBase + channel] * weights[weightBase + channel];
+                            sum += input[inputBase + channel + 1] * weights[weightBase + channel + 1];
+                            sum += input[inputBase + channel + 2] * weights[weightBase + channel + 2];
+                            sum += input[inputBase + channel + 3] * weights[weightBase + channel + 3];
                         }
 
-                        for (; c < depth; c++) {
-                            sum += input[inputBase + c] * weights[kernelBase + c];
+                        for (let channel = channelLimit; channel < d; channel++) {
+                            sum += input[inputBase + channel] * weights[weightBase + channel];
                         }
                     }
                 }
 
-                output[outBase + f] = sum;
+                output[(h * oW + w) * oD + filter] = sum;
             }
         }
     }
 
     return output;
-};
+}
 
-const DilateInput = (input, shape, stride) => {
-    const [H, W, C] = shape;
-    const dilatedH = (H - 1) * stride + 1;
-    const dilatedW = (W - 1) * stride + 1;
-    
-    const dilatedSize = dilatedH * dilatedW * C;
-    const dilated = new Float32Array(dilatedSize);
+const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, kernels) => {
+    // If convolve forward does the shrinking, this function does the opposite. The delta to project needs to be larger than what's coming in
+    const [oH, oW, oD] = OutputProjectionShape; // target output shape of this function
+    const [deltaH, deltaW, deltaD] = deltaInputShape; // current delta shape coming in
+    const [f, kh, kw, d] = kernelShape;
 
-    for (let c = 0; c < C; c++) {
-        for (let h = 0; h < H; h++) {
-            for (let w = 0; w < W; w++) {
-                const srcIdx = (h * W + w) * C + c;
-                const dilatedHIdx = h * stride;
-                const dilatedWIdx = w * stride;
-                const dstIdx = (dilatedHIdx * dilatedW + dilatedWIdx) * C + c;
-                dilated[dstIdx] = input[srcIdx];
+    if (deltaD !== f) {
+        throw new Error(`ConvolveBackward: delta depth (${deltaD}) != number of filters (${f})`);
+    }
+    if (oD !== d) {
+        throw new Error(`ConvolveBackward: output depth (${oD}) != kernel input depth (${d})`);
+    }
+    if (input.length !== deltaH * deltaW * deltaD) {
+        throw new Error(`ConvolveBackward: expected ${deltaH * deltaW * deltaD} input values, received ${input.length}`);
+    }
+    if (kernels.length !== f * kh * kw * d) {
+        throw new Error(`ConvolveBackward: expected ${f * kh * kw * d} weights, received ${weights.length}`);
+    }
+
+    const weights = RotateKernels(f, kh, kw, d, kernels);
+    const output = new Float32Array(oH * oW * oD);
+
+    // Scatter each incoming delta through the weights used by the forward convolution.
+    for (let h = 0; h < deltaH; h++) {
+        for (let w = 0; w < deltaW; w++) {
+            const deltaBase = (h * deltaW + w) * deltaD;
+
+            for (let filter = 0; filter < f; filter++) {
+                const deltaValue = input[deltaBase + filter];
+
+                for (let kernelH = 0; kernelH < kh; kernelH++) {
+                    const outputH = h + kernelH;
+                    if (outputH >= oH) continue;
+
+                    for (let kernelW = 0; kernelW < kw; kernelW++) {
+                        const outputW = w + kernelW;
+                        if (outputW >= oW) continue;
+
+                        const outputBase = (outputH * oW + outputW) * oD;
+                        const weightBase = ((filter * kh + kernelH) * kw + kernelW) * d;
+
+                        for (let channel = 0; channel < d; channel++) {
+                            output[outputBase + channel] += deltaValue * weights[weightBase + channel];
+                        }
+                    }
+                }
             }
         }
     }
 
-    return {
-        data: dilated,
-        dilatedHeight: dilatedH,
-        dilatedWidth: dilatedW
-    };
-};
+    return output;
+}
 
 const RotateKernels = (F, KH, KW, D, weights) => {
     const rotated = new Float32Array(weights.length);
@@ -1623,11 +1619,9 @@ module.exports = {
     SGD,
     Adam,
     RMSProp,
-    ApplyPadding,
-    Convolve,
+    ConvolveForward,
+    ConvolveBackward,
     ConvolveDelta,
-    DilateInput,
-    Convolve,
     transConv,
     transConvBackward,
     computeBiasGradsForConv,

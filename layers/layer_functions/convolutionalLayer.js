@@ -1,6 +1,6 @@
 const activation = require('../../core/bindings')
-const { applyPadding, Convolve, ConvolveDelta, element_wise_mul, Dilate_Input, DeltaMatMul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
-const {  calculateTensorShape, getPaddingSizes, createTensorBuffer } = require("../../utils/utils");
+const { ConvolveForward, ConvolveBackward, element_wise_mul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
+const {  calculateTensorShape, createTensorBuffer } = require("../../utils/utils");
 
 
 
@@ -60,23 +60,15 @@ const initParams = (size, shape, layer_data) => {
     
 }
 
-/**
- * Determeines what is the task the model is trained on
- * @param {Object} layerObject layer configuration object
- * @param {String} lossFunc loss function is used for training
- * @param {Float32Array} trainY target labels 
- * @returns {string} task type
- */
-const determineInferenceType = (layerObject, lossFunc, trainY) => {
+const determineInferenceType = () => {
     throw new Error('Convolutional layer cannot be an output layer for now');
 }
 
 const feedforward = (data) => {
     const layerData = data.layerData;
-    const strides = layerData.strides;
-    const [f, kh, kw, kd] = layerData.weightShape;
-    const [input_H, input_W, input_D] = layerData.inputShape; 
-    const padding = layerData.padding;
+    const kernelShape = layerData.weightShape;
+    const inputShape= layerData.inputShape;
+    const outputShape = layerData.outputShape;
     const input = data.input;
     const pointer = data.pointer;
     const modelID = data.modelID;
@@ -94,22 +86,8 @@ const feedforward = (data) => {
         throw new Error("EERR_CONV_SHAPE_MISMATCH");
     }
 
-    // 1. compute expected output tensor shape
-    const { OutputHeight, OutputWidth } = calculateTensorShape(input_H, input_W, kh, kw, input_D, strides, padding);
-
-    // 2. get padding sizes for each sides
-    const {top, bottom, left, right} = getPaddingSizes(input_H, input_W, kh, kw, strides, padding);
-
-    // 3. apply padding
-    const {data: paddedTensor, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
-
-    if (paddedTensor.some(Number.isNaN)) {
-        console.error("paddedTensor has NaNs detected during feedforward in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
-    }
-
     // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = Convolve(paddedTensor, strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer, modelID, layerID);
+    const convolve_result = ConvolveForward(input, inputShape, outputShape, kernelShape, pointer, modelID, layerID);
 
     if (convolve_result.some(Number.isNaN)) {
         console.error("NaN detected after Convolve operation during feedforward in convolutional layer");
@@ -144,7 +122,9 @@ const projectDeltaBackward = (data) => {
 
     const layerData = data.layerData;
     const delta = data.delta;
-    const targetShape = data.inputShape;
+    const targetShape = layerData.inputShape;
+    const deltaShape = layerData.outputShape;
+    const kernelShape = layerData.weightShape;
     const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
@@ -154,49 +134,9 @@ const projectDeltaBackward = (data) => {
         throw new Error("ERR_NAN_DETECTED");
     }
 
-    const [Fn, KHn, KWn, KCn] = layerData.weightShape;
-    const [oHn, oWn, oDn]= layerData.outputShape;
-    const [oHprev, oWprev] = layerData.inputShape;
-    const stridesN = layerData.strides;
-    const paddingN = layerData.padding;
-
-    // 1. Dilate the delta to undo the strides used in the forward pass
-    const { data: dilated, dilatedHeight: dilatedH, dilatedWidth: dilatedW } = Dilate_Input(delta, [oHn, oWn, oDn], stridesN);
-    if (dilated.some(Number.isNaN)) {
-        console.error("Delta dilation has NaNs detected during delta projection in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
-    }
-
-
-    // 2. Determine how much padding to add around the dilated delta so that the full-convolution with the flipped kernel lands on the correct shape.
-    let pT, pB, pL, pR;
-    if (paddingN === "valid") {
-        // "valid" forward → "full" backward: pad K-1 on every side
-        pT = pB = KHn - 1;
-        pL = pR = KWn - 1;
-    } else {
-        // "same" forward: split K-1, then top up so the result is at least oHprev × oWprev
-        pT = Math.floor((KHn - 1) / 2);  pB = (KHn - 1) - pT;
-        pL = Math.floor((KWn - 1) / 2);  pR = (KWn - 1) - pL;
-
-        const needH = oHprev + KHn - 1;   // ConvolveDelta needs Hp >= needH
-        const needW = oWprev + KWn - 1;
-        const haveH = dilatedH + pT + pB;
-        const haveW = dilatedW + pL + pR;
-        if (haveH < needH) pB += (needH - haveH);
-        if (haveW < needW) pR += (needW - haveW);
-    }
-
-    // 3. Apply padding
-    const { data: paddedInput, shape } = applyPadding(dilated, dilatedH, dilatedW, oDn, pT, pB, pL, pR);
-    
-    if (paddedInput.some(Number.isNaN)) {
-        console.error("Paddedd delta has NaNs detected during delta projection in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
-    }
     
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
-    const result = ConvolveDelta(paddedInput, shape, [Fn, KHn, KWn, KCn], [oHprev, oWprev], pointer, 1, modelID, layerID);
+    const result = ConvolveBackward(delta, targetShape, deltaShape, kernelShape, pointer, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in convolutional layer");
         throw new Error("ERR_NAN_DETECTED");

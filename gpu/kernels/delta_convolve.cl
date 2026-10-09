@@ -1,61 +1,56 @@
 __kernel void delta_convolve(
     __global const float* input,
     __global const float* weights,
-    __global float* output_tensor,
-    const int Wp,
-    const int C_in,
-    const int F,
-    const int KH,
-    const int KW,
-    const int C_k,
-    const int oH,
-    const int oW,
-    const int stride
+    __global float* output,
+    const int deltaH,
+    const int deltaW,
+    const int numFilters,
+    const int kernelH,
+    const int kernelW,
+    const int depth,
+    const int outputH,
+    const int outputW
 ) {
-    int h = get_global_id(0);
-    int w = get_global_id(1);
-    int c_out = get_global_id(2);
+    const int h = get_global_id(0);
+    const int w = get_global_id(1);
+    const int channel = get_global_id(2);
 
-    if (h >= oH || w >= oW || c_out >= C_k) return;
+    if (h >= outputH || w >= outputW || channel >= depth) return;
 
     float sum = 0.0f;
+    for (int kh = 0; kh < kernelH; kh++) {
+        const int deltaY = h - kh;
+        if (deltaY < 0 || deltaY >= deltaH) continue;
 
-    for (int kh = 0; kh < KH; kh++) {
-        int rkh = KH - 1 - kh;   // flipped kernel-height index
+        for (int kw = 0; kw < kernelW; kw++) {
+            const int deltaX = w - kw;
+            if (deltaX < 0 || deltaX >= deltaW) continue;
 
-        for (int kw = 0; kw < KW; kw++) {
-            int rkw = KW - 1 - kw;   // flipped kernel-width index
+            const int deltaBase = (deltaY * deltaW + deltaX) * numFilters;
+            const int kernelBase = ((kernelH - 1 - kh) * kernelW + (kernelW - 1 - kw)) * depth + channel;
+            int filter = 0;
 
-            int ph = h * stride + kh;
-            int pw = w * stride + kw;
-            int baseInputIdx = (ph * Wp + pw) * C_in;
-            int baseKernelIdx = (rkh * KW + rkw) * C_k;   // uses rkh/rkw, not kh/kw
-
-            int f = 0;
-            for (; f <= F - 4; f += 4) {
-                int inputIdx0 = baseInputIdx + f;
-                int inputIdx1 = baseInputIdx + f + 1;
-                int inputIdx2 = baseInputIdx + f + 2;
-                int inputIdx3 = baseInputIdx + f + 3;
-
-                int kernelIdx0 = (f * KH + kh) * KW * C_k + baseKernelIdx + c_out;
-                int kernelIdx1 = ((f + 1) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
-                int kernelIdx2 = ((f + 2) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
-                int kernelIdx3 = ((f + 3) * KH + kh) * KW * C_k + baseKernelIdx + c_out;
-
-                sum += input[inputIdx0] * weights[kernelIdx0];
-                sum += input[inputIdx1] * weights[kernelIdx1];
-                sum += input[inputIdx2] * weights[kernelIdx2];
-                sum += input[inputIdx3] * weights[kernelIdx3];
+            for (; filter <= numFilters - 4; filter += 4) {
+                const float delta0 = input[deltaBase + filter];
+                const float delta1 = input[deltaBase + filter + 1];
+                const float delta2 = input[deltaBase + filter + 2];
+                const float delta3 = input[deltaBase + filter + 3];
+                const int weight0 = filter * kernelH * kernelW * depth + kernelBase;
+                const int weight1 = (filter + 1) * kernelH * kernelW * depth + kernelBase;
+                const int weight2 = (filter + 2) * kernelH * kernelW * depth + kernelBase;
+                const int weight3 = (filter + 3) * kernelH * kernelW * depth + kernelBase;
+                sum += delta0 * weights[weight0];
+                sum += delta1 * weights[weight1];
+                sum += delta2 * weights[weight2];
+                sum += delta3 * weights[weight3];
             }
 
-            for (; f < F; f++) {
-                int inputIdx = baseInputIdx + f;
-                int kernelIdx = (f * KH + kh) * KW * C_k + baseKernelIdx + c_out;
-                sum += input[inputIdx] * weights[kernelIdx];
+            for (; filter < numFilters; filter++) {
+                const int weight = filter * kernelH * kernelW * depth + kernelBase;
+                sum += input[deltaBase + filter] * weights[weight];
             }
         }
     }
 
-    output_tensor[(h * oW + w) * C_k + c_out] = sum;
+    output[(h * outputW + w) * depth + channel] = sum;
 }

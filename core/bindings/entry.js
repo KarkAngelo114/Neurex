@@ -299,37 +299,23 @@ const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modu
  * @returns 
  */
 const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
+
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
- * @param {Number} inputH 
- * @param {Number} inputW 
- * @param {Number} channels 
- * @param {Number} padTop 
- * @param {Number} padBottom 
- * @param {Number} padLeft 
- * @param {Number} padRight 
- * @returns 
- */
-const applyPadding = (input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight) => functions.ApplyPadding(input, inputH, inputW, channels, padTop, padBottom, padLeft, padRight);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Number} strides 
+ * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Array<Number>} kernelShape 
- * @param {Array<Number>} inputShape 
  * @param {Number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns 
  */
-const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer, modelID, layerID) => functions.Convolve(
-    input, 
-    strides, 
-    outputShape, 
-    kernelShape, 
-    inputShape, 
+const ConvolveForward = (input, inputShape, outputShape, kernelShape, pointer, modelID, layerID) => functions.ConvolveForward(
+    input,
+    inputShape,
+    outputShape,
+    kernelShape,
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
@@ -337,38 +323,17 @@ const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer,
     layerID
 );
 
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Array<Number>} shape_array 
- * @param {Number} strides 
- * @returns {{data: Float32Array, dilatedHeight: Number, dilatedWidth: Number}} {data, dilatedHeight, dilatedWidth}
- */
-const Dilate_Input = (input, shape_array, strides) => functions.DilateInput(input, shape_array, strides);
-
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Array<Number>} deltaShape 
- * @param {Array<Number>} kernel_shape 
- * @param {Array<Number>} outputShape 
- * @param {Number} pointer 
- * @param {Number} stride 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, stride = 1, modelID, layerID) => functions.ConvolveDelta(
-    input, 
-    deltaShape, 
-    kernel_shape, 
-    outputShape, 
+const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, pointer, modelID, layerID) => functions.ConvolveBackward(
+    input,
+    OutputProjectionShape,
+    deltaInputShape,
+    kernelShape,
     getGlobalParams(modelID).globalWeights[pointer],
-    stride,
     pointer,
     modelID,
     layerID
 );
+
 
 /**
  * 
@@ -381,9 +346,10 @@ const ConvolveDelta = (input, deltaShape, kernel_shape, outputShape, pointer, st
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
+ * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns {{params: Float32Array, velocity: Float32Array}}
  */
-const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramType, modelID) => functions.SGD(params, grads, velocity, lr, momentum, pointer, paramType, modelID);
+const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramType, modelID, layerID) => functions.SGD(params, grads, velocity, lr, momentum, pointer, paramType, modelID, layerID);
 
 /**
  * 
@@ -400,9 +366,10 @@ const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramTyp
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
+ * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns 
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, pointer, paramType, modelID) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, pointer, paramType, modelID);
+const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, pointer, paramType, modelID, layerID) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, pointer, paramType, modelID, layerID);
 
 /**
  * "✅☑️"
@@ -415,9 +382,10 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2,
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
+ * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns {{ params: Float32Array, sqAvg: Float32Array }}
  */
-const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID);
+const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID);
 
 /**
  * "✅☑️"
@@ -1135,12 +1103,10 @@ module.exports = {
     tanh,
     softmax,
     linear,
-    applyPadding,
-    Convolve,
+    ConvolveForward,
+    ConvolveBackward,
     transConv,
     transConvBackward,
-    Dilate_Input,
-    ConvolveDelta,
     computeWeightGradientsForWeightsInConnectedLayer,
     ComputeGradientForKernels,
     accumulateKernelGradsForTransConv,

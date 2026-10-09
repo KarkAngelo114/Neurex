@@ -1326,7 +1326,8 @@ class Neurex {
                 trainingFeatureSize: options?.trainingFeatureSize || 1,
                 pointer: pointer,
                 paramType: "weights",
-                modelID: this.modelID
+                modelID: this.modelID,
+                layerID: layerID
             });
 
             // update weights corresponding a parametric layer using a pointer
@@ -1350,7 +1351,8 @@ class Neurex {
                     trainingFeatureSize: options?.trainingFeatureSize || 1,
                     pointer: pointer,
                     paramType: "biases",
-                    modelID: this.modelID
+                    modelID: this.modelID,
+                    layerID: layerID
                 });
 
                 this.biases[pointer] = res2.params;

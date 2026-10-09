@@ -3,7 +3,6 @@ __kernel void convolve(
     __global const float* weights,
     __global const float* biases,
     __global float* output,
-    const int strides,
     const int outputH,
     const int outputW,
     const int numFilters,
@@ -13,53 +12,49 @@ __kernel void convolve(
     const int inputH,
     const int inputW
 ) {
-    int y = get_global_id(0);
-    int x = get_global_id(1);
-    int f = get_global_id(2);
+    const int y = get_global_id(0);
+    const int x = get_global_id(1);
+    const int filter = get_global_id(2);
 
-    // Bounds check
-    if (y >= outputH || x >= outputW || f >= numFilters) return;
+    if (y >= outputH || x >= outputW || filter >= numFilters) return;
 
-    int kernelSize = kernelH * kernelW * depth;
+    const int kernelSize = kernelH * kernelW * depth;
+    const int outputIndex = (y * outputW + x) * numFilters + filter;
+    const int filterOffset = filter * kernelSize;
+    float sum = biases[filter];
 
-    // Equivalent to CPU:
-    int baseY = y * strides;
-    int baseX = x * strides;
-    int outIndex = (y * outputW + x) * numFilters + f;
+    for (int kh = 0; kh < kernelH; kh++) {
+        const int inputY = y + kh;
+        if (inputY >= inputH) continue;
 
-    float sum = biases[f];
+        for (int kw = 0; kw < kernelW; kw++) {
+            const int inputX = x + kw;
+            if (inputX >= inputW) continue;
 
-    // Filter offset
-    int filterOffset = f * kernelSize;
+            const int inputBase = (inputY * inputW + inputX) * depth;
+            const int weightBase = filterOffset + (kh * kernelW + kw) * depth;
+            int channel = 0;
 
-    for (int ky = 0; ky < kernelH; ky++) {
-        int inY = baseY + ky;
-
-        if (inY >= inputH) continue;
-
-        for (int kx = 0; kx < kernelW; kx++) {
-            int inX = baseX + kx;
-
-            if (inX >= inputW) continue;
-
-            int inputBase = (inY * inputW + inX) * depth;
-            int kernelBase = filterOffset + (ky * kernelW + kx) * depth;
-
-            int c = 0;
-            
-            for (; c <= depth - 4; c += 4) {
-                sum += input[inputBase + c]     * weights[kernelBase + c];
-                sum += input[inputBase + c + 1] * weights[kernelBase + c + 1];
-                sum += input[inputBase + c + 2] * weights[kernelBase + c + 2];
-                sum += input[inputBase + c + 3] * weights[kernelBase + c + 3];
+            for (; channel <= depth - 4; channel += 4) {
+                const float input0 = input[inputBase + channel];
+                const float input1 = input[inputBase + channel + 1];
+                const float input2 = input[inputBase + channel + 2];
+                const float input3 = input[inputBase + channel + 3];
+                const float weight0 = weights[weightBase + channel];
+                const float weight1 = weights[weightBase + channel + 1];
+                const float weight2 = weights[weightBase + channel + 2];
+                const float weight3 = weights[weightBase + channel + 3];
+                sum += input0 * weight0;
+                sum += input1 * weight1;
+                sum += input2 * weight2;
+                sum += input3 * weight3;
             }
 
-            // Remaining channels
-            for (; c < depth; c++) {
-                sum += input[inputBase + c] * weights[kernelBase + c];
+            for (; channel < depth; channel++) {
+                sum += input[inputBase + channel] * weights[weightBase + channel];
             }
         }
     }
 
-    output[outIndex] = sum;
+    output[outputIndex] = sum;
 }
