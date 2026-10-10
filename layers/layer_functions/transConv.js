@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const {cacheOutputLayerDelta, transConv, computeBiasGradsForConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateKernelGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, transConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 
 const initParams = (size, shape, layer_data) => {
@@ -207,7 +207,6 @@ const applyOwnDerivative = (data) => {
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
     const deltas = data.deltas;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const activation_outputs = data.activation_outputs;
     const weightGrads = data.weightGrads;
@@ -215,16 +214,24 @@ const gradientAccumulation = (data) => {
     const layerID = layerData.layerID;
 
     const strides = layerData.strides;
-    const filters = layerData.filters;
     const inputShape = layerData.inputShape; // [iH, iW, iD]
     const outputShape = layerData.outputShape; // [oH, oW, oD]
     const weightShape = layerData.weightShape; // [f, kh, kw, d]
 
-    const kernelWeightGrads = accumulateKernelGradsForTransConv(activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape, pointer, modelID, layerID);
+    const {weightGrads: kernelWeightGrads, biasGrads: kernelBiasGrads} = accumulateWeightandBiasGradsForTransConv(
+        activation_outputs,
+        deltas,
+        weightGrads,
+        biasGrads,
+        inputShape,
+        outputShape,
+        weightShape,
+        strides,
+        modelID,
+        layerID
+    );
+
     if (kernelWeightGrads.some(v => Number.isNaN(v))) throw new Error("weight gradient accumulation outputs NaNs (trans conv)");
-    
-    const [outH, outW] = layerData.outputShape;
-    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID, layerID);
     
     if (kernelBiasGrads.some(v => Number.isNaN(v))) throw new Error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
 

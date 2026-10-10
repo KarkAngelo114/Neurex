@@ -1,5 +1,5 @@
 const activation = require('../../core/bindings')
-const { ConvolveForward, ConvolveBackward, element_wise_mul, ComputeGradientForKernels, computeBiasGradsForConv } = require("../../core/bindings");
+const { ConvolveForward, ConvolveBackward, element_wise_mul,AccumulateWeightAndBiasGradsForConv } = require("../../core/bindings");
 const {  calculateTensorShape, createTensorBuffer } = require("../../utils/utils");
 
 
@@ -181,31 +181,16 @@ const gradientAccumulation = (data) => {
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const [filters, kH, kW, inDepth] = layerData.weightShape
-    const [inH, inW] = layerData.inputShape
-    const [outH, outW] = layerData.outputShape
+    const kernelShape = layerData.weightShape
+    const inputShape = layerData.inputShape
+    const outputShape = layerData.outputShape
 
-
-    const kernelWeightGrads = ComputeGradientForKernels(
-        activation_outputs,
-        deltas,
-        weightGrads,
-        [inH, inW, inDepth],
-        [outH, outW, filters],
-        [kH, kW],
-        1,
-        pointer, 
-        modelID,
-        layerID
-    );
+    const {weightGrads: kernelWeightGrads, biasGrads: kernelBiasGrads} = AccumulateWeightAndBiasGradsForConv(activation_outputs, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID);
 
     if (kernelWeightGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after kernel weightGrads accumulation in convolutional layer");
         throw new Error("ERR_NAN_DETECTED");
     }
-
-
-    const kernelBiasGrads =  computeBiasGradsForConv(biasGrads, deltas, outH, outW, filters, pointer, modelID, layerID);
 
     if (kernelBiasGrads.some(Number.isNaN)) {
         console.error("NaN detected after kernel biasGrads accumulation in convolutional layer");

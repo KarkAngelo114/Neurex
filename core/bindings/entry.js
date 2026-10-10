@@ -368,6 +368,32 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
     layerID
 );
 
+/**
+ * 
+ * @param {Float32Array} activations 
+ * @param {Float32Array} deltas 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biasGrads 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Array<Number>} kernelShape 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{weightGrads: Float32Array, biasGrads: Float32Array}}
+ */
+const AccumulateWeightAndBiasGradsForConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID) => float32_Modules.AccumulateWeightAndBiasGradsForConv(
+    activations,
+    deltas,
+    weightGrads,
+    biasGrads,
+    inputShape,
+    outputShape,
+    kernelShape,
+    1,
+    modelID,
+    layerID
+);
+
 
 /**
  * 
@@ -420,55 +446,6 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2,
  * @returns {{ params: Float32Array, sqAvg: Float32Array }}
  */
 const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID);
-
-/**
- * "✅☑️"
- * @param {Float32Array} input inputs that is already activated by and activation function
- * @param {Float32Array} delta delta input
- * @param {Float32Array} ZeroedGrads zero gradients for accumulation
- * @param {Array<Number>} inputShape input shape: [inputH, inputW, Cin]
- * @param {Array<Number>} outputShape output shape: [H, W, Cout]
- * @param {Array<Number>} kernelSize kernel size: [Kh, Kw]
- * @param {Number} stride stride value. Default value is `1`
- * @param {Number} pointer 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns accumulated gradients
- */
-const ComputeGradientForKernels = (input, delta, ZeroedGrads, inputShape, outputShape, kernelSize, stride = 1, pointer, modelID, layerID) => functions.computeKernelGradients(
-    input, 
-    delta, 
-    ZeroedGrads, 
-    inputShape, outputShape, 
-    kernelSize, 
-    stride,
-    pointer,
-    modelID,
-    layerID
-);
-
-/**
- * 
- * @param {Float32Array} grads 
- * @param {Float32Array} deltas 
- * @param {Number} oh 
- * @param {Number} ow 
- * @param {Number} num_filters 
- * @param {Number} pointer 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const computeBiasGradsForConv = (grads, deltas, oh, ow, num_filters, pointer, modelID, layerID) => functions.computeBiasGradsForConv(
-    grads, 
-    deltas, 
-    oh, 
-    ow, 
-    num_filters,
-    pointer,
-    modelID,
-    layerID
-);
 
 /**
  * "✅☑️" performs X[i] /= scaling_value
@@ -733,29 +710,27 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
 
 /**
  * "✅☑️"
- * @param {*} activation_outputs 
- * @param {*} delta 
- * @param {*} zeroGradAccumulator 
- * @param {*} strides 
- * @param {*} filters 
- * @param {*} inputShape 
- * @param {*} outputShape 
- * @param {*} weightShape 
- * @param {pointer} pointer 
- * @param {String} modelID
- * @param {String} layerID
- * @returns 
+ * @param {Float32Array} activations 
+ * @param {Float32Array} deltas 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biasGrads 
+ * @param {Array<Number>} inputShape 
+ * @param {Array<Number>} outputShape 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} strides 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{ weightGrads: Float32Array, biasGrads: Float32Array }}
  */
-const accumulateKernelGradsForTransConv = (activation_outputs, delta, zeroGradAccumulator, strides, filters, inputShape, outputShape, weightShape, pointer, modelID, layerID) => functions.accumulateKernelGradsForTransConv(
-    activation_outputs,
-    delta, 
-    zeroGradAccumulator,
-    strides,
-    filters, 
+const accumulateWeightandBiasGradsForTransConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, weightShape, strides, modelID, layerID) => functions.accumulateWeightandBiasGradsForTransConv(
+    activations,
+    deltas,
+    weightGrads,
+    biasGrads,
     inputShape, 
-    outputShape, 
+    outputShape,
     weightShape,
-    pointer, 
+    strides,
     modelID,
     layerID
 );
@@ -1006,7 +981,7 @@ const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDi
  * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionWeightGrads(
+const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateSimpleAttentionWeightGrads(
     dQ,
     dK,
     dV,
@@ -1030,7 +1005,7 @@ const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, we
  * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionBiasGrads(
+const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateSimpleAttentionBiasGrads(
     dQ,
     dK,
     dV,
@@ -1043,34 +1018,19 @@ const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seq
 
 /**
  * "✅☑️"
- * @param {Float32Array} biasGrads 
- * @param {Float32Array} delta 
- * @param {Number} pointer 
+ * @param {Float32Array} gammaGrads 
+ * @param {Float32Array} dGamma 
+ * @param {Float32Array} betaGrads 
+ * @param {Float32Array} dBeta
  * @param {String} modelID 
  * @param {String} layerID 
- * @returns 
+ * @returns {{gammaGrads: Float32Array, betaGrads: Float32Array}}
  */
-const accumulateGammaGrads = (grads, delta, pointer, modelID, layerID) => functions.accumulateGammaGrads(
-    grads,
-    delta,
-    pointer,
-    modelID,
-    layerID
-);
-
-/**
- * "✅☑️"
- * @param {Float32Array} biasGrads 
- * @param {Float32Array} delta 
- * @param {Number} pointer 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const accumulateBetaGrads = (grads, delta, pointer, modelID, layerID) => functions.accumulateBetaGrads(
-    grads,
-    delta,
-    pointer,
+const AccumulateGammaAndBetaGrads = (gammaGrads, dGamma, betaGrads, dBeta, modelID, layerID) => functions.AccumulateGammaAndBetaGrads(
+    gammaGrads,
+    dGamma,
+    betaGrads,
+    dBeta,
     modelID,
     layerID
 );
@@ -1088,60 +1048,74 @@ const cacheOutputLayerDelta = (delta, modelID, layerID) => {
 }
 
 module.exports = {
-    getEmbeddings,
-    returnEmbeddings,
-    MatMul,
-    DeltaMatMul,
-    accumulateWeightsAndBiasGradsForConnectedLayer,
+    init,
+    shutdown,
+
     relu,
     sigmoid,
     tanh,
     softmax,
     linear,
+
+    getEmbeddings,
+    returnEmbeddings,
+    sinusoidalPE,
+
+    MatMul,
+    DeltaMatMul,
+    accumulateWeightsAndBiasGradsForConnectedLayer,
+    
     ConvolveForward,
     ConvolveBackward,
+    AccumulateWeightAndBiasGradsForConv,
+
     transConv,
     transConvBackward,
-    ComputeGradientForKernels,
-    accumulateKernelGradsForTransConv,
-    computeBiasGradsForConv,
-    scale,
-    ApplySGD,
-    ApplyAdam,
-    ApplyRMSProp,
+    accumulateWeightandBiasGradsForTransConv,
+
     element_wise_mul,
     element_wise_sub,
     element_wise_add,
     accumulate_element_wise_mul,
+    scale,
+    scaleDiff,
+
+    ApplySGD,
+    ApplyAdam,
+    ApplyRMSProp,
+    
     MaxPool,
     MaxPoolDelta,
-    init,
-    scaleDiff,
+
     mse,
     mae,
     categorical_cross_entropy,
     sparse_categorical_cross_entropy,
     binary_cross_entropy,
+
     recurrentMatMul,
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
+
     gradientClipping,
+
     CoreAttention,
-    computeLayerNorm,
     CoreAttentionBackward,
+    accumulateSimpleAttentionWeightGrads,
+    accumulateSimpleAttentionBiasGrads,
+
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
     accumulateAttentionWeightsGradients,
     accumulateAttentionBiasGrads,
-    accumulateSimpleAttentionWeightGrads,
-    accumulateSimpleAttentionBiasGrads,
-    shutdown,
-    sinusoidalPE,
+
+    computeLayerNorm,
     computeLayerNormBackward,
-    accumulateGammaGrads,
-    accumulateBetaGrads,
+    AccumulateGammaAndBetaGrads,
+
     cacheOutputLayerDelta,
+
     derivatives: {
         relu: drelu,
         sigmoid: dsigmoid,

@@ -1,4 +1,4 @@
-const { computeLayerNorm, accumulateGammaGrads: accumulateGammaGradsFunc, accumulateBetaGrads: accumulateBetaGradsFunc, computeLayerNormBackward } = require("../../core/bindings/entry");
+const { computeLayerNorm, computeLayerNormBackward, AccumulateGammaAndBetaGrads } = require("../../core/bindings/entry");
 const { createTensorBuffer } = require("../../utils/utils");
 
 const initParams = (size, shape, layer_data) => {
@@ -84,23 +84,21 @@ const applyOwnDerivative = (data) => {
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     const gammaGrads = data.weightGrads;
     const betaGrads = data.biasGrads;
 
     const dGamma = layerData.cache.dGamma;
-    const accumulatedGammaGrads = accumulateGammaGradsFunc(gammaGrads, dGamma, pointer, modelID, layerID);
+    const dBeta = layerData.cache.dBeta;
+
+    const {gammaGrads: accumulatedGammaGrads, betaGrads: accumulatedBetaGrads} = AccumulateGammaAndBetaGrads(gammaGrads, dGamma, betaGrads, dBeta, modelID, layerID);
 
     if (accumulatedGammaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating gamma grads");
         throw new Error("ERR_NAN_DETECTED");
     }
     
-    const dBeta = layerData.cache.dBeta;
-    const accumulatedBetaGrads = accumulateBetaGradsFunc(betaGrads, dBeta, pointer, modelID, layerID);
-
     if (accumulatedBetaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating beta grads");
         throw new Error("ERR_NAN_DETECTED");

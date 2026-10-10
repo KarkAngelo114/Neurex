@@ -281,7 +281,6 @@ const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => {
     }
 }
 
-
 const ConvolveForward = (input, inputShape, outputShape, kernelShape, weights, biases) => {
     const [f, kh, kw, d] = kernelShape;
     const [iH, iW, iD] = inputShape;
@@ -337,6 +336,27 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, weights, b
     return output;
 }
 
+const RotateKernels = (F, KH, KW, D, weights) => {
+    const rotated = new Float32Array(weights.length);
+
+    for (let f = 0; f < F; f++) {
+        for (let kh = 0; kh < KH; kh++) {
+            for (let kw = 0; kw < KW; kw++) {
+                for (let d = 0; d < D; d++) {
+                    const oldIdx = (f * KH * KW * D) + (kh * KW * D) + (kw * D) + d;
+                    const newKh = KH - 1 - kh;
+                    const newKw = KW - 1 - kw;
+                    const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
+                    
+                    rotated[newIdx] = weights[oldIdx];
+                }
+            }
+        }
+    }
+    // Return the rotated array for temporary use
+    return rotated; 
+};
+
 const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, kernels) => {
     // If convolve forward does the shrinking, this function does the opposite. The delta to project needs to be larger than what's coming in
     const [oH, oW, oD] = OutputProjectionShape; // target output shape of this function
@@ -390,115 +410,10 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
     return output;
 }
 
-const RotateKernels = (F, KH, KW, D, weights) => {
-    const rotated = new Float32Array(weights.length);
-
-    for (let f = 0; f < F; f++) {
-        for (let kh = 0; kh < KH; kh++) {
-            for (let kw = 0; kw < KW; kw++) {
-                for (let d = 0; d < D; d++) {
-                    const oldIdx = (f * KH * KW * D) + (kh * KW * D) + (kw * D) + d;
-                    const newKh = KH - 1 - kh;
-                    const newKw = KW - 1 - kw;
-                    const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
-                    
-                    rotated[newIdx] = weights[oldIdx];
-                }
-            }
-        }
-    }
-    // Return the rotated array for temporary use
-    return rotated; 
-};
-
-const ConvolveDelta = (input, delta_shape, kernels_shape, outputShape, weights, stride) => {
-
-    const [Hp, Wp, C_in] = delta_shape;
-    const [F, KH, KW, C_k] = kernels_shape;
-    const [oH, oW] = outputShape;
-
-    // rotate kernels
-    const rotated_kernel = RotateKernels(F, KH, KW, C_k, weights);
-
-    const output = new Float32Array(oH * oW * C_k);
-
-    // ---- Convolution ----
-    for (let c_out = 0; c_out < C_k; c_out++) {     // output channel = previous depth
-        for (let h = 0; h < oH; h++) {
-            for (let w = 0; w < oW; w++) {
-                let sum = 0;
-                for (let kh = 0; kh < KH; kh++) {
-                    for (let kw = 0; kw < KW; kw++) {
-                        const ph = h * stride + kh;
-                        const pw = w * stride + kw;
-                        const baseIdx = (ph * Wp + pw) * C_in;
-                        const kernelBase = ((kh * KW + kw) * F) * C_k + c_out;
-
-                        let f = 0;
-                        for (; f <= F - 4; f += 4) {
-                            sum += input[baseIdx + f] * rotated_kernel[f * C_k + kernelBase];
-                            sum += input[baseIdx + f + 1] * rotated_kernel[(f + 1) * C_k + kernelBase];
-                            sum += input[baseIdx + f + 2] * rotated_kernel[(f + 2) * C_k + kernelBase];
-                            sum += input[baseIdx + f + 3] * rotated_kernel[(f + 3) * C_k + kernelBase];
-                        }
-
-                        for (; f < F; f++) {
-                            const padIdx = baseIdx + f;
-                            const kernelIdx = ((f * KH + kh) * KW + kw) * C_k + c_out;
-                            sum += input[padIdx] * rotated_kernel[kernelIdx];
-                        }
-                    }
-                }
-                output[(h * oW + w) * C_k + c_out] = sum;
-            }
-        }
-    }
-    return output;
-};
-
-const computeBiasGradsForConv = (grads, delta, outH, outW, numFilters) => {
-    for (let f = 0; f < numFilters; f++) {
-        let sum = 0;
-
-        for (let h = 0; h < outH; h++) {
-            for (let w = 0; w < outW; w++) {
-                const idx = (h * outW + w) * numFilters + f;
-                sum += delta[idx];
-            }
-        }
-
-        grads[f] += sum;
-    }
-
-    return grads;
-};
-
-const accumulateGammaGrads = (grads, delta) => {
-    const output = grads;
-
-    for (let i = 0; i < delta.length; i++) {
-        output[i] += delta[i];
-    }
-
-    return output;
-}
-
-const accumulateBetaGrads = (grads, delta) => {
-    const output = grads;
-
-    for (let i = 0; i < delta.length; i++) {
-        output[i] += delta[i];
-    }
-
-    return output;
-}
-
-
-const computeKernelGradients = (input, delta, weightGrads, inputShape, outputShape, kernelSize, stride) => {
-
+const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, stride) => {
     const [inputH, inputW, Cin] = inputShape;
-    const [H, W, Cout] = outputShape; 
-    const [Kh, Kw] = kernelSize;
+    const [H, W, Cout] = outputShape;
+    const [numFilters, Kh, Kw, d] = kernelShape;
 
     const padH = Math.floor(Kh / 2);
     const padW = Math.floor(Kw / 2);
@@ -522,10 +437,10 @@ const computeKernelGradients = (input, delta, weightGrads, inputShape, outputSha
                                 const deltaIndex = (h * W + w) * Cout + f;
                                 const deltaVal = delta[deltaIndex];
 
-                                sum0 += input[baseInputIndex + c] * deltaVal;
-                                sum1 += input[baseInputIndex + c + 1] * deltaVal;
-                                sum2 += input[baseInputIndex + c + 2] * deltaVal;
-                                sum3 += input[baseInputIndex + c + 3] * deltaVal;
+                                sum0 += activations_outputs[baseInputIndex + c] * deltaVal;
+                                sum1 += activations_outputs[baseInputIndex + c + 1] * deltaVal;
+                                sum2 += activations_outputs[baseInputIndex + c + 2] * deltaVal;
+                                sum3 += activations_outputs[baseInputIndex + c + 3] * deltaVal;
                             }
                         }
                     }
@@ -548,7 +463,7 @@ const computeKernelGradients = (input, delta, weightGrads, inputShape, outputSha
                             if (inH >= 0 && inH < inputH && inW >= 0 && inW < inputW) {
                                 const inputIndex = (inH * inputW + inW) * Cin + c;
                                 const deltaIndex = (h * W + w) * Cout + f;
-                                sum += input[inputIndex] * delta[deltaIndex];
+                                sum += activations_outputs[inputIndex] * delta[deltaIndex];
                             }
                         }
                     }
@@ -560,7 +475,37 @@ const computeKernelGradients = (input, delta, weightGrads, inputShape, outputSha
         }
     }
 
-    return weightGrads;
+    for (let f = 0; f < numFilters; f++) {
+        let sum = 0;
+
+        for (let h = 0; h < H; h++) {
+            for (let w = 0; w < W; w++) {
+                const idx = (h * H + w) * numFilters + f;
+                sum += delta[idx];
+            }
+        }
+
+        biasGrads[f] += sum;
+    }
+
+    return {
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    }
+
+}
+
+const AccumulateGammaAndBetaGrads = (gammaGrads, dGamma, betaGrads, dBeta) => {
+
+    for (let i = 0; i < dGamma.length; i++) {
+        gammaGrads[i] += dGamma[i];
+        betaGrads[i] += dBeta[i];
+    }
+
+    return {
+        gammaGrads: gammaGrads,
+        betaGrads: betaGrads
+    }
 }
 
 const MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
@@ -962,10 +907,10 @@ const transConvBackward = (delta, inputShape, outputShape, strides, filters, wei
     return deltaInput;
 }
 
-const accumulateKernelGradsForTransConv = (activation_outputs, deltas, weightGrads, strides, filters, inputShape, outputShape, weightShape) => {
+const accumulateWeightandBiasGradsForTransConv = (activation_outputs, deltas, weightGrads, biasGrads, inputShape, outputShape, weightShape, strides,) => {
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
-    const [f, kh, kw, d] = weightShape;
+    const [filters, kh, kw, d] = weightShape;
 
     const padH = Math.max(0, (iH - 1) * strides + kh - oH);
     const padW = Math.max(0, (iW - 1) * strides + kw - oW);
@@ -999,7 +944,23 @@ const accumulateKernelGradsForTransConv = (activation_outputs, deltas, weightGra
         }
     }
 
-    return weightGrads;
+    for (let f = 0; f < filters; f++) {
+        let sum = 0;
+
+        for (let h = 0; h < oH; h++) {
+            for (let w = 0; w < oW; w++) {
+                const idx = (h * oW + w) * filters + f;
+                sum += deltas[idx];
+            }
+        }
+
+        biasGrads[f] += sum;
+    }
+
+    return {
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
 
 const dotProduct = (arr1, arr2, inputSize, outputSize) => {
@@ -1615,12 +1576,10 @@ module.exports = {
     RMSProp,
     ConvolveForward,
     ConvolveBackward,
-    ConvolveDelta,
+    AccumulateWeightAndBiasGradsForConv,
     transConv,
     transConvBackward,
-    computeBiasGradsForConv,
-    computeKernelGradients,
-    accumulateKernelGradsForTransConv,
+    accumulateWeightandBiasGradsForTransConv,
     MaxPooling,
     MaxPoolDelta,
     element_wise_mul,
@@ -1650,6 +1609,5 @@ module.exports = {
     accumulateSimpleAttentionWeightGrads,
     accumulateSimpleAttentionBiasGrads,
     computeLayerNormBackward,
-    accumulateGammaGrads,
-    accumulateBetaGrads
+    AccumulateGammaAndBetaGrads,
 }
