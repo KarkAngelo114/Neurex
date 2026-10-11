@@ -227,11 +227,11 @@ const gradientClipping = (grads, threshold) => {
     return grads;
 }
 
-const SGD = (params, grads, velocity, lr, momentum = 0.9) => {
+const SGD = (params, grads, velocity, lr, momentum = 0.9, batchSize) => {
 
     for (let i = 0; i < params.length; i++) {
 
-        velocity[i] = momentum * velocity[i] + grads[i];
+        velocity[i] = momentum * velocity[i] + (grads[i] / batchSize);
 
         params[i] -= lr * velocity[i];
     }
@@ -242,13 +242,13 @@ const SGD = (params, grads, velocity, lr, momentum = 0.9) => {
     };
 };
 
-const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
+const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, batchSize) => {
     const output = params;
     const output_M = m;
     const output_V = v;
 
     for (let i = 0; i < grads.length; i++) {
-        let g = grads[i];
+        let g = (grads[i] / batchSize);
 
         m[i] = beta1 * m[i] + (1 - beta1) * g;
         v[i] = beta2 * v[i] + (1 - beta2) * g * g;
@@ -268,11 +268,12 @@ const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon) => {
     }
 }
 
-const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate) => {
+const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, batchSize) => {
 
     for (let i = 0; i < params.length; i++) {
-        sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (grads[i] * grads[i]);
-        params[i] -= (lr / (Math.sqrt(sqAvg[i]) + epsilon)) * grads[i];
+        const g = (grads[i] / batchSize);
+        sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (g * g);
+        params[i] -= (lr / (Math.sqrt(sqAvg[i]) + epsilon)) * g;
     }
 
     return {

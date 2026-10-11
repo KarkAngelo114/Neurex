@@ -462,7 +462,7 @@ declare module 'neurex' {
         backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[]}
         
         /**
-        * The `updateParams` is the actual method to update the parameters of your model. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
+        * Scaling gradients and paramters takes in this method. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
         * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
         * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
         * @param {updateParamsOptions} options update params options

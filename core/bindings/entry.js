@@ -403,13 +403,14 @@ const AccumulateWeightAndBiasGradsForConv = (activations, deltas, weightGrads, b
  * @param {Float32Array} velocity array of calculated velocity
  * @param {Number} learning_rate learning rate value
  * @param {Number} momentum momentum value
+ * @param {Number} batchSize batchSize
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns {{params: Float32Array, velocity: Float32Array}}
  */
-const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramType, modelID, layerID) => functions.SGD(params, grads, velocity, lr, momentum, pointer, paramType, modelID, layerID);
+const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, batchSize, pointer, paramType, modelID, layerID) => functions.SGD(params, grads, velocity, lr, momentum, batchSize, pointer, paramType, modelID, layerID);
 
 /**
  * 
@@ -423,13 +424,29 @@ const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, pointer, paramTyp
  * @param {Number} epsilon - epsilon constant value
  * @param {Number} beta1 - beta1 value
  * @param {Number} beta2 - beta2 value
+ * @param {Number} batchSize batchSize
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns 
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, pointer, paramType, modelID, layerID) => functions.Adam(params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, pointer, paramType, modelID, layerID);
+const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, batchSize, pointer, paramType, modelID, layerID) => functions.Adam(
+    params, 
+    grads, 
+    m, 
+    v, 
+    t, 
+    learning_rate, 
+    beta1, 
+    beta2, 
+    epsilon, 
+    batchSize, 
+    pointer, 
+    paramType, 
+    modelID, 
+    layerID
+);
 
 /**
  * "✅☑️"
@@ -439,13 +456,14 @@ const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2,
  * @param {Number} lr learning rate value 
  * @param {Number} epsilon epsilon value
  * @param {Number} decayRate decay rate value
+ * @param {Number} batchSize batchSize
  * @param {number} pointer pointer value to access corresponding parameters based on Model ID
  * @param {String} paramType specify if it's a weights or biases parameter
  * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
  * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
  * @returns {{ params: Float32Array, sqAvg: Float32Array }}
  */
-const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, pointer, paramType, modelID, layerID);
+const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, batchSize, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, batchSize, pointer, paramType, modelID, layerID);
 
 /**
  * "✅☑️" performs X[i] /= scaling_value

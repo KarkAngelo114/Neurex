@@ -19,7 +19,7 @@ const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
 const Layers = require('../layers/layers');
-const { init, scale, shutdown } = require('./bindings');
+const { init, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
 const version = require('../package.json').version;
@@ -1299,12 +1299,6 @@ class Neurex {
             }
 
             const layerID = layer_data_obj.layerID;
-            // scale weight gradients
-            weightGrads[pointer] = scale(weightGrads[pointer], batchSize, this.modelID, layerID);
-
-            // scale bias gradients
-            biasGrads[pointer] = scale(biasGrads[pointer], batchSize, this.modelID, layerID);
-
             
             if (this.gradient_normalizers.length > 0) {
                 for (const normalizer of this.gradient_normalizers) {
@@ -1321,7 +1315,7 @@ class Neurex {
                 lr: this.learning_rate,
                 previousEpochLoss: options?.previousEpochLoss || 0,
                 current_epoch: options?.current_epoch || 1,
-                batchSize: options?.batchSize || 1,
+                batchSize: batchSize,
                 totalEpoch: options?.totalEpoch || 1,
                 trainingFeatureSize: options?.trainingFeatureSize || 1,
                 pointer: pointer,
@@ -1346,7 +1340,7 @@ class Neurex {
                     lr: this.learning_rate,
                     previousEpochLoss: options?.previousEpochLoss || 0,
                     current_epoch: options?.current_epoch || 1,
-                    batchSize: options?.batchSize || 1,
+                    batchSize: batchSize,
                     totalEpoch: options?.totalEpoch || 1,
                     trainingFeatureSize: options?.trainingFeatureSize || 1,
                     pointer: pointer,

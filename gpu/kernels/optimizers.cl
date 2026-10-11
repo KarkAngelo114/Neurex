@@ -4,14 +4,15 @@ __kernel void sgd(
     __global float* velocity,
     const float lr,
     const float momentum,
-    const int paramSize
+    const int paramSize,
+    const int batchSize
 ) {
 
     int i = get_global_id(0);
 
     if (i >= paramSize) return;
 
-    velocity[i] = momentum * velocity[i] + grads[i];
+    velocity[i] = momentum * velocity[i] + (grads[i] / batchSize);
     params[i] -= lr * velocity[i];
 }
 
@@ -25,14 +26,15 @@ __kernel void adam(
     const float beta1,
     const float beta2,
     const float epsilon,
-    const int paramSize
+    const int paramSize,
+    const int batchSize
 ) {
 
     int i = get_global_id(0);
 
     if (i >= paramSize) return;
 
-    float grad = gradient[i];
+    float grad = (gradient[i] / batchSize);
 
     stateM[i] = beta1 * stateM[i] + (1 - beta1) * grad;
     stateV[i] = beta2 * stateV[i] + (1 - beta2) * grad * grad;
@@ -52,13 +54,15 @@ __kernel void rmsprop(
     const float lr,
     const float epsilon,
     const float decayRate,
-    const int size
+    const int size,
+    const int batchSize
 ) {
     int i = get_global_id(0);
 
     if (i >= size) return;
 
-    sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (grads[i] * grads[i]);
-    params[i] -= (lr / (sqrt(sqAvg[i]) + epsilon)) * grads[i];
+    float grad = (grads[i] / batchSize);
+    sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (grad * grad);
+    params[i] -= (lr / (sqrt(sqAvg[i]) + epsilon)) * grad;
 
 }
