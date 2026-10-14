@@ -956,7 +956,8 @@ class Neurex {
                 if (lossLower === "categorical_cross_entropy" || lossLower === "sparse_categorical_cross_entropy" || lossLower === "binary_cross_entropy") {
                     let epochPredictions = [];
                     for (let i = 0; i < trainX.length; i++) {
-                        epochPredictions.push(this.feedforward(trainX[i]).predictions);
+                        const { predictions } = this.feedforward(trainX[i]);
+                        epochPredictions.push(new Float32Array(predictions));
                     }
 
                     accuracy = this.#calculateClassificationAccuracy(epochPredictions, trainY, lossLower);
@@ -1087,7 +1088,7 @@ class Neurex {
                 let input_data = input[sample_index];
 
                 const {predictions} = this.feedforward(input_data);
-                outputs.push(predictions);
+                outputs.push(new Float32Array(predictions));
             }
 
             return outputs;
