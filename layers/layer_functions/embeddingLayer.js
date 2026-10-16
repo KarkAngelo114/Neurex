@@ -1,5 +1,6 @@
 const { XavierInitialization } = require("../../utils/utils");
 const { getEmbeddings, returnEmbeddings } = require('../../core/bindings');
+const errFlags = require('../../err_flags');
 
 
 /**
@@ -73,7 +74,6 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
     process.exit(1);
 }
 
-
 const feedforward = (data) => {
     const layerData = data.layerData;
     const embeddingDim = layerData.embeddingDim;
@@ -86,7 +86,7 @@ const feedforward = (data) => {
 
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in embedding layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     };
 
     
@@ -101,7 +101,6 @@ const getOutputLayerDelta = () => {
     console.error('Embedding layer cannot be an output layer.');
     process.exit(1);
 }
-
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
@@ -118,7 +117,7 @@ const gradientAccumulation = (data) => {
 
     if (accumulatedGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during weight grads accumulation in embedding layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     };
 
     return {

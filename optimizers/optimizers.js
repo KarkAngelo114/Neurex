@@ -1,5 +1,6 @@
 
 const { red, reset } = require('../color-code');
+const errFlags = require('../err_flags');
 const { ApplySGD, ApplyAdam, ApplyRMSProp } = require('../core/bindings');
 
 
@@ -11,8 +12,8 @@ module.exports = {
             const {params, grads, lr, state: state = {}, pointer, paramType, modelID, layerID, batchSize} = data;
 
             if (params.length !== grads.length) {
-                console.log(grads, params);
-                throw new Error("SGD: Params and grads size mismatch");
+                console.error("SGD: Params and grads size mismatch");
+                throw new Error(errFlags.UNEQUAL_SIZE);
             }
 
             if (!state.v) {
@@ -36,8 +37,8 @@ module.exports = {
             const {params, grads, lr, state: state = {}, pointer, paramType, modelID, layerID, batchSize} = data;
 
             if (params.length !== grads.length) {
-                console.log(grads, params);
-                throw new Error("Adam: Params and grads size mismatch");
+                console.error("Adam: Params and grads size mismatch");
+                throw new Error(errFlags.UNEQUAL_SIZE);
             }
 
             if (!state.m) {
@@ -66,7 +67,7 @@ module.exports = {
             
             if (params.length != grads.length) {
                 console.error(`${red}[ERROR]${reset} Parammeter and Gradient sizes does not match.`);
-                throw new Error("ERR_PARAM_GRAD_SIZE_MISMATCH");
+                throw new Error(errFlags.UNEQUAL_SIZE);
             }
 
             if (!state.sqAvg) {

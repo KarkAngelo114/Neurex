@@ -13,7 +13,8 @@
 const activation = require('../core/bindings/entry');
 const UUID = require('crypto');
 
-// import modular functions of different layers. 
+// import modular functions of different layers.
+const errFlags = require('../err_flags');
 const inputConfig = require('./layer_functions/inputLayer');
 const ann = require('./layer_functions/connectedLayer');
 const cnn = require('./layer_functions/convolutionalLayer');
@@ -51,7 +52,10 @@ class Layers {
      * @returns {Object} The reshape layer object configuration
     */
     reshape(targetShape = [28, 28, 3]) {
-        if (targetShape.some(n => !n || n <= 0)) throw new Error(`[ERROR]------- Values should never be 0, null or a negative value.`);
+        if (targetShape.some(n => !n || n <= 0)) {
+            console.error(`[ERROR]------- Values should never be 0, null or a negative value.`);
+            throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+        }   
 
         return {
             layer_name: 'Reshape',
@@ -77,7 +81,10 @@ class Layers {
     * @returns {Object} - The embedding layer object configuration
     */
     embeddingLayer(vocabSize, embeddingDim, maxSequenceLength) {
-        if (vocabSize <= 0 || embeddingDim <= 0 || maxSequenceLength <= 0) throw new Error(`VocabSize or embeddingDim should not be a negative number or 0. vocabSize: ${vocabSize} | embeddingDim: ${embeddingDim} | maxSequenceLength: ${maxSequenceLength}`);
+        if (vocabSize <= 0 || embeddingDim <= 0 || maxSequenceLength <= 0) {
+            console.error(`VocabSize or embeddingDim should not be a negative number or 0. vocabSize: ${vocabSize} | embeddingDim: ${embeddingDim} | maxSequenceLength: ${maxSequenceLength}`);
+            throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+        }
 
         return {
             layer_name:"Embedding Layer",
@@ -108,6 +115,7 @@ class Layers {
             isParametric: false,
             shapeType: "sequential",
             layerID: UUID.randomUUID(),
+            useBias: false,
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
             feedforward: (data) => spe.feedforward(data),
@@ -132,13 +140,13 @@ class Layers {
         try {
 
             if (!activation_function || !layer_size || layer_size <= 0) {
-                throw new Error(`[ERROR] Layer Error | Activation function: ${activation_function} | layer size: ${layer_size}`);
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
             let function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(errFlags.ACTIVATION_TYPE_ERR);
             }
 
             return {
@@ -160,7 +168,8 @@ class Layers {
             };
         }
         catch (error) {
-            console.log(error.message);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -180,23 +189,23 @@ class Layers {
      */
     convolutionalLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = 'same', useBias = true) {
         try {
-            if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
-            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
-            if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
-            if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
-            if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
+            if (!filters || filters <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!strides || strides <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!kernel_size || kernel_size.length === 0 || kernel_size[0] <= 0 || kernel_size[1] <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!activation_function) throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
+            if (!padding) throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
 
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR] "${padding.toLowerCase()}" is invalid. Use 'same' or 'valid' only`);
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
             // check if the activation function is valid
             const function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(errFlags.ACTIVATION_TYPE_ERR);
             }
 
             return {
@@ -221,8 +230,8 @@ class Layers {
             }
         }
         catch (error) {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -237,17 +246,20 @@ class Layers {
      */
     maxPooling(poolSize, strides = 1, padding = "same") {
         try {
+            if (!poolSize || poolSize.length < 2) {
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
+            }
             if (poolSize[0] <= 0 || poolSize[1] <= 0) {
-                throw new Error(`[ERROR] pool size value cannot be 0 or a negative value`);
+                throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
             }
 
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR] ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
-            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
+            if (!strides || strides <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
 
             return {
                 layer_name: "Max Pooling",
@@ -267,8 +279,8 @@ class Layers {
             }
         }
         catch (error) {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -283,8 +295,8 @@ class Layers {
         try {
             let function_name = activation_function.toLowerCase();
 
-            if (!activation[function_name] || !activation.derivatives[function_name])  throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid.`);
-            if (!units || units <= 0) throw new Error(`[ERROR] Units cannot be null, negative integer or a 0. | Units: ${units}`);
+            if (!activation[function_name] || !activation.derivatives[function_name]) throw new Error(errFlags.ACTIVATION_TYPE_ERR);
+            if (!units || units <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
 
             return {
                 layer_name: "Recurrent Cell", 
@@ -306,8 +318,8 @@ class Layers {
             }
         }
         catch (error) {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -326,23 +338,23 @@ class Layers {
      */
     transConvLayer(filters = 1, strides = 1, kernel_size = [3, 3], activation_function = 'relu', padding = "Same", useBias = true) {
         try {
-            if (!filters || filters <= 0) throw new Error(`[ERROR]-------- Filters cannot be empty, less than or equal to 0. Filters: ${filters}`);
-            if (!strides || strides <= 0) throw new Error(`[ERROR]-------- Strides cannot be empty, less that or equal to 0. Strides: ${strides}`);
-            if (!kernel_size || kernel_size.length == 0 || (kernel_size[0] <= 0 || kernel_size[1] <= 0)) throw new Error(`[ERROR]------- Kernels cannot be empty, nor it's height or width is less than or equal to 0. Kernel size: ${kernel_size}`);
-            if (!activation_function || activation_function == undefined || activation_function == null || activation_function === "") throw new Error(`[ERROR]-------- activation_function cannot be empty, null or undefined.`);
-            if (!padding || padding == undefined || padding == null || padding === "") throw new Error(`[ERROR]-------- Padding cannot be empty, null or undefined.`);
+            if (!filters || filters <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!strides || strides <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!kernel_size || kernel_size.length === 0 || kernel_size[0] <= 0 || kernel_size[1] <= 0) throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
+            if (!activation_function) throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
+            if (!padding) throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
 
             // check if the padding is same/valid, otherwise throw error
             let paddings = ["same", "valid"];
             if (!paddings.includes(padding.toLowerCase())) {
-                throw new Error(`[ERROR] ${padding.toLowerCase()} is invalid. Use 'same' or 'valid' only`);
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
             // check if the activation function is valid
             const function_name = activation_function.toLowerCase();
 
             if (!activation[function_name] || !activation.derivatives[function_name]) {
-                throw new Error(`[ERROR] Activation function '${function_name}' or its derivative not found or invalid,`);
+                throw new Error(errFlags.ACTIVATION_TYPE_ERR);
             }
 
             return {
@@ -367,8 +379,8 @@ class Layers {
             }
         }
         catch (error) {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -410,7 +422,7 @@ class Layers {
     multiHeadAttention(numHeads = 8, useCausalMasking = false, useBias = true) {
         try {
             if (numHeads <= 0 || !numHeads) {
-                throw new Error("Num heads cannot be 0, null, or a negative number")
+                throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
             }
             
             let function_name = "softmax";// same for the simpleAttention, default is softmax
@@ -437,8 +449,8 @@ class Layers {
 
         }
         catch (error) {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            throw error;
         }
     }
 
@@ -475,6 +487,7 @@ class Layers {
             isParametric: false,
             shapeType: null,
             endConnection: false,
+            useBias: false,
             layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
@@ -497,6 +510,7 @@ class Layers {
             shapeType: null,
             layerID: UUID.randomUUID(),
             endConnection: true,
+            useBias: false,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             determineInferenceType: () => {},
             feedforward: (data) => residual_end.feedforward(data),

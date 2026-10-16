@@ -1,6 +1,7 @@
 const activation = require('../../core/bindings')
 const { ConvolveForward, ConvolveBackward, element_wise_mul,AccumulateWeightAndBiasGradsForConv } = require("../../core/bindings");
 const {  calculateTensorShape, createTensorBuffer } = require("../../utils/utils");
+const errFlags = require('../../err_flags');
 
 
 
@@ -76,14 +77,14 @@ const feedforward = (data) => {
 
     if (input.some(Number.isNaN)) {
         console.error("Input has NaNs detected during feedforward in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     const totalSize = layerData.inputShape.reduce((acc, val) => acc * val, 1);
 
     if (input.length != totalSize) {
         console.error(`Input tensor doesn't match with the expected input tensor shape: Expected shape/size: ${[input_H, input_W, input_D]} or ${totalSize}. The size of the input entered is ${input.length}`);
-        throw new Error("EERR_CONV_SHAPE_MISMATCH");
+        throw new Error(errFlags.SHAPE_ERR);
     }
 
     // 4. Perform the convolve operation using the shapes calculated in step 1
@@ -91,7 +92,7 @@ const feedforward = (data) => {
 
     if (convolve_result.some(Number.isNaN)) {
         console.error("NaN detected after Convolve operation during feedforward in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     // 5. activate each depth input using the given activation function
@@ -100,7 +101,7 @@ const feedforward = (data) => {
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after activation function during feedforward in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = {
@@ -131,7 +132,7 @@ const projectDeltaBackward = (data) => {
 
     if (delta.some(Number.isNaN)) {
         console.error("Delta has NaNs detected during delta projection in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     
@@ -139,7 +140,7 @@ const projectDeltaBackward = (data) => {
     const result = ConvolveBackward(delta, targetShape, deltaShape, kernelShape, pointer, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     return result;
@@ -158,14 +159,14 @@ const applyOwnDerivative = (data) => {
 
     if (dAct.some(Number.isNaN)) {
         console.error("Delta Derivative has NaNs detected after applying derivative activation in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
     
     const result = element_wise_mul(dAct, delta, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected after applying derivative activation in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     return result;
@@ -177,7 +178,6 @@ const gradientAccumulation = (data) => {
     const activation_outputs = data.activation_outputs;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
@@ -189,12 +189,12 @@ const gradientAccumulation = (data) => {
 
     if (kernelWeightGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after kernel weightGrads accumulation in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     if (kernelBiasGrads.some(Number.isNaN)) {
         console.error("NaN detected after kernel biasGrads accumulation in convolutional layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
 

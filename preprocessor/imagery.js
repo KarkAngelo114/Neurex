@@ -3,7 +3,8 @@ const path = require('path');
 const { red, reset, green, lime } = require('../color-code')
 const fs = require('fs').promises;
 const sharp = require('sharp');
-const { OneHotEncoded, IntegerLabeling, BinaryLabeling } = require('../preprocessor/label_encoder')
+const { OneHotEncoded, IntegerLabeling, BinaryLabeling } = require('../preprocessor/label_encoder');
+const errFlags = require('../err_flags');
 
 /**
  * @async
@@ -20,7 +21,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     if (!label_mode) {
         const error = `Label mode is "undefined"`;
         console.error(`${red}[ERROR]${reset} ${error}`);
-        throw new Error('Label mode error');
+        throw new Error(errFlags.LABEL_MODE_ERR);
     }
 
 
@@ -29,7 +30,7 @@ const load_images_from_directory = async (targetDir, resize = [28, 28], pixelFor
     if (!allowedLabelModes.includes(label_mode.toLowerCase())) {
         const error = `Label mode "${label_mode}" is invaid. Please use "binary", "categorical", or "sparse".`;
         console.error(`${red}[ERROR]${reset} ${error}`);
-        throw new Error('Label mode error');
+        throw new Error(errFlags.LABEL_MODE_ERR);
     }
 
     const subdirs = []; // only subdirectories (class names)
@@ -131,7 +132,9 @@ const load_single_image = async (file_path, resize = [28, 28], pixelFormat = "gr
         const stat = await fs.stat(file_path);
 
         if (!stat.isFile()) {
-            throw new Error("Provided path is not a valid file.");
+            console.error("Provided path is not a valid file.");
+            throw new Error(errFlags.ERR_UNRESOLVED_DIR_PATH);
+            
         }
 
         let image = sharp(file_path).resize(resize[1], resize[0]);

@@ -1,4 +1,5 @@
 const path = require('path');
+const errFlag = require('../err_flags');
 const { globalState } = require('./modeSelector');
 const { red, reset } = require('../color-code');
 let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
@@ -19,7 +20,8 @@ exports.setGlobalParams = (modelID, weights, biases) => {
         }
 
         if (!weights || !biases) {
-            throw new Error('[ERROR] No parameters to store....')
+            console.error('[ERROR] No parameters to store....');
+            throw new Error(errFlag.MODEL_PARAMETER_ERR);
         }
 
         paramStore.set(modelID, {weights, biases});
@@ -51,7 +53,8 @@ exports.getGlobalParams = (modelID) => {
         const entry = paramStore.get(modelID);
 
         if (!entry || entry.weights.length == 0 || entry.biases.length == 0) {
-            throw new Error(`[ERROR] No parameters stored for model "${modelID}". Call "setParams()" first before your custom training loop.`);
+            console.error(`[ERROR] No parameters stored for model "${modelID}". Call "setParams()" first before your custom training loop.`);
+            throw new Error(errFlag.MODEL_PARAMETER_ERR);
         }
 
         return {

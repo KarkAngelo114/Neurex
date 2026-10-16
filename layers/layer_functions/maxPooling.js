@@ -1,5 +1,6 @@
 const { MaxPoolDelta, MaxPool } = require("../../core/bindings");
 const { calculateTensorShape } = require("../../utils/utils");
+const errFlags = require('../../err_flags');
 
 /**
  * Initialized parameters for this layer
@@ -51,7 +52,6 @@ const feedforward = (data) => {
     const layerData = data.layerData;
     const input = data.input;
     
-
     const inputShape= layerData.inputShape;
     const outputShape = layerData.outputShape;
     const poolsize= layerData.poolSize;
@@ -64,7 +64,7 @@ const feedforward = (data) => {
 
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected after pooling operation in maxpooling during feedforward");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     return {
@@ -91,7 +91,7 @@ const applyOwnDerivative = (data) => {
     const output = MaxPoolDelta(delta, indices, inputH, inputW, inputD, modelID, layerID);
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected after unpooling operation in maxpooling during delta projection");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
     
     return output;

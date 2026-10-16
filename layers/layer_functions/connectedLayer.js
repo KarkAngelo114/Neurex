@@ -2,6 +2,7 @@ const { MatMul, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGrad
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
+const errFlags = require('../../err_flags');
 
 const initParams = (size, shape, layer_data) => {
     const inputSize = size;
@@ -92,7 +93,7 @@ const feedforward = (data) => {
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in connected layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = { 
@@ -135,7 +136,7 @@ const getOutputLayerDelta = (data) => {
     else {
         if (preds.length != actuals.length) {
             console.error(`[${red}ERROR${reset}] Predictions array is not equal to actuals array. Prediction size: ${preds.length} || Target data output size:${actuals.length}`);
-            throw new Error("[ERROR] Output data shape mismatch");
+            throw new Error(errFlags.SHAPE_ERR);
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
@@ -143,7 +144,10 @@ const getOutputLayerDelta = (data) => {
 
         dOutputLayer = scaleDiff(preds, actuals, dAct, modelID, layerID);
 
-        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
+        if (dOutputLayer.some(v => Number.isNaN(v))) {
+            console.error("Delta of the output layer has NaNs");
+            throw new Error(errFlags.NAN_ERR);
+        } 
 
     }
 
@@ -166,7 +170,7 @@ const projectDeltaBackward = (data) => {
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in connected layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     };
 
     return result;
@@ -188,7 +192,7 @@ const applyOwnDerivative = (data) => {
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in connected layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     return result;
@@ -196,7 +200,6 @@ const applyOwnDerivative = (data) => {
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
@@ -210,12 +213,12 @@ const gradientAccumulation = (data) => {
 
     if (accumulatedWeightGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during weightGrads accumulation in connected layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     };
 
     if (accumulatedBiasGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during biasGrads accumulation in connected layer");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     };
 
     return {

@@ -1,13 +1,7 @@
-const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, accumulateAttentionWeightsGradients, accumulateAttentionBiasGrads } = require('../../core/bindings/entry');;
+const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, accumulate_MHA_WeightsAndBiasGrads} = require('../../core/bindings/entry');
 const { createTensorBuffer, concatenateFloat32Array } = require('../../utils/utils');
+const errFlags = require('../../err_flags');
 
-/**
- * Initialized parameters for this layer
- * @param {Number} size number of neurons for this layer 
- * @param {Array<Number>} shape shape of the incoming input
- * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
- */
 const initParams = (size, shape, layer_data) => {
     try {
         // assume that next to embedding layer is multiHeadAttention(),
@@ -61,13 +55,6 @@ const initParams = (size, shape, layer_data) => {
     }
 }
 
-/**
- * Determeines what is the task the model is trained on
- * @param {Object} layerObject layer configuration object
- * @param {String} lossFunc loss function is used for training
- * @param {Float32Array} trainY target labels 
- * @returns {string} task type
- */
 const determineInferenceType = () => {
     throw new Error('multi-head attention layer cannot be an output layer for now');
 }
@@ -79,7 +66,6 @@ const feedforward = (data) => {
     const pointer = data.pointer;
     const input = data.input;
     const layerID = layerData.layerID;
-
 
     const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
 
@@ -94,7 +80,10 @@ const feedforward = (data) => {
         S_perHead: S_perHead
     };
 
-    if (finalOutput.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during feed forward)");
+    if (finalOutput.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] output array has NaNs (Multi-Head Attention during feed forward)");
+        throw new Error(errFlags.NAN_ERR);
+    }
 
     return {
         outputs: finalOutput,
@@ -103,21 +92,16 @@ const feedforward = (data) => {
     };
 }
 
-/**
- * 
- * @param {Float32Array} preds array of predicton outputs 
- * @param {Float32Array} actuals array of target labels 
- * @param {Array<Float32Array>} zs array of pre-activated values (zs)
- * @param {String} lossFunc loss function used in training
- * @param {String} tasktype task type the model is trained for 
- * @param {Object} layerObj layer config object of the last layer
- * @returns {Float32Array} the delta of the output layer
- */
 const getOutputLayerDelta = () => {
     throw new Error('multi-head attention layer cannot be an output layer for now');
 }
 
 const projectDeltaBackward = (data) => {
+    return data.delta;
+}
+
+
+const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
@@ -137,24 +121,17 @@ const projectDeltaBackward = (data) => {
         dX: dX
     };
 
-    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Multi-Head Attention during projecting delta backward)");
+    if (dX.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] output array has NaNs (Multi-Head Attention during projecting delta backward)");
+        throw new Error(errFlags.NAN_ERR);
+    }
+    
     return dX;
-}
-
-/**
- * @param {Float32Array} delta - projected delta (output of next_layer.projectDeltaBackward)
- * @param {Float32Array} z - pre-activation values (z) for this layer
- * @param {Object} layer_data - this layer's own configuration
- * @returns {Float32Array} delta for the layer before this one
- */
-const applyOwnDerivative = (data) => {
-    return data.delta;
 }
 
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
@@ -162,13 +139,32 @@ const gradientAccumulation = (data) => {
     const layerID = layerData.layerID;
 
     const { embedDim, seqLen, cache } = layerData;
-    const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache; 
+    const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache;
 
-    const accumulatedAttentionWeightGrads = accumulateAttentionWeightsGradients(dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID);
-    if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
+    const {weightGrads: accumulatedAttentionWeightGrads, biasGrads: accumulatedAttentionBiasGrads } = accumulate_MHA_WeightsAndBiasGrads(
+        dQ,
+        dK,
+        dV,
+        dMhaOutput,
+        mhaOutput,
+        activation_outputs,
+        weightGrads,
+        biasGrads,
+        embedDim,
+        seqLen,
+        modelID,
+        layerID
+    );
 
-    const accumulatedAttentionBiasGrads = accumulateAttentionBiasGrads(dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen,  modelID, layerID);
-    if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
+    if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
+        throw new Error(errFlags.NAN_ERR);
+    }
+    
+    if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
+        throw new Error(errFlags.NAN_ERR);
+    }
 
     return {
         accumulatedWeightGrads: accumulatedAttentionWeightGrads,

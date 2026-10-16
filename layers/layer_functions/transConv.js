@@ -2,6 +2,7 @@ const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
 const {cacheOutputLayerDelta, transConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
+const errFlags = require('../../err_flags');
 
 const initParams = (size, shape, layer_data) => {
     try {
@@ -106,10 +107,16 @@ const feedforward = (data) => {
     const activation_function = activation[layerData.activation_function.name];
 
     const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
-    if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
+    if (transConvOutput.some(v => Number.isNaN(v))) {
+        console.error("[Trans Conv Error] output array has NaNs after trans conv Ops");
+        throw new Error(errFlags.NAN_ERR)
+    }
 
     const output = activation_function(transConvOutput, modelID, layerID);
-    if (output.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after applying activation");
+    if (output.some(v => Number.isNaN(v))) {
+        console.error("[Trans Conv Error] output array has NaNs after applying activation");
+        throw new Error(errFlags.NAN_ERR);
+    }
 
     layerData.cache = {
         layer_output: output,
@@ -150,7 +157,7 @@ const getOutputLayerDelta = (data) => {
     else {
         if (preds.length != actuals.length) {
             console.error(`[${red}ERROR${reset}] Predictions array is not equal to actuals array. Prediction size: ${preds.length} || Target data output size:${actuals.length}`);
-            throw new Error("[ERROR] Output data shape mismatch");
+            throw new Error(errFlags.SHAPE_ERR);
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
@@ -158,7 +165,10 @@ const getOutputLayerDelta = (data) => {
 
         dOutputLayer = scaleDiff(preds, actuals, dAct, modelID, layerID);
 
-        if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
+        if (dOutputLayer.some(v => Number.isNaN(v))) {
+            console.error("Delta of the output layer has NaNs");
+            throw new Error(errFlags.NAN_ERR);
+        } 
 
     }
 
@@ -181,7 +191,10 @@ const projectDeltaBackward = (data) => {
     const layerID = layerData.layerID;
 
     const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
-    if (result.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
+        throw new Error(errFlags.NAN_ERR);
+    }
     
     return result;
 }
@@ -190,7 +203,6 @@ const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
     const delta = data.delta;
     const z = data.z_value;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
@@ -199,7 +211,10 @@ const applyOwnDerivative = (data) => {
 
     const dAct = dActivation(z, storedOutput, modelID, layerID);
     const result = element_wise_mul(dAct, delta, modelID, layerID);
-    if (result.some(v => Number.isNaN(v))) throw new Error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
+        throw new Error(errFlags.NAN_ERR);
+    }
 
     return result;
 }
@@ -231,9 +246,15 @@ const gradientAccumulation = (data) => {
         layerID
     );
 
-    if (kernelWeightGrads.some(v => Number.isNaN(v))) throw new Error("weight gradient accumulation outputs NaNs (trans conv)");
+    if (kernelWeightGrads.some(v => Number.isNaN(v))) {
+        console.error("weight gradient accumulation outputs NaNs (trans conv)");
+        throw new Error(errFlags.NAN_ERR)
+    }
     
-    if (kernelBiasGrads.some(v => Number.isNaN(v))) throw new Error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
+    if (kernelBiasGrads.some(v => Number.isNaN(v))) {
+        console.error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
+        throw new Error(errFlags.NAN_ERR);
+    }
 
     return {
         accumulatedWeightGrads: kernelWeightGrads,

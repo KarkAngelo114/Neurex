@@ -11,6 +11,7 @@ const float32_Modules = require('./float32Ops');
 const { globalState } = require('../../gpu/modeSelector'); 
 const { red, reset, yellow } = require('../../color-code');
 const { getGlobalParams } = require('../../gpu/globals');
+const errFlags = require('../../err_flags');
 
 let addon;
 let functions;
@@ -485,7 +486,10 @@ const scale = (input, scalingValue, modelID, layerID) => functions.scale(input, 
  */
 const element_wise_mul = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 
-    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
+    if (flat_arr_1.length != flat_arr_2.length) {
+        console.error(`${red}[ERROR]${reset}Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length}`);
+        throw new Error(errFlags.UNEQUAL_SIZE);
+    }    
     
     return functions.element_wise_mul(flat_arr_1, flat_arr_2, modelID, layerID);
 }
@@ -503,7 +507,10 @@ const element_wise_mul = (flat_arr_1, flat_arr_2, modelID, layerID) => {
  */
 const element_wise_sub = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 
-    if (flat_arr_1.length != flat_arr_2.length) throw new Error(`${red}[ERROR]------- Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length} ${reset}`);
+    if (flat_arr_1.length != flat_arr_2.length) {
+        console.error(`${red}[ERROR]${reset} Error: Both arrays are not equal in length. array1: ${flat_arr_1.length} | array2:${flat_arr_2.length}`);
+        throw new Error(errFlags.UNEQUAL_SIZE);
+    }
     return functions.element_wise_sub(new Float32Array(flat_arr_1), new Float32Array(flat_arr_2), modelID, layerID);
 }
 
@@ -519,7 +526,10 @@ const element_wise_sub = (flat_arr_1, flat_arr_2, modelID, layerID) => {
  * @throws am error will occured if both array are not equal in length
  */
 const element_wise_add = (arr1, arr2, modelID, layerID) => {
-    if (arr1.length != arr2.length) throw new Error(`[ERROR] Error: Both arrays are not equal in length. array1: ${arr1.length} | array2:${arr2.length}`);
+    if (arr1.length != arr2.length) {
+        console.error(`[ERROR] Error: Both arrays are not equal in length. array1: ${arr1.length} | array2:${arr2.length}`);
+        throw new Error(errFlags.UNEQUAL_SIZE);
+    }
 
     return functions.element_wise_add(arr1, arr2, modelID, layerID);
 }
@@ -536,7 +546,8 @@ const element_wise_add = (arr1, arr2, modelID, layerID) => {
  */
 const scaleDiff = (arr1, arr2, arr3, modelID, layerID) => {
     if (arr1.length !== arr2.length || arr2.length !== arr3.length || arr1.length !== arr3.length) {
-        throw new Error(`${red}[ERROR]------- Error: All arrays must be equal in length. array1: ${arr1.length} | array2: ${arr2.length} | array3: ${arr3.length} ${reset}`);
+        console.error(`${red}[ERROR]${reset} Error: All arrays must be equal in length. array1: ${arr1.length} | array2: ${arr2.length} | array3: ${arr3.length}`);
+        throw new Error(errFlags.UNEQUAL_SIZE);
     }
 
     return functions.scaleDiff(new Float32Array(arr1), new Float32Array(arr2), new Float32Array(arr3), modelID, layerID);
@@ -808,7 +819,10 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer
 
     if (!flat_arr_1 || !flat_arr_2 || !flat_arr_3) throw new Error("[ERROR]------- requires '3' input arrays for this operation."); 
 
-    if (flat_arr_1.length !== flat_arr_2.length || flat_arr_1.length !== flat_arr_3.length) throw new Error(`${red}[ERROR]------- Error: 3 input arrays are not equal in length. array1: ${flat_arr_1.length} | array2: ${flat_arr_2.length} ${reset} | array3: ${flat_arr_3.length}`);
+    if (flat_arr_1.length !== flat_arr_2.length || flat_arr_1.length !== flat_arr_3.length) {
+        console.error(`${red}[ERROR]------- Error: 3 input arrays are not equal in length. array1: ${flat_arr_1.length} | array2: ${flat_arr_2.length} ${reset} | array3: ${flat_arr_3.length}`);
+        throw new Error(errFlags.UNEQUAL_SIZE);
+    }
 
     return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3, pointer, modelID);
 };
@@ -913,7 +927,7 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
  * @param {String} layerID string value to reference model's unique parameters
  * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dMhaOutput: Float32Array, dX: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID) => functions.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => functions.CoreMultiHeadAttentionBackward(
     delta,
     getGlobalParams(modelID).globalWeights[pointer],
     Q,
@@ -932,57 +946,33 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
 );
 
 /**
- * "✅☑️"
- * @param {Float32Array} dQ 
- * @param {Float32Array} dK 
- * @param {Float32Array} dV 
- * @param {Float32Array} deltaMHA 
- * @param {Float32Array} MHA_output 
- * @param {Float32Array} activation_outputs 
- * @param {Float32Array} weightGrads 
- * @param {Number} embedDim 
- * @param {Number} seqLen 
- * @param {String} modelID model ID
- * @param {String} layerID layerID
- * @returns 
- */
-const accumulateAttentionWeightsGradients = (dQ, dK, dV, deltaMHA, MHA_output, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateAttentionWeightsGradients(
-    dQ,
-    dK,
-    dV,
-    deltaMHA,
-    MHA_output,
-    activation_outputs,
-    weightGrads,
-    embedDim,
-    seqLen,
-    modelID, 
-    layerID
-);
-
-
-/**
- * "✅☑️"
+ * "☑️"
  * @param {Float32Array} dQ 
  * @param {Float32Array} dK 
  * @param {Float32Array} dV 
  * @param {Float32Array} dMhaOutput 
+ * @param {Float32Array} mhaOutput 
+ * @param {Float32Array} activation_outputs 
+ * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
  * @param {Number} embedDim 
  * @param {Number} seqLen 
- * @param {String} modelID model ID
- * @param {String} layerID layerID
- * @returns 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{weightGrdas: Float32Array, biasGrads: Float32Array}}
  */
-const accumulateAttentionBiasGrads = (dQ, dK, dV, dMhaOutput, biasGrads, embedDim, seqLen,  modelID, layerID) => functions.accumulateAttentionBiasGrads(
+const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulate_MHA_WeightsAndBiasGrads(
     dQ,
     dK,
     dV,
     dMhaOutput,
+    mhaOutput,
+    activation_outputs,
+    weightGrads,
     biasGrads,
     embedDim,
     seqLen,
-    modelID, 
+    modelID,
     layerID
 );
 
@@ -1125,8 +1115,7 @@ module.exports = {
 
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
-    accumulateAttentionWeightsGradients,
-    accumulateAttentionBiasGrads,
+    accumulate_MHA_WeightsAndBiasGrads,
 
     computeLayerNorm,
     computeLayerNormBackward,

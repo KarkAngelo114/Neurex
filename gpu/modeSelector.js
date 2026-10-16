@@ -1,4 +1,5 @@
 const { reset, red, gray } = require('../color-code');
+const errFlags = require('../err_flags');
 const { OpenCL_detectGPU } = require('../gpu/gpu_init');
 
 let selectedDevice = null;
@@ -64,7 +65,7 @@ const OpenCL_findBestDevice = (findBest) => {
         const reason = data?.ok === false ? `OpenCL error: ${data.error}` : `No dedicated GPU found. To use 'any' type of compute in OpenCL, disable 'findBestDevice' to 'false'. Read: ${gray}https://neurex-documentation.vercel.app/javascript-nodejs${reset} for info.`;
 
         console.error(reason);
-        throw new Error("ERR_OPENCL_ERROR");
+        throw new Error(errFlags.OPENCL_ERR);
     }
 
     selectedDevice = best;
@@ -79,12 +80,12 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
 
     if (!typeof stringValue === "string" || !stringValue instanceof String) {
         console.error('[ERROR] "type" is not a type of string');
-        throw new Error("ERR_TYPE_ERROR");
+        throw new Error(errFlags.VALUE_TYPE_ERR);
     }
 
     if(!stringValue) {
         console.error("[ERROR] 'type' cannot be null, empty string or undefined");
-        throw new Error(('ERR_TYPE_UNDEFINED'));
+        throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
     }
 
 
@@ -96,7 +97,7 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
 
     if (isBackendSet) {
         console.error(`${red}[ERROR]${reset} Compute backend is already set. You can only set one time across training instances.`);
-        throw new Error("ERR_COMPUTE_BACKEND_SETTING");
+        throw new Error(errFlags.COMPUTE_BACKEND_ERR);
     }
 
     if (stringValue.toLowerCase() === "cpu" || stringValue.toLowerCase() === "pure-js") {
@@ -109,7 +110,7 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
     }
     else {
         console.error(`"${stringValue}" is currently not supported in Neurex yet. Use "cpu", "pure-js" or "opencl" only`);
-        throw new Error("ERR_UNSUPPORTED_COMPUTE_BACKEND");
+        throw new Error(errFlags.COMPUTE_BACKEND_ERR);
     }
 
     isBackendSet = true;
@@ -123,7 +124,7 @@ const globalState = () => {
 
     if (!isBackendSet) {
         console.error(`${red}[ERROR]${reset} Compute backend is not yet initialized. Call "setComputeBackend()" first. Read: ${gray}https://neurex-documentation.vercel.app/javascript-nodejs${reset} for info.`);
-        throw new Error("ERR_COMPUTE_BACKEND_NOT_SET");
+        throw new Error(errFlags.COMPUTE_BACKEND_ERR);
     }
 
     return {

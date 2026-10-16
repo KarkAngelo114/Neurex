@@ -1,6 +1,6 @@
 const { createTensorBuffer, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const activation = require('../../core/bindings');
-const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta, recurrentWeightGradsAccumulation, recurrentBiasGradsAccumulation } = require('../../core/bindings');
+const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta, recurrentWeightGradsAccumulation, recurrentBiasGradsAccumulation, cacheOutputLayerDelta } = require('../../core/bindings');
 /**
  * Initialized parameters for this layer
  * @param {Number} size number of neurons for this layer 
@@ -152,13 +152,14 @@ const feedforward = (data) => {
             [layerData.weightShape[0], layerData.weightShape[1]], 
             [layerData.weightShape[2], layerData.weightShape[3]], 
             pointer,
-            modelID
+            modelID,
+            layerID
         );
 
         if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
         
         // Update hidden state for the next step
-        current_hidden = activation[layerData.activation_function.name](z_t, pointer, modelID);
+        current_hidden = activation[layerData.activation_function.name](z_t, modelID, layerID);
 
         // Record history for backprop
         all_z_values.push(z_t);
@@ -170,8 +171,6 @@ const feedforward = (data) => {
         hidden_states: all_hidden_states,
         recurrentZs: all_z_values
     }
-
-    
 
     let final_output;
     if (layerData.return_sequence) {
@@ -208,7 +207,7 @@ const getOutputLayerDelta = (data) => {
     let dOutputLayer = new Float32Array(preds.length); 
 
     if (lossFunc === "categorical_cross_entropy" || lossFunc === "binary_cross_entropy") {
-        dOutputLayer = element_wise_sub(preds, actuals);
+        dOutputLayer = element_wise_sub(preds, actuals, modelID, layerID);
     }
     else if (lossFunc === "sparse_categorical_cross_entropy") {
         dOutputLayer.set(preds);
@@ -225,13 +224,15 @@ const getOutputLayerDelta = (data) => {
         }
 
         const lastLayerZs = zs[zs.length - 1]; 
-        const dAct = dActivation(lastLayerZs, storedOutput, pointer, modelID); 
+        const dAct = dActivation(lastLayerZs, storedOutput, modelID, layerID); 
 
-        dOutputLayer = scaleDiff(preds, actuals, dAct);
+        dOutputLayer = scaleDiff(preds, actuals, dAct, modelID, layerID);
 
         if (dOutputLayer.some(v => Number.isNaN(v))) throw new Error("Delta of the output layer has NaNs"); 
 
     }
+
+    cacheOutputLayerDelta(dOutputLayer, modelID, layerID);
 
     return dOutputLayer;
    
@@ -240,6 +241,12 @@ const getOutputLayerDelta = (data) => {
 
 const projectDeltaBackward = (data) => {
 
+    return data.delta;
+
+};
+
+
+const applyOwnDerivative = (data) => {
     const layer_data = data.layerData;
     const delta = data.delta;
     const pointer = data.pointer;
@@ -273,28 +280,26 @@ const projectDeltaBackward = (data) => {
 
         // pass both recurrentZs[t] and hiddenStates[t]
         // the recurrenZs are array of float32array that are not yet passed through an activation function. While the hidden states are the activated outputs
-        const dAct = dActivation(recurrentZs[t], hiddenStates[t], pointer, modelID);
+        const dAct = dActivation(recurrentZs[t], hiddenStates[t], modelID, layerID);
         
         // For element-wise activations, dAct is dL/dz. 
         // For Softmax, dsoftmax(a_t, dTotal) computes the Jacobian-vector product J^T * dTotal directly.
         const delta_t = (layer_data.activation_function.name === "softmax") 
             ? dAct // dsoftmax already calculates the vector product if passed (a, delta)
-            : element_wise_mul(dTotal, dAct);
+            : element_wise_mul(dTotal, dAct, modelID, layerID);
 
         if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrent cell projectDeltaBackward");
 
         deltaTs[t] = delta_t;
         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer, modelID);
-        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer, modelID);
+        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer, modelID, layerID);
         inputDeltas.set(dInput_t, t * featureSize);
     }
 
     layer_data.cache.deltaTs = deltaTs;
+
     return inputDeltas;
 };
-
-
-const applyOwnDerivative = (data) => data.delta;
 
 const gradientAccumulation = (data) => {
     const layer_data = data.layerData;

@@ -23,6 +23,7 @@ const { init, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
 const version = require('../package.json').version;
+const errFlags = require('../err_flags');
 
 class Neurex {
     constructor () {
@@ -93,7 +94,8 @@ class Neurex {
 
         if (configs?.checkpoint_per_epoch < 0) {
             this.isfailed = true;
-            throw new Error(`${color.red}[Error]${color.reset} checkpoint cannot be less than 0.`)
+            console.error(`${color.red}[Error]${color.reset} checkpoint cannot be less than 0.`);
+            throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
         }
 
         if (configs?.checkpoint_per_epoch !== undefined) this.checkpoint = configs?.checkpoint_per_epoch;
@@ -131,7 +133,7 @@ class Neurex {
 
         if (!this.layers || this.layers.length === 0) {
             console.error(`${color.red}[ERROR]${color.reset} No model to show. Ensure you have built or loaded an existing model`);
-            throw new Error('ERR_NO_MODEL_TO_SHOW');
+            throw new Error(errFlags.BUILD_ERR);
         }
 
         const COLS = [
@@ -334,12 +336,14 @@ class Neurex {
     async loadSavedModel(model, showLog = true) {
         try {
             if (!model) {
-                throw new Error(`${color.red}\n[ERROR]${color.reset}} No model provided`);
+                console.error(`${color.red}\n[ERROR]${color.reset}} No model provided`);
+                throw new Error(errFlags.LOAD_MODEL_ERR)
             }
 
             if (this.layers.length > 0) {
                 this.isfailed = true;
-                throw new Error(`${color.red}[ERROR]${color.reset} Failed to load model.\nReason:\nThere's already a new network being built.`);
+                console.error(`${color.red}[ERROR]${color.reset} Failed to load model.\nReason:\nThere's already a new network being built.`);
+                throw new Error(errFlags.LOAD_MODEL_ERR)
             }
 
             const dir = process.cwd();
@@ -352,7 +356,8 @@ class Neurex {
 
             // Check extension
             if (path.extname(model_file) !== '.nrx') {
-                throw new Error(`${color.red}Invalid file type. Only .nrx model files are supported.${color.reset}`);
+                console.error(`${color.red}[ERROR]${color.reset} Invalid file type. Only .nrx model files are supported.`);
+                throw new Error(errFlags.UNSUPPORTED_MODEL_TYPE);
             }
 
             // Read file
@@ -361,13 +366,15 @@ class Neurex {
             // Validate magic header
             const header = rawBuffer.slice(0, 4).toString('utf-8');
             if (header !== 'NRX4') {
-                throw new Error(`${color.red}Invalid version format.${color.reset}`);
+                console.error(`${color.red}[ERROR]${color.reset} Invalid version format. You might have loaded a model that is incompatible to the current version.`);
+                throw new Error(errFlags.UNSUPPORTED_MODEL_VER);
             }
 
             // Check version
             const version = rawBuffer[4];
             if (version !== 0x04) {
-                throw new Error(`${color.red}Unsupported NRX version: ${version}${color.reset}`);
+                console.error(`${color.red}[ERROR]${color.reset} Unsupported NRX version: ${version}. You might have loaded a model that is incompatible to the current version.`);
+                throw new Error(errFlags.UNSUPPORTED_MODEL_VER);
             }
 
             // Read metadata block (small, JSON-friendly: arch, hyperparams, shapes)
@@ -523,7 +530,7 @@ class Neurex {
                 }
                 else {
                     console.error(`${color.red}[ERROR]${color.reset} Unknown layer type '${layerData.layer_name}' found in model. It might you've loaded a model that is not compatible to this version of Neurex yet nor has the corresponding layer type to map back. To confirm, you can check layer definitions in ${color.gray}https://neurex-documentation.vercel.app/javascript-nodejs#layers${color.reset} or update to the newest version of Neurex.`);
-                    throw new Error(`ERR_UKNOWN_LAYER_TYPE`);
+                    throw new Error(errFlags.BUILD_ERR);
                 }
                 
                 return newLayer;
@@ -558,49 +565,40 @@ class Neurex {
      * @param {Array<Object>} model
      */
     sequentialBuild(model) {
-
-        try {
-
-            if (this.layers.length > 0) {
-                console.log(`\n${color.orange}[INFO]${color.reset} Skipping sequential build: \n\n reason:\n There/you might have loaded a model already. Please check if already load a model.\n`);
-                return;
-            }
-
-            if (!model || model.length < 1) {
-                console.log(`${color.red}[ERROR]${color.reset} No layers added. Have you add layers from the "Layers" class here?`);
-                throw new Error("ERR_NO_LAYERS_TO_BUILD");
-            }
-
-            model.flat(Infinity).forEach(layer => {
-                // extract input size
-                if (layer.layer_name === "Input Layer") {
-                    this.input_size = layer.layer_size;
-                    this.input_shape = layer.input_shape || [1, 1, this.input_size || 1];
-                    this.depth = this.input_shape[2] || 1;
-
-                    this.currentShape = [this.input_shape[0],this.input_shape[1], this.input_shape[2]];
-                    this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
-
-                }
-                else {
-                    this.layers.push(layer);
-                }
-            });
-
-            this.hasSequentiallyBuild = true;
-            this.num_layers = this.layers.length;
-            
-            this.#build();
-            
-            this.lastLayerObject = this.layers[this.layers.length - 1];
-
-            this.modelID = UUID.randomUUID();
-        }
-
         
-        catch(err) {
-            throw new Error(err);
+        if (this.layers.length > 0) {
+            console.log(`\n${color.orange}[INFO]${color.reset} Skipping sequential build: \n\n reason:\n There/you might have loaded a model already. Please check if already load a model.\n`);
+            return;
         }
+
+        if (!model || model.length < 1) {
+            console.log(`${color.red}[ERROR]${color.reset} No layers added. Have you add layers from the "Layers" class here?`);
+            throw new Error(errFlags.BUILD_ERR);
+        }
+
+        model.flat(Infinity).forEach(layer => {
+            // extract input size
+            if (layer.layer_name === "Input Layer") {
+                this.input_size = layer.layer_size;
+                this.input_shape = layer.input_shape || [1, 1, this.input_size || 1];
+                this.depth = this.input_shape[2] || 1;
+
+                this.currentShape = [this.input_shape[0],this.input_shape[1], this.input_shape[2]];
+                this.currentSize = this.input_shape[0] * this.input_shape[1] * this.input_shape[2];
+            }
+            else {
+                this.layers.push(layer);
+            }
+        });
+
+        this.hasSequentiallyBuild = true;
+        this.num_layers = this.layers.length;
+            
+        this.#build();
+            
+        this.lastLayerObject = this.layers[this.layers.length - 1];
+
+        this.modelID = UUID.randomUUID();
     }
 
     /**
@@ -711,7 +709,7 @@ class Neurex {
 
         if (!this.losses.includes(loss.toLowerCase())) {
             console.error(`${color.red}[ERROR]${color.reset} "${loss}" is not a loss function or isn't available loss function.`);
-            throw new Error("ERR_UNKNOWN_LOSS_FUNC");
+            throw new Error(errFlags.UNSUPPORTED_LOSS_ERR);
         }
 
         if (!this.hasInitializedNativeBindings) {
@@ -728,7 +726,7 @@ class Neurex {
 
         if (this.layers.length == 0) {
             console.error(`${color.red}[ERROR]${color.reset} No layers constructed. Have you created your model or loaded an existing one?`);
-            throw new Error("ERR_NO_MODEL_BUILT_OR_LOADED");
+            throw new Error(errFlags.BUILD_ERR);
         };
 
         let trainX = [];
@@ -739,7 +737,7 @@ class Neurex {
             if (inputs[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || inputs[i].length != this.input_size) {
                 this.isfailed = true;
                 console.log(`${color.red}[ERROR]${color.reset} Input data must be the same shape set in the input layer\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${inputs[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
-                throw new Error(`ERR_SHAPE_MISMATCH`);
+                throw new Error(errFlags.SHAPE_ERR);
             }
 
             trainX.push(inputs[i] instanceof Float32Array ? inputs[i] : new Float32Array(inputs[i].flat(Infinity)));
@@ -763,12 +761,13 @@ class Neurex {
                 console.log(`Epoch: ${epoch ? "specified" : "not specified"}`);
                 console.log(`Batch Size: ${batch_size ? "specified" : "not specified"}`);
                 console.log(`${color.red}[ERROR]${color.reset} There is/are missing parameter/s. Failed to start training...`);
-                throw new Error("ERR_MISSING_PARAMETERS");
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
             if (epoch == 0 || batch_size == 0 || !epoch || !batch_size || epoch < 0 || batch_size < 0) {
                 this.isfailed = true;
-                throw new Error("[FAILED] Epoch or batch size cannot be zero or a negative number");
+                console.error("Epoch or batch size cannot be zero or a negative number");
+                throw new Error(errFlags.NEGATIVE_NUMBER_ARGUMENT);
             }
 
             if (this.visualizers.length > 0) {
@@ -776,7 +775,8 @@ class Neurex {
                 for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.initialize !== 'function') {
                         this.isfailed = true;
-                        throw new Error("A plugin function doesn't have a callable initialize() function.");
+                        console.error("A plugin function doesn't have a callable initialize() function.");
+                        throw new Error(errFlags.PLUGIN_ERR);
                     }
                     
                     await visualizer?.initialize();
@@ -822,7 +822,8 @@ class Neurex {
                 for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.visualize !== 'function') {
                         this.isfailed = true;
-                        throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                        console.error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                        throw new Error(errFlags.PLUGIN_ERR);
                     }
                     
                     await visualizer.visualize(visualizerData, modelData, trainX, trainY);
@@ -1009,7 +1010,8 @@ class Neurex {
                     for (const visualizer of this.visualizers) {
                         if (typeof visualizer?.visualize !== 'function') {
                             this.isfailed = true;
-                            throw new Error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                            console.error("Failed to use a visualizer plugin. No callable 'visualize()' function.");
+                            throw new Error(errFlags.PLUGIN_ERR);
                         }
                         await visualizer.visualize(visualizerData, modelData, trainX, trainY);
 
@@ -1033,7 +1035,8 @@ class Neurex {
                 for (const visualizer of this.visualizers) {
                     if (typeof visualizer?.abort !== 'function') {
                         this.isfailed = true;
-                        throw new Error("Failed to use a visualizer plugin. No callable 'abort()' function.");
+                        console.error("Failed to use a visualizer plugin. No callable 'abort()' function.");
+                        throw new Error(errFlags.PLUGIN_ERR);
                     }
 
                     await visualizer.abort();
@@ -1065,19 +1068,21 @@ class Neurex {
         setGlobalParams(this.modelID, this.weights, this.biases);
 
         if (!this.weights || !this.biases) {
-            throw new Error("Parameters are missing");
+            console.error("Parameters are missing");
+            throw new Error(errFlags.MODEL_PARAMETER_ERR)
         }
 
         try {
             if (!input) {
-                throw new Error("\n[ERROR] No inputs")
+                console.error(`${color.red}[ERROR]${color.reset} No inputs are provided`);
+                throw new Error(errFlags.ARGUMENT_NULL_OR_UNDEFINED);
             }
 
             for (let i = 0; i < input.length; i++) {
                 if (input[i].length != (this.input_shape[0] * this.input_shape[1] * this.input_shape[2]) || input[i].length != this.input_size) {
                     this.isfailed = true;
                     console.log(`${color.red}[ERROR]${color.reset} Input data must be the same shape set in the input layer\n- Use getTensorShape() or getInputSize()\n\nInput size/shape: ${input[i].length} || Expected: [${this.input_shape}] or ${this.input_size}\n`)
-                    throw new Error(`Shape mismatch`);
+                    throw new Error(errFlags.SHAPE_ERR);
                 }
 
                 input[i] = input[i] instanceof Float32Array ? input[i] : new Float32Array(input[i].flat(Infinity));
@@ -1378,8 +1383,8 @@ class Neurex {
             this.layers.forEach((layer_data) => {
                 // each layer must have an UUID
                 if (!layer_data?.layerID) {
-                    console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID`);
-                    throw new Error("ERR_NO_UNIQUE_ID");
+                    console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID. Ensure that you return "layerID" as a property of a layer.`);
+                    throw new Error(errFlags.NO_LAYER_UNIQUE_ID_ERR);
                 }
                 
                 if (layer_data.layer_name === "Residual Start") {
@@ -1448,8 +1453,8 @@ class Neurex {
 
         // each layer must have an UUID
         if (!layer_data?.layerID) {
-            console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID`);
-            throw new Error("ERR_NO_UNIQUE_ID");
+            console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID. Ensure that you return "layerID" as a property of a layer.`);
+            throw new Error(errFlags.NO_LAYER_UNIQUE_ID_ERR);
         }
 
         if (layer_data.layer_name === "Residual Start") {
@@ -1503,7 +1508,8 @@ class Neurex {
      */
     #save(data, weights, biases, fileName) {
         if (this.isfailed) {
-            console.log('[FAILED]------- Failed to save model');
+            console.error(`${color.red}[ERROR]${color.reset} Failed to save model`);
+            throw new Error(errFlags.MODEL_SAVE_ERR);
         }
         else {
             const dir = process.cwd() //path.dirname(require.main.filename);

@@ -1,5 +1,6 @@
 const { computeLayerNorm, computeLayerNormBackward, AccumulateGammaAndBetaGrads } = require("../../core/bindings/entry");
 const { createTensorBuffer } = require("../../utils/utils");
+const errFlags = require('../../err_flags');
 
 const initParams = (size, shape, layer_data) => {
     // gamma initialized to 1s, beta initialized to 0s
@@ -40,7 +41,7 @@ const feedforward = (data) => {
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after normalization operation on layerNorm");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = {
@@ -76,7 +77,7 @@ const applyOwnDerivative = (data) => {
 
     if (dX.some(v => Number.isNaN(v))) {
         console.error("layerNorm has NaNs after delta projection");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
     
     return dX;
@@ -96,12 +97,12 @@ const gradientAccumulation = (data) => {
 
     if (accumulatedGammaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating gamma grads");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
     
     if (accumulatedBetaGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected after accumulating beta grads");
-        throw new Error("ERR_NAN_DETECTED");
+        throw new Error(errFlags.NAN_ERR);
     }
 
     return {
