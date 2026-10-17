@@ -961,7 +961,7 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
  * @param {String} layerID 
  * @returns {{weightGrdas: Float32Array, biasGrads: Float32Array}}
  */
-const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulate_MHA_WeightsAndBiasGrads(
+const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, biasGrads, embedDim, seqLen, modelID, layerID) => functions.accumulate_MHA_WeightsAndBiasGrads(
     dQ,
     dK,
     dV,
@@ -989,7 +989,7 @@ const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, a
  * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateSimpleAttentionWeightGrads(
+const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionWeightGrads(
     dQ,
     dK,
     dV,
@@ -1013,7 +1013,7 @@ const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, we
  * @param {String} layerID layerID
  * @returns 
  */
-const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => functions.accumulateSimpleAttentionBiasGrads(
+const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionBiasGrads(
     dQ,
     dK,
     dV,
