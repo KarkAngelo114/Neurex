@@ -104,7 +104,6 @@ const getOutputLayerDelta = () => {
 
 const gradientAccumulation = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
@@ -113,7 +112,7 @@ const gradientAccumulation = (data) => {
     const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;
 
-    const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, pointer, modelID, layerID);
+    const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, modelID, layerID);
 
     if (accumulatedGrads.some(v => Number.isNaN(v))) {
         console.error("NaN detected during weight grads accumulation in embedding layer");

@@ -93,6 +93,7 @@ __kernel void multi_head_attention(
 	int column = get_global_id(1);
 	if (token >= seqLen || column >= embedDim) return;
 
+	// `qOutput`, `kOutput`, and `vOutput` also know as `q`, `k`, and `v` in the C++ host might have old data. Ensure to use `=` not `+=` to safely overwrite
 	qOutput[token * embedDim + column] = mha_q(input, qWeights, qBiases, token, embedDim, column);
 	kOutput[token * embedDim + column] = mha_q(input, kWeights, kBiases, token, embedDim, column);
 	vOutput[token * embedDim + column] = mha_q(input, vWeights, vBiases, token, embedDim, column);
@@ -103,14 +104,13 @@ __kernel void multi_head_attention(
 	for (int key = 0; key < seqLen; ++key) {
 		float probability = mha_softmax(input, qWeights, kWeights, qBiases, kBiases, token, key, head, embedDim, seqLen, headDim, scale, causal);
 		attentionValue += probability * mha_q(input, vWeights, vBiases, key, embedDim, head * headDim + headColumn);
+
+		// `scores` might have old data. Ensure to use `=` not `+=` to safely overwrite
 		scores[(head * seqLen + token) * seqLen + key] = probability;
 	}
 
+	// `mhaOutput` might have old data. Ensure to use `=` not `+=` to safely overwrite
 	mhaOutput[token * embedDim + column] = attentionValue;
-
-	float result = oBiases[column];
-	for (int i = 0; i < embedDim; ++i) result += mhaOutput[token * embedDim + i] * oWeights[i * embedDim + column];
-	finalOutput[token * embedDim + column] = result;
 }
 
 __kernel void multi_head_attention_projection(
@@ -123,9 +123,15 @@ __kernel void multi_head_attention_projection(
 ) {
 	int token = get_global_id(0);
 	int column = get_global_id(1);
+
 	if (token >= seqLen || column >= embedDim) return;
+
 	float result = oBiases[column];
-	for (int i = 0; i < embedDim; ++i) result += mhaOutput[token * embedDim + i] * oWeights[i * embedDim + column];
+	for (int i = 0; i < embedDim; ++i) {
+		result += mhaOutput[token * embedDim + i] * oWeights[i * embedDim + column];
+	}
+	
+	// `finalOutput` might have old data. Ensure to use `=` not `+=` to safely overwrite
 	finalOutput[token * embedDim + column] = result;
 }
 
@@ -176,6 +182,7 @@ __kernel void multi_head_attention_backward(
 		if (causal && key > token) dScaled = 0.0f;
 		dq += dScaled * kCache[key * embedDim + column];
 	}
+	
 	for (int query = 0; query < seqLen; ++query) {
 		float dS = 0.0f;
 		for (int d = 0; d < headDim; ++d) dS += dMha[query * embedDim + head * headDim + d] * vCache[token * embedDim + head * headDim + d];
@@ -193,14 +200,6 @@ __kernel void multi_head_attention_backward(
 	dQ[token * embedDim + column] = dq * scale;
 	dK[token * embedDim + column] = dk * scale;
 	dV[token * embedDim + column] = dv;
-
-	float dx = 0.0f;
-	for (int e = 0; e < embedDim; ++e) {
-		dx += dQ[token * embedDim + e] * qWeights[column * embedDim + e];
-		dx += dK[token * embedDim + e] * kWeights[column * embedDim + e];
-		dx += dV[token * embedDim + e] * vWeights[column * embedDim + e];
-	}
-	dX[token * embedDim + column] = dx;
 }
 
 __kernel void multi_head_attention_backward_dmha(
@@ -240,7 +239,7 @@ __kernel void multi_head_attention_backward_dx(
 	dX[token * embedDim + column] = value;
 }
 
-__kernel void accumulate_attention_weight_grads(
+__kernel void accumulate_attention_weight_and_bias_grads(
 	__global const float* input,
 	__global const float* mhaOutput,
 	__global const float* dQ,
@@ -248,6 +247,7 @@ __kernel void accumulate_attention_weight_grads(
 	__global const float* dV,
 	__global const float* dMhaOutput,
 	__global float* weightGrads,
+	__global float* biasGrads,
 	int embedDim,
 	int seqLen
 ) {
@@ -257,6 +257,7 @@ __kernel void accumulate_attention_weight_grads(
 	if (block >= 4 || inputIndex >= embedDim || outputIndex >= embedDim) return;
 
 	float sum = 0.0f;
+	float biasSum = 0.0f;
 	for (int t = 0; t < seqLen; t++) {
 		float activation = block == 3
 			? mhaOutput[t * embedDim + inputIndex]
@@ -269,33 +270,10 @@ __kernel void accumulate_attention_weight_grads(
 					? dV[t * embedDim + outputIndex]
 					: dMhaOutput[t * embedDim + outputIndex]));
 		sum += activation * delta;
+		biasSum += delta;
 	}
 	weightGrads[block * embedDim * embedDim + inputIndex * embedDim + outputIndex] += sum;
-}
-
-__kernel void accumulate_attention_bias_grads(
-	__global const float* dQ,
-	__global const float* dK,
-	__global const float* dV,
-	__global const float* dMhaOutput,
-	__global float* biasGrads,
-	int embedDim,
-	int seqLen
-) {
-	int block = get_global_id(0);
-	int index = get_global_id(1);
-	if (block >= 4 || index >= embedDim) return;
-
-	float sum = 0.0f;
-	for (int t = 0; t < seqLen; t++) {
-		float delta = block == 0
-			? dQ[t * embedDim + index]
-			: (block == 1
-				? dK[t * embedDim + index]
-				: (block == 2
-					? dV[t * embedDim + index]
-					: dMhaOutput[t * embedDim + index]));
-		sum += delta;
+	if (inputIndex == 0) {
+		biasGrads[block * embedDim + outputIndex] += biasSum;
 	}
-	biasGrads[block * embedDim + index] += sum;
 }
