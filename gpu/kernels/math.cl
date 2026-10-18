@@ -69,3 +69,17 @@ __kernel void accumulate_element_wise_mul(
 
     arr3[i] += arr2[i] * arr1[i];
 }
+
+__kernel void element_wise_add(
+    __global const float* arr1,
+    __global const float* arr2,
+    __global float* output,
+    const int size
+) {
+
+    int i = get_global_id(0);
+    if (i >= size) return;
+
+    output[i] = arr1[i] + arr2[i];
+
+}

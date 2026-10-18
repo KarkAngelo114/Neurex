@@ -37,10 +37,12 @@ const projectDeltaBackward = (data) => {
 
     const delta = data.delta;
     const modelID = data.modelID;
+    const layerData = data.layerData;
+    const layerID = layerData.layerID;
 
     const cached = getResidual(modelID); // this must be the delta stored by the `residualEnd` during delta projection
 
-    const output = element_wise_add(delta, cached);
+    const output = element_wise_add(delta, cached, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) throw new Error("RESIDUAL_ADD_ERROR: output contains NaNs.");
 

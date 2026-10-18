@@ -23,10 +23,12 @@ const feedforward = (data) => {
     // residualEnd will add the projected output by the previous layers to the stored input in an element-wise manner
     const input = data.input;
     const modelID = data.modelID;
+    const layerData = data.layerData;
+    const layerID = layerData.layerID;
 
     const cached = getResidual(modelID); // this must be the cached input by the `residualStart`
 
-    const output = element_wise_add(cached, input);
+    const output = element_wise_add(cached, input, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) throw new Error("RESIDUAL_ADD_ERROR: output contains NaNs.");
 
