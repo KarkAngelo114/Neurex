@@ -47,9 +47,15 @@ const Softmax = (arr) => {
 
 const Linear = (arr) => arr;
 
+const DLinear = (arr) => {
+    const output = new Float32Array(arr.length);
+    output.fill(1);
+    return output;
+};
 
 const DReLu = (arr) => {
     const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
         output[i] = arr[i] > 0 ? 1 : 0;
     }
@@ -58,19 +64,23 @@ const DReLu = (arr) => {
 
 const DSigmoid = (arr) => {
     const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
         const s = 1 / (1 + Math.exp(-arr[i]));
         output[i] = s * (1 - s);
     }
+    
     return output;
 };
 
 const DTanh = (arr) => {
     const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
         const t = Math.tanh(arr[i]);
         output[i] = 1 - t * t;
     }
+
     return output;
 };
 
@@ -89,9 +99,34 @@ const DSoftmax = (arr1, arr2) => {
     return output;
 };
 
-const DLinear = (arr) => {
-    const output = new Float32Array(arr.length);
-    output.fill(1);
+const element_wise_mul = (arr1, arr2) => {
+    let output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < arr1.length; i++) {
+        output[i] = arr1[i] * arr2[i];
+    }
+
+    return output;
+};
+
+const scaleDiff = (arr1, arr2, arr3) => {
+    let output = new Float32Array(arr1.length);
+    const scale = 2.0 / output.length;
+
+    for (let i = 0; i < output.length; i++) {
+        output[i] = (arr1[i] - arr2[i]) * arr3[i] * scale;
+    }
+
+    return output;
+};
+
+const element_wise_sub = (arr1, arr2) => {
+    let output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < output.length; i++) {
+        output[i] = arr1[i] - arr2[i];
+    }
+
     return output;
 };
 
@@ -115,42 +150,6 @@ const getEmbeddings = (tokenVector, embeddingDim, lookup) => {
     }
 
     return output;
-}
-
-const DenseForward = (input, weightShape, activationFuncType, weights, biases) => {
-    const [inputSize, outputSize] = weightShape;
-    // this function must be translated to C++ too for bulk operation. This function returns an object which is the z_values and the activated_output
-    // For GPU branch, this must be implemented in kernel level so that one native call, two process in one go before moving the next layer type.
-    
-    // map activation function string to the activation functions above
-    const activationFunction = {
-        "relu": Relu,
-        "sigmoid":Sigmoid,
-        "tahn":Tanh,
-        "linear":Linear,
-        "softmax":Softmax
-    }
-
-    const output = new Float32Array(outputSize);
-
-    output.set(biases);
-
-    for (let i = 0; i < inputSize; i++) {
-        const inputVal = input[i];
-
-        const rowStart = i * outputSize;
-        const rowEnd = rowStart + outputSize;
-        const weightRow = weights.subarray(rowStart, rowEnd);
-
-        for (let j = 0; j < outputSize; j++) {
-            output[j] += inputVal * weightRow[j];
-        }
-    }
-
-    return {
-        z_values: output,
-        activated_output: activationFunction[activationFuncType](output)
-    };
 }
 
 const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
@@ -194,6 +193,42 @@ const MatMul = (input, inputSize, outputSize, weights, biases) => {
     return output;
 };
 
+const DenseForward = (input, weightShape, activationFuncType, weights, biases) => {
+    const [inputSize, outputSize] = weightShape;
+    // this function must be translated to C++ too for bulk operation. This function returns an object which is the z_values and the activated_output
+    // For GPU branch, this must be implemented in kernel level so that one native call, two process in one go before moving the next layer type.
+    
+    // map activation function string to the activation functions above
+    const activationFunction = {
+        "relu": Relu,
+        "sigmoid":Sigmoid,
+        "tanh":Tanh,
+        "linear":Linear,
+        "softmax":Softmax
+    }
+
+    const output = new Float32Array(outputSize);
+
+    output.set(biases);
+
+    for (let i = 0; i < inputSize; i++) {
+        const inputVal = input[i];
+
+        const rowStart = i * outputSize;
+        const rowEnd = rowStart + outputSize;
+        const weightRow = weights.subarray(rowStart, rowEnd);
+
+        for (let j = 0; j < outputSize; j++) {
+            output[j] += inputVal * weightRow[j];
+        }
+    }
+
+    return {
+        z_values: output,
+        activated_output: activationFunction[activationFuncType](output)
+    };
+}
+
 const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     const prevDelta = new Float32Array(inputSize);
 
@@ -212,6 +247,29 @@ const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     }
 
     return prevDelta;
+}
+
+const fusedFinalDeltaProjector = (zs, cachedActivatedOutput, incoming_delta, activationFuncType) => {
+    const activationFunction = {
+        "relu": DReLu,
+        "sigmoid":DSigmoid,
+        "tanh":DTanh,
+        "linear":DLinear,
+        "softmax":DSoftmax
+    }
+
+    // special case for hidden layers that uses softmax activation (which is uncommon), the 
+    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
+    if (activationFuncType === "softmax") {
+        return DSoftmax(cachedActivatedOutput, incoming_delta);
+    }
+
+    // get the derivatives
+    const dAct = activationFunction[activationFuncType](zs);
+
+    // perform element-wise multiplication for final delta
+    return element_wise_mul(dAct, incoming_delta);
+    
 }
 
 const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weightGrads, biasGrads, weightShape) => {
@@ -331,7 +389,7 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
     const activationFunction = {
         "relu": Relu,
         "sigmoid":Sigmoid,
-        "tahn":Tanh,
+        "tanh":Tanh,
         "linear":Linear,
         "softmax":Softmax
     }
@@ -622,37 +680,6 @@ const MaxPoolDelta = (delta, indices, H, W, D) => {
 
 }
 
-const element_wise_mul = (arr1, arr2) => {
-    let output = new Float32Array(arr1.length);
-
-    for (let i = 0; i < arr1.length; i++) {
-        output[i] = arr1[i] * arr2[i];
-    }
-
-    return output;
-}
-
-const scaleDiff = (arr1, arr2, arr3) => {
-    let output = new Float32Array(arr1.length);
-    const scale = 2.0 / output.length;
-
-    for (let i = 0; i < output.length; i++) {
-        output[i] = (arr1[i] - arr2[i]) * arr3[i] * scale;
-    }
-
-    return output;
-}
-
-const element_wise_sub = (arr1, arr2) => {
-    let output = new Float32Array(arr1.length);
-
-    for (let i = 0; i < output.length; i++) {
-        output[i] = arr1[i] - arr2[i];
-    }
-
-    return output;
-}
-
 const mse = (predictions, actuals) => {
     let occurrence = predictions.length;
     let sum = 0;
@@ -816,7 +843,7 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
     const activationFunction = {
         "relu": Relu,
         "sigmoid":Sigmoid,
-        "tahn":Tanh,
+        "tanh":Tanh,
         "linear":Linear,
         "softmax":Softmax
     }
@@ -1629,10 +1656,9 @@ module.exports = {
     returnEmbeddings,
 
     DenseForward,
-
-    MatMul,
     DeltaMatMul,
     accumulateWeightsAndBiasGradsForConnectedLayer,
+
     scale,
     SGD,
     Adam,
@@ -1672,4 +1698,6 @@ module.exports = {
     accumulateSimpleAttentionBiasGrads,
     computeLayerNormBackward,
     AccumulateGammaAndBetaGrads,
+
+    fusedFinalDeltaProjector,
 }

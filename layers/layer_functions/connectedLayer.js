@@ -1,4 +1,4 @@
-const { DenseForward, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
+const { DenseForward, fusedFinalDeltaProjector, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -111,7 +111,6 @@ const getOutputLayerDelta = (data) => {
     const layerObj = data.layerData;
     const preds = data.predictions;
     const actuals = data.actuals;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const lossFunc = data.loss;
     const zs = data.zs;
@@ -183,12 +182,10 @@ const applyOwnDerivative = (data) => {
     const z = data.z_value;
     const layerID = layerData.layerID;
 
-    const dActivation = activation.derivatives[layerData.activation_function.name];
+    const dActivation = layerData.activation_function.name
     const storedOutput = layerData.cache.layer_output;
 
-    const dAct = dActivation(z, storedOutput, modelID, layerID);
-
-    const result = element_wise_mul(dAct, delta, modelID, layerID);
+    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in connected layer");

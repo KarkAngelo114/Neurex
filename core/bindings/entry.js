@@ -177,6 +177,26 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
     layerID
 );
 
+
+/**
+ * "☑️" A utility function that performs derivative activation function and element-wise multiplication internally as one fused operation. Used by layer types that has common pipeline (stateless or layers that process data in linear manner) of projecting delta by getting the derivative activation of its zs values and performing element-wise multiplication.
+ * @param {Float32Array} zs 
+ * @param {Float32Array} storedActivatedOutput 
+ * @param {Float32Array} incoming_delta 
+ * @param {String} activationFunc 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {Float32Array} final delta
+ */
+const fusedFinalDeltaProjector = (zs, storedActivatedOutput, incoming_delta, activationFunc, modelID, layerID) => float32_Modules.fusedFinalDeltaProjector(
+    zs,
+    storedActivatedOutput,
+    incoming_delta,
+    activationFunc.toLowerCase(),
+    modelID,
+    layerID
+);
+
 /**
  * 
  * @param {Float32Array} activations 
@@ -1126,6 +1146,7 @@ module.exports = {
     AccumulateGammaAndBetaGrads,
 
     cacheOutputLayerDelta,
+    fusedFinalDeltaProjector,
 
     derivatives: {
         relu: drelu,

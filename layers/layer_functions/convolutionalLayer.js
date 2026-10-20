@@ -1,5 +1,5 @@
 const activation = require('../../core/bindings')
-const { ConvolveForward, ConvolveBackward, element_wise_mul,AccumulateWeightAndBiasGradsForConv } = require("../../core/bindings");
+const { ConvolveForward, fusedFinalDeltaProjector, ConvolveBackward, element_wise_mul, AccumulateWeightAndBiasGradsForConv } = require("../../core/bindings");
 const {  calculateTensorShape, createTensorBuffer } = require("../../utils/utils");
 const errFlags = require('../../err_flags');
 
@@ -87,7 +87,7 @@ const feedforward = (data) => {
         throw new Error(errFlags.SHAPE_ERR);
     }
 
-    const activationFuncString = layerData.activation_function.name
+    const activationFuncString = layerData.activation_function.name;
     const {z_values, activated_output} = ConvolveForward(input, inputShape, outputShape, kernelShape, activationFuncString, pointer, modelID, layerID);
 
     if (activated_output.some(v => Number.isNaN(v))) {
@@ -139,27 +139,21 @@ const projectDeltaBackward = (data) => {
 
 const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
+    const modelID = data.modelID;
     const delta = data.delta;
     const z = data.z_value;
-    const modelID = data.modelID;
     const layerID = layerData.layerID;
-
-    const dActivation = activation.derivatives[layerData.activation_function.name];
+    
+    const dActivation = layerData.activation_function.name
     const storedOutput = layerData.cache.layer_output;
-    const dAct = dActivation(z, storedOutput, modelID, layerID);
-
-    if (dAct.some(Number.isNaN)) {
-        console.error("Delta Derivative has NaNs detected after applying derivative activation in convolutional layer");
+    
+    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
+    
+    if (result.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during derivative application in connected layer");
         throw new Error(errFlags.NAN_ERR);
     }
     
-    const result = element_wise_mul(dAct, delta, modelID, layerID);
-
-    if (result.some(v => Number.isNaN(v))) {
-        console.error("NaN detected after applying derivative activation in convolutional layer");
-        throw new Error(errFlags.NAN_ERR);
-    }
-
     return result;
 }
 

@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const {cacheOutputLayerDelta, transConvForward, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, fusedFinalDeltaProjector, transConvForward, scaleDiff, transConvBackward, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
@@ -197,21 +197,21 @@ const projectDeltaBackward = (data) => {
 
 const applyOwnDerivative = (data) => {
     const layerData = data.layerData;
+    const modelID = data.modelID;
     const delta = data.delta;
     const z = data.z_value;
-    const modelID = data.modelID;
     const layerID = layerData.layerID;
-
-    const dActivation = activation.derivatives[layerData.activation_function.name];
+    
+    const dActivation = layerData.activation_function.name;
     const storedOutput = layerData.cache.layer_output;
-
-    const dAct = dActivation(z, storedOutput, modelID, layerID);
-    const result = element_wise_mul(dAct, delta, modelID, layerID);
+    
+    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
+    
     if (result.some(v => Number.isNaN(v))) {
-        console.error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
+        console.error("NaN detected during derivative application in connected layer");
         throw new Error(errFlags.NAN_ERR);
     }
-
+    
     return result;
 }
 
