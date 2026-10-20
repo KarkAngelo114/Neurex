@@ -11,6 +11,7 @@ const Relu = (arr) => {
 
 const Sigmoid = (arr) => {
     const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
         output[i] = 1 / (1 + Math.exp(-arr[i]));
     }
@@ -19,6 +20,7 @@ const Sigmoid = (arr) => {
 
 const Tanh = (arr) => {
     const output = new Float32Array(arr.length);
+
     for (let i = 0; i < output.length; i++) {
         output[i] = Math.tanh(arr[i]);
     }
@@ -27,6 +29,7 @@ const Tanh = (arr) => {
 
 const Softmax = (arr) => {
     const output = new Float32Array(arr.length);
+
     const maxVal = Math.max(...arr);
     let sum = 0;
 
@@ -114,6 +117,42 @@ const getEmbeddings = (tokenVector, embeddingDim, lookup) => {
     return output;
 }
 
+const DenseForward = (input, weightShape, activationFuncType, weights, biases) => {
+    const [inputSize, outputSize] = weightShape;
+    // this function must be translated to C++ too for bulk operation. This function returns an object which is the z_values and the activated_output
+    // For GPU branch, this must be implemented in kernel level so that one native call, two process in one go before moving the next layer type.
+    
+    // map activation function string to the activation functions above
+    const activationFunction = {
+        "relu": Relu,
+        "sigmoid":Sigmoid,
+        "tahn":Tanh,
+        "linear":Linear,
+        "softmax":Softmax
+    }
+
+    const output = new Float32Array(outputSize);
+
+    output.set(biases);
+
+    for (let i = 0; i < inputSize; i++) {
+        const inputVal = input[i];
+
+        const rowStart = i * outputSize;
+        const rowEnd = rowStart + outputSize;
+        const weightRow = weights.subarray(rowStart, rowEnd);
+
+        for (let j = 0; j < outputSize; j++) {
+            output[j] += inputVal * weightRow[j];
+        }
+    }
+
+    return {
+        z_values: output,
+        activated_output: activationFunction[activationFuncType](output)
+    };
+}
+
 const returnEmbeddings = (activation_outputs, delta, weightGrads, dim) => {
     
     const embeddingDim = dim;
@@ -174,6 +213,7 @@ const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
 
     return prevDelta;
 }
+
 const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weightGrads, biasGrads, weightShape) => {
     const [inputSize, outputSize] = weightShape;
 
@@ -282,10 +322,19 @@ const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, batchSize) => {
     }
 }
 
-const ConvolveForward = (input, inputShape, outputShape, kernelShape, weights, biases) => {
+const ConvolveForward = (input, inputShape, outputShape, kernelShape, activationFuncType, weights, biases) => {
     const [f, kh, kw, d] = kernelShape;
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
+
+    // map activation function string to the activation functions above
+    const activationFunction = {
+        "relu": Relu,
+        "sigmoid":Sigmoid,
+        "tahn":Tanh,
+        "linear":Linear,
+        "softmax":Softmax
+    }
 
     if (d !== iD) {
         throw new Error(`ConvolveForward: kernel input depth (${d}) != input depth (${iD})`);
@@ -334,7 +383,12 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, weights, b
         }
     }
 
-    return output;
+    const activatedOutput = activationFunction[activationFuncType](output);
+
+    return {
+        z_values: output,
+        activated_output: activatedOutput
+    };
 }
 
 const RotateKernels = (F, KH, KW, D, weights) => {
@@ -752,11 +806,20 @@ const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, unit
     return output;
 }
 
-const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases) => {
+const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, weights, biases) => {
     
     const [iH, iW, iD] = inputShape;
     const [oH, oW, oD] = outputShape;
     const [f, kh, kw, d] = weightShape;
+
+    // map activation function string to the activation functions above
+    const activationFunction = {
+        "relu": Relu,
+        "sigmoid":Sigmoid,
+        "tahn":Tanh,
+        "linear":Linear,
+        "softmax":Softmax
+    }
 
     const output = new Float32Array(oH * oW * oD);
 
@@ -780,11 +843,6 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
     const padW = Math.max(0,(iW - 1) * strides + kw - oW);
     const padTop = Math.floor(padH / 2);
     const padLeft = Math.floor(padW / 2);
-
-    // Flat index helpers.
-    const inputIndex = (y, x, c) => (y * iW + x) * iD + c;
-    const outputIndex = (y, x, c) => (y * oW + x) * f + c;
-    const weightIndex = (filter, ky, kx, c) =>(((filter * kh) + ky) * kw + kx) * d + c;
 
     for (let iy = 0; iy < iH; iy++) {
         for (let ix = 0; ix < iW; ix++) {
@@ -843,7 +901,12 @@ const transConv = (input, inputShape, outputShape, strides, filters, weightShape
         }
     }
 
-    return output;
+    const activatedOutput = activationFunction[activationType](output);
+
+    return {
+        z_values: output,
+        activated_output: activatedOutput 
+    };
 };
 
 const transConvBackward = (delta, inputShape, outputShape, strides, filters, weightShape, weights) => {
@@ -1564,6 +1627,9 @@ module.exports = {
     DLinear,
     getEmbeddings,
     returnEmbeddings,
+
+    DenseForward,
+
     MatMul,
     DeltaMatMul,
     accumulateWeightsAndBiasGradsForConnectedLayer,
@@ -1574,7 +1640,7 @@ module.exports = {
     ConvolveForward,
     ConvolveBackward,
     AccumulateWeightAndBiasGradsForConv,
-    transConv,
+    transConvForward,
     transConvBackward,
     accumulateWeightandBiasGradsForTransConv,
     MaxPooling,

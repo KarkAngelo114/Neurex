@@ -1140,5 +1140,11 @@ declare module 'neurex' {
          * @param {boolean} findBestDevice lets you find the best compute device. Default value is `true`. Applies only for vendor-agnostic platforms (like `OpenCL`). Setting this to `false` will use the first detected device by the platform provider in it's device list. This means that it can use an iGPU for compute, which is not recommended.
          */
         export function setComputeBackend(type: backendType, findBestDevice: boolean): void;
+
+        /**
+         * Performs a dedicated device detection in OpenCL. Returns a boolean value only. If returned `true`, then there's a dedicated compute device to offload calculation on, otherwise, returns `false` if none.
+         * @returns {boolean}
+         */
+        export function OpenCLFindDedicatedDevice(): boolean;
     }
 }

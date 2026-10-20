@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const {cacheOutputLayerDelta, transConv, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, transConvForward, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
@@ -104,27 +104,23 @@ const feedforward = (data) => {
     const weightShape = layerData.weightShape; // [f, kh, kw, d]
     const strides = layerData.strides;
     const filters = layerData.filters;
-    const activation_function = activation[layerData.activation_function.name];
+    const activation_function_string = layerData.activation_function.name;
 
-    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
-    if (transConvOutput.some(v => Number.isNaN(v))) {
-        console.error("[Trans Conv Error] output array has NaNs after trans conv Ops");
-        throw new Error(errFlags.NAN_ERR)
-    }
+    const {z_values, activated_output} = transConvForward(input, inputShape, outputShape, strides, filters, weightShape, activation_function_string, pointer, modelID, layerID);
 
-    const output = activation_function(transConvOutput, modelID, layerID);
-    if (output.some(v => Number.isNaN(v))) {
+
+    if (activated_output.some(v => Number.isNaN(v))) {
         console.error("[Trans Conv Error] output array has NaNs after applying activation");
         throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = {
-        layer_output: output,
+        layer_output: activated_output,
     }
 
     return {
-        outputs: output,
-        z_values: transConvOutput,
+        outputs: activated_output,
+        z_values: z_values,
         incrementor_value: 1
     }
 }

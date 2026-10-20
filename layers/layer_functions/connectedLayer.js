@@ -1,4 +1,4 @@
-const { MatMul, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
+const { DenseForward, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -85,23 +85,23 @@ const feedforward = (data) => {
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const [inputSize, outputSize] = layerData.weightShape;
-    const z_values = MatMul(input, inputSize, outputSize, pointer, modelID, layerID);
+    const weightShape = layerData.weightShape;
 
-    const activation_function = activation[layerData.activation_function.name];
-    let outputs = activation_function(z_values, modelID, layerID);
+    const activation_function = layerData.activation_function.name;
 
-    if (outputs.some(v => Number.isNaN(v))) {
+    const {activated_output, z_values} = DenseForward(input, weightShape, activation_function, pointer, modelID, layerID);
+
+    if (activated_output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in connected layer");
         throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = { 
-        layer_output: outputs 
+        layer_output: activated_output 
     };
 
     return { 
-        outputs: outputs, 
+        outputs: activated_output, 
         z_values: z_values, 
         incrementor_value: 1 
     };

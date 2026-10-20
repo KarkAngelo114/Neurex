@@ -134,27 +134,27 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, l
 );
 
 /**
- * "✅☑️"
- * @function MatMul
- * @param {Float32Array} inputs - 1D float32array of input features
- * @param {Float32Array} weights - 1D float32array of weights
- * @param {Float32Array} biases - 1D float32array of biases
- * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
- * @param {Number} outputSize - the layer size of this layer
- * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
- * @param {String} modelID model ID
+ * "☑️"
+ * Performs a linear operation of a classic dense layer and applies activation directly to the output as one bulk operation. 
+ * @param {Float32Array} input 
+ * @param {Array<Number>} weightShape 
+ * @param {String} activationFunc 
+ * @param {Number} pointer 
+ * @param {String} modelID 
  * @param {String} layerID 
+ * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const MatMul = (inputs, inputSize, outputSize, pointer, modelID, layerID) => functions.MatMul(
-    inputs, 
-    inputSize, 
-    outputSize, 
+const DenseForward = (input, weightShape, activationFunc, pointer, modelID, layerID) =>  float32_Modules.DenseForward(
+    input, 
+    weightShape,
+    activationFunc.toLowerCase(),
     getGlobalParams(modelID).globalWeights[pointer], 
-    getGlobalParams(modelID).globalBiases[pointer], 
+    getGlobalParams(modelID).globalBiases[pointer],
     pointer,
-    modelID,
+    modelID, 
     layerID
 );
+
 
 /**
  * "✅☑️"
@@ -325,21 +325,23 @@ const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modu
 const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 
 /**
- * "✅☑️"
+ * "☑️" Performs the classic operation of a convolution layer and applies activation function directly to the output as one bulk operation
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Array<Number>} kernelShape 
+ * @param {String} activationFunc 
  * @param {Number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
- * @returns 
+ * @returns {{z_values: Float32Array,activated_output: Float32Array }}
  */
-const ConvolveForward = (input, inputShape, outputShape, kernelShape, pointer, modelID, layerID) => functions.ConvolveForward(
+const ConvolveForward = (input, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => float32_Modules.ConvolveForward(
     input,
     inputShape,
     outputShape,
     kernelShape,
+    activationFunc.toLowerCase(),
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
@@ -685,25 +687,27 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
 );
 
 /**
- * "✅☑️"
+ * "☑️" Performs the transpose convolution operation and applies activation output directly as one bulk operation
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Number} strides 
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
+ * @param {String} activationType
  * @param {Number} pointer 
  * @param {String} modelID model ID
  * @param {String} layerID 
- * @returns {Float32Array} trans conv output.
+ * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConv(
+const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, pointer, modelID, layerID) => float32_Modules.transConvForward(
     input, 
     inputShape, 
     outputShape, 
     strides, 
     filters, 
-    weightShape, 
+    weightShape,
+    activationType.toLowerCase(), 
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
@@ -1069,7 +1073,7 @@ module.exports = {
     returnEmbeddings,
     sinusoidalPE,
 
-    MatMul,
+    DenseForward,
     DeltaMatMul,
     accumulateWeightsAndBiasGradsForConnectedLayer,
     
@@ -1077,7 +1081,7 @@ module.exports = {
     ConvolveBackward,
     AccumulateWeightAndBiasGradsForConv,
 
-    transConv,
+    transConvForward,
     transConvBackward,
     accumulateWeightandBiasGradsForTransConv,
 

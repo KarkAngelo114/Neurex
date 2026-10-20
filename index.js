@@ -20,7 +20,7 @@ const { modelVisualizer } = require('./applications/visualizer/modelVisualizer')
 const { clipGradient } = require('./normalizers');
 const { mnist_digits } = require('./applications/datasets');
 const { createTensorBuffer } = require('./utils/utils');
-const { setComputeBackend } = require('./gpu/modeSelector');
+const { setComputeBackend, OpenCLFindDedicatedDevice } = require('./gpu/modeSelector');
 
 
 
@@ -91,6 +91,7 @@ module.exports= {
         OpenCL_detectGPU,
     },
     backend: {
-        setComputeBackend
+        setComputeBackend,
+        OpenCLFindDedicatedDevice
     }
 }

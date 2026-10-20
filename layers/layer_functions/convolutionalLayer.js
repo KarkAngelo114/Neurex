@@ -87,30 +87,21 @@ const feedforward = (data) => {
         throw new Error(errFlags.SHAPE_ERR);
     }
 
-    // 4. Perform the convolve operation using the shapes calculated in step 1
-    const convolve_result = ConvolveForward(input, inputShape, outputShape, kernelShape, pointer, modelID, layerID);
+    const activationFuncString = layerData.activation_function.name
+    const {z_values, activated_output} = ConvolveForward(input, inputShape, outputShape, kernelShape, activationFuncString, pointer, modelID, layerID);
 
-    if (convolve_result.some(Number.isNaN)) {
-        console.error("NaN detected after Convolve operation during feedforward in convolutional layer");
-        throw new Error(errFlags.NAN_ERR);
-    }
-
-    // 5. activate each depth input using the given activation function
-    const activation_function = activation[layerData.activation_function.name];
-    const outputs = activation_function(convolve_result, modelID, layerID);
-
-    if (outputs.some(v => Number.isNaN(v))) {
+    if (activated_output.some(v => Number.isNaN(v))) {
         console.error("NaN detected after activation function during feedforward in convolutional layer");
         throw new Error(errFlags.NAN_ERR);
     }
 
     layerData.cache = {
-        layer_output: outputs,
+        layer_output: activated_output,
     }
 
     return {
-        outputs: outputs,
-        z_values: convolve_result,
+        outputs: activated_output,
+        z_values: z_values,
         incrementor_value: 1
     };
 }

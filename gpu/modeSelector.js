@@ -1,4 +1,4 @@
-const { reset, red, gray } = require('../color-code');
+const { reset, red, gray, yellow } = require('../color-code');
 const errFlags = require('../err_flags');
 const { OpenCL_detectGPU } = require('../gpu/gpu_init');
 
@@ -18,8 +18,9 @@ const isDedicated = (d) => !d.hostUnifiedMemory && !INTEGRATED_NAME_HINTS.test(d
 /** Returns dedicated GPUs sorted best → worst (VRAM, then compute units, then clock). */
 const OpenCL_rankDedicatedDevices = (devices = [], findBest) => {
     if (!findBest) {
-        // if user pass `findBest` as false, no need to filter out for best devices. Return device list and let the `OpenCL_resolveBestDevice`
+        // if `findBest` as false, no need to filter out for best devices. Return device list and let the `OpenCL_resolveBestDevice`
         // choose the first indexed device (this could be an iGPU)
+        // note: this is only for debugging. The function `setComputeBackend` function won't accepts the 2nd argument if everythimh is finalized.
         return devices;
     }
 
@@ -34,13 +35,13 @@ const OpenCL_rankDedicatedDevices = (devices = [], findBest) => {
     
 
 /** 
-* Detect + rank in one call. Never throws. OpenCL is vendoer agnostic, so we can let users select for best compute device or just use 
-* whatever it is index first in the list of device (that includes iGPU) based on the findBest boolean this.state.
+* Detect + rank in one call. Never throws.
 * @param {Boolean} findBest
 * 
 */
 const OpenCL_resolveBestDevice = (findbest) => {
     const data = OpenCL_detectGPU();
+
     if (!data?.ok) {
         return { 
             data: data, 
@@ -74,9 +75,12 @@ const OpenCL_findBestDevice = (findBest) => {
 /**
  * 
  * @param {String} stringValue 
- * @param {Boolean} findBestDevice
+
  */
 const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
+
+    // the 2nd argument is only for debugging. If everything is finalized, users won't be allowed to use OpenCL on iGPUs
+
 
     if (!typeof stringValue === "string" || !stringValue instanceof String) {
         console.error('[ERROR] "type" is not a type of string');
@@ -133,8 +137,21 @@ const globalState = () => {
     }
 }
 
+const OpenCLFindDedicatedDevice = () => {
+    // Performs a dedicated device detection in OpenCL. Returns a boolean value only. If returned true, then there's a dedicated compute device to offload on, otherwise, returns false if none.
+    const {data, best} = OpenCL_resolveBestDevice(true);
+
+    if (!data?.ok) {
+        console.warn(`${yellow}[WARN]${reset} An error occurred when finding a device. Returning "false" as fallback`);
+        return false;
+    }
+
+    return best ? true : false;
+}
+
 
 module.exports = {
     setComputeBackend,
-    globalState
+    globalState,
+    OpenCLFindDedicatedDevice
 }
