@@ -144,7 +144,7 @@ const applyOwnDerivative = (data) => {
     const z = data.z_value;
     const layerID = layerData.layerID;
     
-    const dActivation = layerData.activation_function.name
+    const dActivation = layerData.activation_function.name;
     const storedOutput = layerData.cache.layer_output;
     
     const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);

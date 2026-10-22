@@ -1,34 +1,37 @@
 const { unpackQKVO, transpose2D, concatenateFloat32Array } = require("../../../utils/utils");
 
 const Relu = (arr) => {
-    const output = new Float32Array(arr.length);
+   const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         output[i] = Math.max(arr[i], 0);
     }
+
     return output;
 };
 
 const Sigmoid = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         output[i] = 1 / (1 + Math.exp(-arr[i]));
     }
+
     return output;
 };
 
 const Tanh = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         output[i] = Math.tanh(arr[i]);
     }
+
     return output;
 };
 
 const Softmax = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     const maxVal = Math.max(...arr);
     let sum = 0;
@@ -54,16 +57,17 @@ const DLinear = (arr) => {
 };
 
 const DReLu = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         output[i] = arr[i] > 0 ? 1 : 0;
     }
+
     return output;
 };
 
 const DSigmoid = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         const s = 1 / (1 + Math.exp(-arr[i]));
@@ -74,7 +78,7 @@ const DSigmoid = (arr) => {
 };
 
 const DTanh = (arr) => {
-    const output = new Float32Array(arr.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         const t = Math.tanh(arr[i]);
@@ -85,7 +89,7 @@ const DTanh = (arr) => {
 };
 
 const DSoftmax = (arr1, arr2) => {
-    let output = new Float32Array(arr1.length);
+    const output = new Float32Array(arr.length).fill(0);
 
     let dot_product = 0;
     for (let i = 0; i < arr1.length; i++) {
@@ -100,7 +104,7 @@ const DSoftmax = (arr1, arr2) => {
 };
 
 const element_wise_mul = (arr1, arr2) => {
-    let output = new Float32Array(arr1.length);
+    const output = new Float32Array(arr1.length).fill(0);
 
     for (let i = 0; i < arr1.length; i++) {
         output[i] = arr1[i] * arr2[i];
@@ -121,7 +125,7 @@ const scaleDiff = (arr1, arr2, arr3) => {
 };
 
 const element_wise_sub = (arr1, arr2) => {
-    let output = new Float32Array(arr1.length);
+    const output = new Float32Array(arr1.length).fill(0);
 
     for (let i = 0; i < output.length; i++) {
         output[i] = arr1[i] - arr2[i];
@@ -405,6 +409,8 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
     }
 
     const output = new Float32Array(oH * oW * oD);
+    const padTop = oH === iH ? Math.floor((kh - 1) / 2) : 0;
+    const padLeft = oW === iW ? Math.floor((kw - 1) / 2) : 0;
 
     for (let h = 0; h < oH; h++) {
         for (let w = 0; w < oW; w++) {
@@ -412,12 +418,12 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
                 let sum = biases ? biases[filter] : 0;
 
                 for (let kernelH = 0; kernelH < kh; kernelH++) {
-                    const inputH = h + kernelH;
-                    if (inputH >= iH) continue;
+                    const inputH = h + kernelH - padTop;
+                    if (inputH < 0 || inputH >= iH) continue;
 
                     for (let kernelW = 0; kernelW < kw; kernelW++) {
-                        const inputW = w + kernelW;
-                        if (inputW >= iW) continue;
+                        const inputW = w + kernelW - padLeft;
+                        if (inputW < 0 || inputW >= iW) continue;
 
                         const inputBase = (inputH * iW + inputW) * iD;
                         const weightBase = ((filter * kh + kernelH) * kw + kernelW) * d;
@@ -449,50 +455,28 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
     };
 }
 
-const RotateKernels = (F, KH, KW, D, weights) => {
-    const rotated = new Float32Array(weights.length);
-
-    for (let f = 0; f < F; f++) {
-        for (let kh = 0; kh < KH; kh++) {
-            for (let kw = 0; kw < KW; kw++) {
-                for (let d = 0; d < D; d++) {
-                    const oldIdx = (f * KH * KW * D) + (kh * KW * D) + (kw * D) + d;
-                    const newKh = KH - 1 - kh;
-                    const newKw = KW - 1 - kw;
-                    const newIdx = (f * KH * KW * D) + (newKh * KW * D) + (newKw * D) + d;
-                    
-                    rotated[newIdx] = weights[oldIdx];
-                }
-            }
-        }
-    }
-    // Return the rotated array for temporary use
-    return rotated; 
-};
-
 const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, kernels) => {
-    // If convolve forward does the shrinking, this function does the opposite. The delta to project needs to be larger than what's coming in
-    const [oH, oW, oD] = OutputProjectionShape; // target output shape of this function
-    const [deltaH, deltaW, deltaD] = deltaInputShape; // current delta shape coming in
+    const [inputH, inputW, inputD] = OutputProjectionShape;
+    const [deltaH, deltaW, deltaD] = deltaInputShape;
     const [f, kh, kw, d] = kernelShape;
 
     if (deltaD !== f) {
         throw new Error(`ConvolveBackward: delta depth (${deltaD}) != number of filters (${f})`);
     }
-    if (oD !== d) {
-        throw new Error(`ConvolveBackward: output depth (${oD}) != kernel input depth (${d})`);
+    if (inputD !== d) {
+        throw new Error(`ConvolveBackward: output depth (${inputD}) != kernel input depth (${d})`);
     }
     if (input.length !== deltaH * deltaW * deltaD) {
         throw new Error(`ConvolveBackward: expected ${deltaH * deltaW * deltaD} input values, received ${input.length}`);
     }
     if (kernels.length !== f * kh * kw * d) {
-        throw new Error(`ConvolveBackward: expected ${f * kh * kw * d} weights, received ${weights.length}`);
+        throw new Error(`ConvolveBackward: expected ${f * kh * kw * d} weights, received ${kernels.length}`);
     }
 
-    const weights = RotateKernels(f, kh, kw, d, kernels);
-    const output = new Float32Array(oH * oW * oD);
+    const padTop = deltaH === inputH ? Math.floor((kh - 1) / 2) : 0;
+    const padLeft = deltaW === inputW ? Math.floor((kw - 1) / 2) : 0;
+    const output = new Float32Array(inputH * inputW * inputD);
 
-    // Scatter each incoming delta through the weights used by the forward convolution.
     for (let h = 0; h < deltaH; h++) {
         for (let w = 0; w < deltaW; w++) {
             const deltaBase = (h * deltaW + w) * deltaD;
@@ -501,18 +485,18 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
                 const deltaValue = input[deltaBase + filter];
 
                 for (let kernelH = 0; kernelH < kh; kernelH++) {
-                    const outputH = h + kernelH;
-                    if (outputH >= oH) continue;
+                    const outputH = h + kernelH - padTop;
+                    if (outputH < 0 || outputH >= inputH) continue;
 
                     for (let kernelW = 0; kernelW < kw; kernelW++) {
-                        const outputW = w + kernelW;
-                        if (outputW >= oW) continue;
+                        const outputW = w + kernelW - padLeft;
+                        if (outputW < 0 || outputW >= inputW) continue;
 
-                        const outputBase = (outputH * oW + outputW) * oD;
+                        const outputBase = (outputH * inputW + outputW) * inputD;
                         const weightBase = ((filter * kh + kernelH) * kw + kernelW) * d;
 
                         for (let channel = 0; channel < d; channel++) {
-                            output[outputBase + channel] += deltaValue * weights[weightBase + channel];
+                            output[outputBase + channel] += deltaValue * kernels[weightBase + channel];
                         }
                     }
                 }
@@ -528,8 +512,8 @@ const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightG
     const [H, W, Cout] = outputShape;
     const [numFilters, Kh, Kw, d] = kernelShape;
 
-    const padH = Math.floor(Kh / 2);
-    const padW = Math.floor(Kw / 2);
+    const padH = H === inputH ? Math.floor((Kh - 1) / 2) : 0;
+    const padW = W === inputW ? Math.floor((Kw - 1) / 2) : 0;
 
     for (let f = 0; f < Cout; f++) {
         for (let kh = 0; kh < Kh; kh++) {
@@ -593,7 +577,7 @@ const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightG
 
         for (let h = 0; h < H; h++) {
             for (let w = 0; w < W; w++) {
-                const idx = (h * H + w) * numFilters + f;
+                const idx = (h * W + w) * numFilters + f;
                 sum += delta[idx];
             }
         }
@@ -866,6 +850,20 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
     // Clear output first (just in case)
     output.fill(0);
 
+    /*
+     * Bias is added ONCE per output element
+     */
+    for (let y = 0; y < oH; y++) {
+        for (let x = 0; x < oW; x++) {
+
+            const outputBase = (y * oW + x) * f;
+
+            for (let filter = 0; filter < f; filter++) {
+                output[outputBase + filter] += biases[filter];
+            }
+        }
+    }
+
     const padH = Math.max(0, (iH - 1) * strides + kh - oH);
     const padW = Math.max(0,(iW - 1) * strides + kw - oW);
     const padTop = Math.floor(padH / 2);
@@ -909,21 +907,6 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
                         output[outputBase + filter] += sum;
                     }
                 }
-            }
-        }
-    }
-
-    /*
-     * Bias is added ONCE per output element, after all
-     * input/kernel contributions have been accumulated.
-     */
-    for (let y = 0; y < oH; y++) {
-        for (let x = 0; x < oW; x++) {
-
-            const outputBase = (y * oW + x) * f;
-
-            for (let filter = 0; filter < f; filter++) {
-                output[outputBase + filter] += biases[filter];
             }
         }
     }

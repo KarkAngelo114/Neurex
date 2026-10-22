@@ -404,7 +404,7 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
  * @param {String} layerID 
  * @returns {{weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const AccumulateWeightAndBiasGradsForConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID) => float32_Modules.AccumulateWeightAndBiasGradsForConv(
+const AccumulateWeightAndBiasGradsForConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID) => functions.AccumulateWeightAndBiasGradsForConv(
     activations,
     deltas,
     weightGrads,
