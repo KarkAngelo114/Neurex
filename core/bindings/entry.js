@@ -144,7 +144,7 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, l
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const DenseForward = (input, weightShape, activationFunc, pointer, modelID, layerID) =>  float32_Modules.DenseForward(
+const DenseForward = (input, weightShape, activationFunc, pointer, modelID, layerID) =>  functions.DenseForward(
     input, 
     weightShape,
     activationFunc.toLowerCase(),
@@ -188,7 +188,7 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
  * @param {String} layerID 
  * @returns {Float32Array} final delta
  */
-const fusedFinalDeltaProjector = (zs, storedActivatedOutput, incoming_delta, activationFunc, modelID, layerID) => float32_Modules.fusedFinalDeltaProjector(
+const fusedFinalDeltaProjector = (zs, storedActivatedOutput, incoming_delta, activationFunc, modelID, layerID) => functions.fusedFinalDeltaProjector(
     zs,
     storedActivatedOutput,
     incoming_delta,
@@ -276,7 +276,7 @@ const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, la
  * @param {String} layerID 
  * @returns 
  */
-const dsigmoid = (input, _, modelID, layerID) => functions.DSigmoid(input, modelID, layerID);
+const dsigmoid = (input, _, modelID, layerID) => float32_Modules.DSigmoid(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} input 
@@ -356,7 +356,7 @@ const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_c
  * @param {String} layerID 
  * @returns {{z_values: Float32Array,activated_output: Float32Array }}
  */
-const ConvolveForward = (input, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => float32_Modules.ConvolveForward(
+const ConvolveForward = (input, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => functions.ConvolveForward(
     input,
     inputShape,
     outputShape,
@@ -572,7 +572,7 @@ const scaleDiff = (arr1, arr2, arr3, modelID, layerID) => {
         throw new Error(errFlags.UNEQUAL_SIZE);
     }
 
-    return functions.scaleDiff(new Float32Array(arr1), new Float32Array(arr2), new Float32Array(arr3), modelID, layerID);
+    return functions.scaleDiff(arr1, arr2, arr3, modelID, layerID);
 }
 
 /**
@@ -720,14 +720,14 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, pointer, modelID, layerID) => float32_Modules.transConvForward(
+const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, pointer, modelID, layerID) => functions.transConvForward(
     input, 
     inputShape, 
     outputShape, 
     strides, 
     filters, 
     weightShape,
-    activationType.toLowerCase(), 
+    activationType.toLowerCase(),
     getGlobalParams(modelID).globalWeights[pointer], 
     getGlobalParams(modelID).globalBiases[pointer],
     pointer,
@@ -748,7 +748,7 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
  * @param {String} layerID
  * @returns {Float32Array}
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConvBackward(
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => float32_Modules.transConvBackward(
     input,
     inputShape,
     outputShape,

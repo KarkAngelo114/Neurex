@@ -212,6 +212,13 @@ declare module 'neurex' {
         optimizer?: (params: any) => Function;
     }
 
+    export interface loadModelFunctionObject {
+        /** Whether to output a confirmation log when a model loads successfully. Accepts a boolean; defaults to `true`. */
+        showLog?: boolean;
+        /** Lets you decide if you want to keep all the layers in your pretrained model unfreeze/trainable or freeze the parameters of all layers disabling them from learning. Freezing the loaded pretrained model locks the parameters during training and won't get updated, preserving the knowledge it is trained for while training on a new task for a new added layer. Note: if you freeze your model and train on different task and didn't at least change the output layer, expect the model won't learn.*/
+        freezeWeights?: boolean;
+    }
+
     export interface pluginFactoryObject {
         /** type of plugin. All plugins must have a type */
         type?: string;
@@ -351,9 +358,9 @@ declare module 'neurex' {
         * The `loadSavedModel` method allows you to load the trained model. The model is typically in .nrx file format which contains the learned parameters of your trained model
         * @async
         * @param {String} model the trained model file name
-        * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`.
+        * @param {loadModelFunctionObject} options an object argument to pass to this function for loading model.
         */
-        loadSavedModel(model: string, showLog: Boolean): void;
+        loadSavedModel(model: string, options: loadModelFunctionObject): void;
 
         /**
         * Removes the last layer of the model including it's initialzed or trained parameters and optimizer states. Useful for transfer learning

@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const {cacheOutputLayerDelta, transConvForward, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, fusedFinalDeltaProjector, transConvForward, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
@@ -106,7 +106,18 @@ const feedforward = (data) => {
     const filters = layerData.filters;
     const activation_function_string = layerData.activation_function.name;
 
-    const {z_values, activated_output} = transConvForward(input, inputShape, outputShape, strides, filters, weightShape, activation_function_string, pointer, modelID, layerID);
+    const {z_values, activated_output} = transConvForward(
+        input, 
+        inputShape, 
+        outputShape, 
+        strides, 
+        filters, 
+        weightShape, 
+        activation_function_string, 
+        pointer, 
+        modelID, 
+        layerID
+    );
 
 
     if (activated_output.some(v => Number.isNaN(v))) {
@@ -202,11 +213,10 @@ const applyOwnDerivative = (data) => {
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const dActivation = activation.derivatives[layerData.activation_function.name];
+    const dActivation = layerData.activation_function.name;
     const storedOutput = layerData.cache.layer_output;
 
-    const dAct = dActivation(z, storedOutput, modelID, layerID);
-    const result = element_wise_mul(dAct, delta, modelID, layerID);
+    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
         throw new Error(errFlags.NAN_ERR);

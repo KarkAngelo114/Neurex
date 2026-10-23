@@ -89,7 +89,7 @@ const DTanh = (arr) => {
 };
 
 const DSoftmax = (arr1, arr2) => {
-    const output = new Float32Array(arr.length).fill(0);
+    const output = new Float32Array(arr1.length).fill(0);
 
     let dot_product = 0;
     for (let i = 0; i < arr1.length; i++) {

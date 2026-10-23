@@ -17,17 +17,19 @@ __kernel void delta_convolve(
 
     if (h >= outputH || w >= outputW || channel >= depth) return;
 
+    const int padTop = deltaH == outputH ? (kernelH - 1) / 2 : 0;
+    const int padLeft = deltaW == outputW ? (kernelW - 1) / 2 : 0;
     float sum = 0.0f;
     for (int kh = 0; kh < kernelH; kh++) {
-        const int deltaY = h - kh;
+        const int deltaY = h - kh + padTop;
         if (deltaY < 0 || deltaY >= deltaH) continue;
 
         for (int kw = 0; kw < kernelW; kw++) {
-            const int deltaX = w - kw;
+            const int deltaX = w - kw + padLeft;
             if (deltaX < 0 || deltaX >= deltaW) continue;
 
             const int deltaBase = (deltaY * deltaW + deltaX) * numFilters;
-            const int kernelBase = ((kernelH - 1 - kh) * kernelW + (kernelW - 1 - kw)) * depth + channel;
+            const int kernelBase = (kh * kernelW + kw) * depth + channel;
             int filter = 0;
 
             for (; filter <= numFilters - 4; filter += 4) {

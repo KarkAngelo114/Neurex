@@ -1,5 +1,5 @@
 // linear
-__kernel void linear(
+__kernel void linear_op(
     __global const float* input,
     __global float* output,
     const int inputSize
@@ -13,7 +13,7 @@ __kernel void linear(
 }
 
 // relu
-__kernel void relu(
+__kernel void relu_op(
     __global const float* input, 
     __global float* output,
     const int inputSize
@@ -27,7 +27,11 @@ __kernel void relu(
 
 
 // sigmoid
-__kernel void sigmoid(__global const float* input, __global float* output, const int inputSize) {
+__kernel void sigmoid_op(
+    __global const float* input, 
+    __global float* output, 
+    const int inputSize
+) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
@@ -36,7 +40,11 @@ __kernel void sigmoid(__global const float* input, __global float* output, const
 }
 
 // tanh
-__kernel void Tanh(__global const float* input, __global float* output, const int inputSize) {
+__kernel void tanh_op(
+    __global const float* input, 
+    __global float* output, 
+    const int inputSize
+) {
     int i = get_global_id(0);
 
     if (i >= inputSize) return;
@@ -45,7 +53,13 @@ __kernel void Tanh(__global const float* input, __global float* output, const in
 }
 
 // softmax
-__kernel void softmax(__global const float* input, __global float* output, const float maxVal, const float sum, const int inputSize) {
+__kernel void softmax_op(
+    __global const float* input, 
+    __global float* output, 
+    const float maxVal, 
+    const float sum, 
+    const int inputSize
+) {
     
     int i = get_global_id(0);
 
@@ -94,4 +108,20 @@ __kernel void dlinear(
 
     // write to output buffer
     output[i] = 1.0f;
+}
+
+__kernel void dsoftmax(
+    __global const float* probabilities,
+    __global const float* delta,
+    __global float* output,
+    const float dotProduct_val,
+    const int size
+) {
+
+    int i = get_global_id(0);
+
+    if (i >= size) return;
+
+    output[i] = probabilities[i] * (delta[i] - dotProduct_val);
+
 }

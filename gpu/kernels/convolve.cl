@@ -21,15 +21,17 @@ __kernel void convolve(
     const int kernelSize = kernelH * kernelW * depth;
     const int outputIndex = (y * outputW + x) * numFilters + filter;
     const int filterOffset = filter * kernelSize;
+    const int padTop = outputH == inputH ? (kernelH - 1) / 2 : 0;
+    const int padLeft = outputW == inputW ? (kernelW - 1) / 2 : 0;
     float sum = biases[filter];
 
     for (int kh = 0; kh < kernelH; kh++) {
-        const int inputY = y + kh;
-        if (inputY >= inputH) continue;
+        const int inputY = y + kh - padTop;
+        if (inputY < 0 || inputY >= inputH) continue;
 
         for (int kw = 0; kw < kernelW; kw++) {
-            const int inputX = x + kw;
-            if (inputX >= inputW) continue;
+            const int inputX = x + kw - padLeft;
+            if (inputX < 0 || inputX >= inputW) continue;
 
             const int inputBase = (inputY * inputW + inputX) * depth;
             const int weightBase = filterOffset + (kh * kernelW + kw) * depth;

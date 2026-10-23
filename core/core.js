@@ -331,9 +331,12 @@ class Neurex {
     /**
      * @async
      * @param {String} model path to your model
-     * @param {Boolean} showLog outputs confirmation log when loading and successfullu loading a model. Default value is `true`. 
+     * @param {Object} options an object argument to pass to this function for loading model
      */
-    async loadSavedModel(model, showLog = true) {
+    async loadSavedModel(model, options) {
+
+        const showLog = options?.showLog || true;
+        const freezeWeights = options?.freezeWeights || false;
         try {
             if (!model) {
                 console.error(`${color.red}\n[ERROR]${color.reset}} No model provided`);
@@ -426,6 +429,7 @@ class Neurex {
 
                 if (layerData.isParametric) {
                     this.parametric_layers.push(layerData.layer_name);
+                    layerData.freezeWeights = freezeWeights;
                 }
 
                 let newLayer;
@@ -1382,6 +1386,7 @@ class Neurex {
             let prevlayer = null;
             this.layers.forEach((layer_data) => {
                 // each layer must have an UUID
+                layer_data.layerID = UUID.randomUUID();
                 if (!layer_data?.layerID) {
                     console.error(`${color.red}[ERROR]${color.reset} Layer ${layer_data?.layer_name || "Custom Layer"} has no unique ID. Ensure that you return "layerID" as a property of a layer.`);
                     throw new Error(errFlags.NO_LAYER_UNIQUE_ID_ERR);
@@ -1426,6 +1431,7 @@ class Neurex {
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
                 layer_data.outputShape = outputShape || [];
+                layer_data.freezeWeights = false;
                 if (overrides) {
                     this.input_shape = overrides.input_shape; // to override the default `this.input_shape` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
                     this.input_size = overrides.input_size; // to override the default `this.input_size` in the constructor just incase no layer.inputShape() was added to the sequentialBuild()
@@ -1450,6 +1456,7 @@ class Neurex {
     // `add_layer()` and run the `initParams()` from the layer's configuration object
     #buildSingle(layer_data) {
         let prevLayer = this.layers[this.layers.length -1]; // get the last layer from the stack
+        layer_data.layerID = UUID.randomUUID();
 
         // each layer must have an UUID
         if (!layer_data?.layerID) {
@@ -1495,6 +1502,7 @@ class Neurex {
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
         layer_data.outputShape = outputShape || [];
+        layer_data.freezeWeights = false;
 
         prevLayer = layer_data;
     }
