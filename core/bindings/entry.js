@@ -707,7 +707,7 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
 );
 
 /**
- * "☑️" Performs the transpose convolution operation and applies activation output directly as one bulk operation
+ * "✅☑️" Performs the transpose convolution operation and applies activation output directly as one bulk operation
  * @param {Float32Array} input 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
@@ -748,7 +748,7 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
  * @param {String} layerID
  * @returns {Float32Array}
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => float32_Modules.transConvBackward(
+const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConvBackward(
     input,
     inputShape,
     outputShape,

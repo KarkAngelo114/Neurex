@@ -925,19 +925,6 @@ const transConvBackward = (delta, inputShape, outputShape, strides, filters, wei
     const [oH, oW, oD] = outputShape;
     const [f, kh, kw, d] = weightShape;
 
-    // Sanity checks
-    if (d !== iD) {
-        throw new Error(`TransConvDelta: weight input depth (${d}) != input depth (${iD})`);
-    }
-
-    if (f !== oD) {
-        throw new Error(`TransConvDelta: number of filters (${f}) != output depth (${oD})`);
-    }
-
-    if (filters !== f) {
-        throw new Error(`TransConvDelta: filters (${filters}) != weightShape[0] (${f})`);
-    }
-
     const deltaInput = new Float32Array(iH * iW * iD);
 
     const padH = Math.max(0, (iH - 1) * strides + kh - oH);
