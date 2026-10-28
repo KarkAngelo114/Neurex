@@ -47,12 +47,20 @@ const projectDeltaBackward = (data) => {
     if (output.some(v => Number.isNaN(v))) throw new Error("RESIDUAL_ADD_ERROR: output contains NaNs.");
 
     return output;
+}
 
+const applyDerivativeAndComputeGradients = (data) => {
+    return {
+        delta: data.delta,
+        weightGrads: [],
+        biasGrads: []
+    }
 }
 
 
 module.exports = {
     initParams,
     feedforward,
-    projectDeltaBackward
+    projectDeltaBackward,
+    applyDerivativeAndComputeGradients
 }

@@ -102,13 +102,13 @@ const getOutputLayerDelta = () => {
     process.exit(1);
 }
 
-const gradientAccumulation = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const modelID = data.modelID;
     const weightGrads = data.weightGrads;
     const biasGrads = data.biasGrads;
-    const activation_outputs = data.activation_outputs;
-    const deltas = data.deltas;
+    const activation_outputs = data.activatedOutput;
+    const deltas = data.delta;
     const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;
 
@@ -120,8 +120,9 @@ const gradientAccumulation = (data) => {
     };
 
     return {
-        accumulatedWeightGrads: accumulatedGrads,
-        accumulatedBiasGrads: biasGrads
+        weightGrads: accumulatedGrads,
+        biasGrads: biasGrads,
+        delta: deltas
     }
 }
 
@@ -130,5 +131,5 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients
 }

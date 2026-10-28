@@ -1251,6 +1251,7 @@ class Neurex {
                 modelID: this.modelID,
                 deltaAlreadyIncludesActivationDerivative: true
             });
+            
             this.weightGrads[outputPointer] = result.weightGrads;
             this.biasGrads[outputPointer] = result.biasGrads;
         }
@@ -1295,9 +1296,9 @@ class Neurex {
             // they still need to have this function because they still need to project the delta
             const result = current_layer.applyDerivativeAndComputeGradients(dispatchData);
             current_delta = result.delta;
+            deltas[layer_index] = current_delta;
             this.weightGrads[currentPointer] = result.weightGrads || []; // fallback if a layer has initialzed gradient array template
             this.biasGrads[currentPointer] = result.biasGrads || []; // fallback if a layer has initialzed gradient array template
-            deltas[layer_index] = current_delta;
         }
 
         return {

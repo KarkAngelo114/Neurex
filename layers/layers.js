@@ -65,8 +65,7 @@ class Layers {
             feedforward: (data) => reshaper.feedforward(data),
             getOutputLayerDelta: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
             projectDeltaBackward: (data) => data.delta,
-            applyOwnDerivative: (data) => data.delta,
-            gradientAccumulation: () => {}
+            applyDerivativeAndComputeGradients: (data) => reshaper.applyDerivativeAndComputeGradients(data)
         }
     }
 
@@ -96,8 +95,7 @@ class Layers {
             feedforward: (data) => embedding.feedforward(data),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
             projectDeltaBackward: (data) => data.delta,
-            applyOwnDerivative: (data) => data.delta,
-            gradientAccumulation: (data) => embedding.gradientAccumulation(data)
+            applyDerivativeAndComputeGradients: (data) => embedding.applyDerivativeAndComputeGradients(data)
         }
     }
 
@@ -114,7 +112,7 @@ class Layers {
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
             feedforward: (data) => spe.feedforward(data),
             projectDeltaBackward: (data) => data.delta,
-            applyOwnDerivative: (data) => data.delta,
+            applyDerivativeAndComputeGradients: (data) => spe.applyDerivativeAndComputeGradients(data)
         }
     }
 
@@ -463,7 +461,7 @@ class Layers {
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
             feedforward: (data) => residual_start.feedforward(data),
             projectDeltaBackward: (data) => residual_start.projectDeltaBackward(data),
-            applyOwnDerivative: (data) => data.delta,
+            applyDerivativeAndComputeGradients: (data) => residual_start.applyDerivativeAndComputeGradients(data)
         }
     }
 
@@ -480,7 +478,7 @@ class Layers {
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
             feedforward: (data) => residual_end.feedforward(data),
             projectDeltaBackward: (data) => residual_end.projectDeltaBackward(data),
-            applyOwnDerivative: (data) => data.delta,
+            applyDerivativeAndComputeGradients: (data) => residual_end.applyDerivativeAndComputeGradients(data)
         }
     }
 
