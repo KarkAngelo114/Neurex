@@ -5,8 +5,7 @@
  * - feedforward()
  * - getOutputLayerDelta()
  * - projectDeltaBackward() 
- * - applyOwnDerivative()
- * - gradientAccumulation
+ * - applyDerivativeAndComputeGradients()
  *
  */
 
@@ -63,7 +62,6 @@ class Layers {
             isParametric: false,
             layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => reshaper.initParams(size, shape, layer_data),
-            determineInferenceType: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
             feedforward: (data) => reshaper.feedforward(data),
             getOutputLayerDelta: () => {  throw new Error('[ERROR]------- reshape cannot be an output layer') },
             projectDeltaBackward: (data) => data.delta,
@@ -95,7 +93,6 @@ class Layers {
             useBias: false, // Embedding layer doesn't have a bias
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => embedding.initParams(size, shape, layer_data),
-            determineInferenceType: () => embedding.determineInferenceType(),
             feedforward: (data) => embedding.feedforward(data),
             getOutputLayerDelta: () => embedding.getOutputLayerDelta(),
             projectDeltaBackward: (data) => data.delta,
@@ -115,9 +112,7 @@ class Layers {
             shapeType: "sequential",
             useBias: false,
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
-            determineInferenceType: () => {},
             feedforward: (data) => spe.feedforward(data),
-            getOutputLayerDelta: () => {},
             projectDeltaBackward: (data) => data.delta,
             applyOwnDerivative: (data) => data.delta,
         }
@@ -156,12 +151,10 @@ class Layers {
                 useBias: useBias,
                 shapeType: "flat",
                 initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
-                determineInferenceType: (layerObject, lossFunc, trainY) => ann.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => ann.feedforward(data),
                 getOutputLayerDelta: (data) => ann.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => ann.projectDeltaBackward(data),
-                applyOwnDerivative: (data) => ann.applyOwnDerivative(data),
-                gradientAccumulation: (data) => ann.gradientAccumulation(data), 
+                applyDerivativeAndComputeGradients: (data) => ann.applyDerivativeAndComputeGradients(data),
             };
         }
         catch (error) {
@@ -217,12 +210,10 @@ class Layers {
                 useBias: useBias,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
-                determineInferenceType: () => cnn.determineInferenceType(),
                 feedforward: (data) => cnn.feedforward(data),
                 getOutputLayerDelta: () => cnn.getOutputLayerDelta(),
                 projectDeltaBackward: (data) => cnn.projectDeltaBackward(data),
-                applyOwnDerivative: (data) => cnn.applyOwnDerivative(data),
-                gradientAccumulation: (data) => cnn.gradientAccumulation(data)
+                applyDerivativeAndComputeGradients: (data) => cnn.applyDerivativeAndComputeGradients(data),
             }
         }
         catch (error) {
@@ -265,12 +256,10 @@ class Layers {
                 isParametric: false,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => maxpool.initParams(size, shape, layer_data),
-                determineInferenceType: () => maxpool.determineInferenceType(),
                 feedforward: (data) => maxpool.feedforward(data),
                 getOutputLayerDelta: () => maxpool.getOutputLayerDelta(),
                 projectDeltaBackward: (data) => data.delta, // pass through
-                applyOwnDerivative: (data) => maxpool.applyOwnDerivative(data),
-                gradientAccumulation: () => {}
+                applyDerivativeAndComputeGradients: (data) => maxpool.applyDerivativeAndComputeGradients(data),
             }
         }
         catch (error) {
@@ -303,7 +292,6 @@ class Layers {
                 useBias: useBias,
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
-                determineInferenceType: (layerObject, lossFunc, trainY) => rnn.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => rnn.feedforward(data),
                 getOutputLayerDelta: (data) => rnn.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => rnn.projectDeltaBackward(data),
@@ -363,12 +351,10 @@ class Layers {
                 useBias: useBias,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => trans.initParams(size, shape, layer_data),
-                determineInferenceType: (layerObject, lossFunc, trainY) => trans.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => trans.feedforward(data),
                 getOutputLayerDelta: (data) => trans.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => trans.projectDeltaBackward(data),
-                applyOwnDerivative: (data) => trans.applyOwnDerivative(data),
-                gradientAccumulation: (data) => trans.gradientAccumulation(data),
+                applyDerivativeAndComputeGradients: (data) => trans.applyDerivativeAndComputeGradients(data),
             }
         }
         catch (error) {
@@ -395,7 +381,6 @@ class Layers {
             useBias: useBias,
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => simple_attention.initParams(size, shape, layer_data),
-            determineInferenceType: (layerObject, lossFunc, trainY) => simple_attention.determineInferenceType(layerObject, lossFunc, trainY),
             feedforward: (data) => simple_attention.feedforward(data),
             getOutputLayerDelta: () => simple_attention.getOutputLayerDelta(),
             projectDeltaBackward: (data) => simple_attention.projectDeltaBackward(data),
@@ -430,7 +415,6 @@ class Layers {
                 useCausalMasking: useCausalMasking,
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => mha.initParams(size, shape, layer_data),
-                determineInferenceType: (layerObject, lossFunc, trainY) => mha.determineInferenceType(layerObject, lossFunc, trainY),
                 feedforward: (data) => mha.feedforward(data),
                 getOutputLayerDelta: (data) => mha.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => mha.projectDeltaBackward(data),
@@ -458,12 +442,10 @@ class Layers {
             useBias: true, // true by default
             isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
-            determineInferenceType: () => {},
             feedforward: (data) => normModule.feedforward(data),
-            getOutputLayerDelta: () => {},
+            getOutputLayerDelta: () => normModule.getOutputLayerDelta(),
             projectDeltaBackward: (data) => data.delta,
-            applyOwnDerivative: (data) => normModule.applyOwnDerivative(data),
-            gradientAccumulation: (data) => normModule.gradientAccumulation(data),
+            applyDerivativeAndComputeGradients: (data) => normModule.applyDerivativeAndComputeGradients(data),
         }
     }
 
@@ -479,13 +461,9 @@ class Layers {
             endConnection: false,
             useBias: false,
             initParams: (size, shape, layer_data) => residual_start.initParams(size, shape, layer_data),
-            determineInferenceType: () => {},
             feedforward: (data) => residual_start.feedforward(data),
-            getOutputLayerDelta: () => {},
             projectDeltaBackward: (data) => residual_start.projectDeltaBackward(data),
             applyOwnDerivative: (data) => data.delta,
-            accumulateWeightGradients: () => {},
-            accumulateBiasGradients: () => {}
         }
     }
 
@@ -500,13 +478,9 @@ class Layers {
             endConnection: true,
             useBias: false,
             initParams: (size, shape, layer_data) => residual_end.initParams(size, shape, layer_data),
-            determineInferenceType: () => {},
             feedforward: (data) => residual_end.feedforward(data),
-            getOutputLayerDelta: () => {},
             projectDeltaBackward: (data) => residual_end.projectDeltaBackward(data),
             applyOwnDerivative: (data) => data.delta,
-            accumulateWeightGradients: () => {},
-            accumulateBiasGradients: () => {}
         }
     }
 

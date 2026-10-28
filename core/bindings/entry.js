@@ -88,6 +88,93 @@ const shutdown = (modelID) => {
 
 
 /**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const relu = (input, modelID, layerID) => functions.Relu(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const sigmoid = (input, modelID, layerID) => functions.Sigmoid(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {String} modelID
+ * @param {String} layerID 
+ * @returns 
+ */
+const tanh = (input, modelID, layerID) => functions.Tanh(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const softmax = (input, modelID, layerID) => functions.Softmax(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const linear = (input, modelID, layerID) => functions.Linear(input, modelID, layerID); 
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Float32Array} _ - reserved float32Array argument space
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Float32Array} _ - reserved float32Array argument space
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const dsigmoid = (input, _, modelID, layerID) => float32_Modules.DSigmoid(input, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Float32Array} _ - reserved float32Array argument space
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const dtanh = (input, _, modelID, layerID) => functions.DTanh(input, modelID, layerID);
+
+/**
+ *  "✅☑️"
+ * @param {Float32Array} arr1 
+ * @param {Float32Array} arr2 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const dsoftmax = (arr1, arr2, modelID, layerID) => functions.DSoftmax(arr1, arr2, modelID, layerID);
+/**
+ * "✅☑️"
+ * @param {Float32Array} input 
+ * @param {Float32Array} _ - reserved float32Array argument space
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns 
+ */
+const dlinear = (input, _, modelID, layerID) => functions.DLinear(input, modelID, layerID);
+
+/**
  *  "✅☑️"
  * @function getEmbeddings
  * @param {Array<Number>} tokenVector an array of token vector 
@@ -179,132 +266,32 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
 
 
 /**
- * "☑️" A utility function that performs derivative activation function and element-wise multiplication internally as one fused operation. Used by layer types that has common pipeline (stateless or layers that process data in linear manner) of projecting delta by getting the derivative activation of its zs values and performing element-wise multiplication.
+ * "☑️" A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
  * @param {Float32Array} zs 
  * @param {Float32Array} storedActivatedOutput 
  * @param {Float32Array} incoming_delta 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biasGrads
+ * @param {Array<Number>} weightShape  
  * @param {String} activationFunc 
  * @param {String} modelID 
  * @param {String} layerID 
- * @returns {Float32Array} final delta
+ * @param {Boolean} applyActivationDerivative
+ * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector = (zs, storedActivatedOutput, incoming_delta, activationFunc, modelID, layerID) => functions.fusedFinalDeltaProjector(
+const fusedFinalDeltaProjector_ForDense = (zs, storedActivatedOutput, incoming_delta, weightGrads, biasGrads, weightShape, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForDense(
     zs,
     storedActivatedOutput,
     incoming_delta,
-    activationFunc.toLowerCase(),
-    modelID,
-    layerID
-);
-
-/**
- * 
- * @param {Float32Array} activations 
- * @param {Float32Array} deltas 
- * @param {Float32Array} weightGrads 
- * @param {Float32Array} biasGrads 
- * @param {Array<Number>} weightShape
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns {{ weightGrads: Float32Array, biasGrads: Float32Array }}
- */
-const accumulateWeightsAndBiasGradsForConnectedLayer  = (activations, deltas, weightGrads, biasGrads, weightShape, modelID, layerID) => functions.accumulateWeightsAndBiasGradsForConnectedLayer(
-    activations,
-    deltas,
-    weightGrads,
+    weightGrads, 
     biasGrads,
     weightShape,
+    activationFunc.toLowerCase(),
     modelID,
-    layerID
+    layerID,
+    applyActivationDerivative
 );
 
-
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const relu = (input, modelID, layerID) => functions.Relu(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const sigmoid = (input, modelID, layerID) => functions.Sigmoid(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {String} modelID
- * @param {String} layerID 
- * @returns 
- */
-const tanh = (input, modelID, layerID) => functions.Tanh(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const softmax = (input, modelID, layerID) => functions.Softmax(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const linear = (input, modelID, layerID) => functions.Linear(input, modelID, layerID); 
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Float32Array} _ - reserved float32Array argument space
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Float32Array} _ - reserved float32Array argument space
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const dsigmoid = (input, _, modelID, layerID) => float32_Modules.DSigmoid(input, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Float32Array} _ - reserved float32Array argument space
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const dtanh = (input, _, modelID, layerID) => functions.DTanh(input, modelID, layerID);
-
-/**
- *  "✅☑️"
- * @param {Float32Array} arr1 
- * @param {Float32Array} arr2 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const dsoftmax = (arr1, arr2, modelID, layerID) => functions.DSoftmax(arr1, arr2, modelID, layerID);
-/**
- * "✅☑️"
- * @param {Float32Array} input 
- * @param {Float32Array} _ - reserved float32Array argument space
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns 
- */
-const dlinear = (input, _, modelID, layerID) => functions.DLinear(input, modelID, layerID);
 /**
  * "✅☑️"
  * @param {Float32Array} p 
@@ -393,28 +380,35 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
 
 /**
  * 
- * @param {Float32Array} activations 
- * @param {Float32Array} deltas 
+ * @param {Float32Array} zs 
+ * @param {Float32Array} activatedOutput 
+ * @param {Float32Array} incomingDelta 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Array<Number>} kernelShape 
+ * @param {Number} strides
+ * @param {String} activationFunc 
  * @param {String} modelID 
  * @param {String} layerID 
- * @returns {{weightGrads: Float32Array, biasGrads: Float32Array}}
+ * @param {Boolean} applyActivationDerivative
+ * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const AccumulateWeightAndBiasGradsForConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID) => functions.AccumulateWeightAndBiasGradsForConv(
-    activations,
-    deltas,
+const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForConv(
+    zs,
+    activatedOutput,
+    incomingDelta,
     weightGrads,
     biasGrads,
     inputShape,
     outputShape,
     kernelShape,
-    1,
+    strides,
+    activationFunc.toLowerCase(),
     modelID,
-    layerID
+    layerID,
+    applyActivationDerivative
 );
 
 
@@ -762,30 +756,36 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
 );
 
 /**
- * "✅☑️"
- * @param {Float32Array} activations 
- * @param {Float32Array} deltas 
+ * "☑️" A specialized operation for transconv layer that performs derivative activation and gradient computation as one bulk operation
+ * @param {Float32Array} zs 
+ * @param {Float32Array} activatedOutput 
+ * @param {Float32Array} incomingDelta 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
- * @param {Array<Number>} weightShape 
- * @param {Number} strides 
+ * @param {Array<Number>} kernelShape 
+ * @param {Number} strides
+ * @param {String} activationFunc 
  * @param {String} modelID 
  * @param {String} layerID 
- * @returns {{ weightGrads: Float32Array, biasGrads: Float32Array }}
+ * @param {Boolean} applyActivationDerivative
+ * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const accumulateWeightandBiasGradsForTransConv = (activations, deltas, weightGrads, biasGrads, inputShape, outputShape, weightShape, strides, modelID, layerID) => functions.accumulateWeightandBiasGradsForTransConv(
-    activations,
-    deltas,
+const fusedFinalDeltaProjector_ForTransConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForTransConv(
+    zs,
+    activatedOutput,
+    incomingDelta,
     weightGrads,
     biasGrads,
-    inputShape, 
+    inputShape,
     outputShape,
-    weightShape,
+    kernelShape,
     strides,
+    activationFunc.toLowerCase(),
     modelID,
-    layerID
+    layerID,
+    applyActivationDerivative
 );
 
 /**
@@ -813,16 +813,20 @@ const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functi
  * 
  * @param {Float32Array} dY incoming delta 
  * @param {Float32Array} X cached input during forward pass 
+ * @param {Float32Array} weightGrads
+ * @param {Float32Array} biasGrads
  * @param {Number} size feature size 
  * @param {number} pointer 
  * @param {String} modelID
  * @param {String} layerID 
- * @returns {{ dX: Float32Array, dGamma: Float32Array, dBeta: Float32Array }}
+ * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, size, eps, pointer, modelID, layerID) => functions.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, weightGrads, biasGrads , size, eps, pointer, modelID, layerID) => float32_Modules.computeLayerNormBackward(
     dY,
     X,
     getGlobalParams(modelID).globalWeights[pointer],
+    weightGrads,
+    biasGrads,
     size, 
     eps,
     pointer,
@@ -1050,25 +1054,6 @@ const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seq
 
 /**
  * "✅☑️"
- * @param {Float32Array} gammaGrads 
- * @param {Float32Array} dGamma 
- * @param {Float32Array} betaGrads 
- * @param {Float32Array} dBeta
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns {{gammaGrads: Float32Array, betaGrads: Float32Array}}
- */
-const AccumulateGammaAndBetaGrads = (gammaGrads, dGamma, betaGrads, dBeta, modelID, layerID) => functions.AccumulateGammaAndBetaGrads(
-    gammaGrads,
-    dGamma,
-    betaGrads,
-    dBeta,
-    modelID,
-    layerID
-);
-
-/**
- * "✅☑️"
  * @param {Float32Array} delta 
  * @param {String} modelID  
  * @param {String} layerID 
@@ -1095,15 +1080,15 @@ module.exports = {
 
     DenseForward,
     DeltaMatMul,
-    accumulateWeightsAndBiasGradsForConnectedLayer,
+    fusedFinalDeltaProjector_ForDense,
     
     ConvolveForward,
     ConvolveBackward,
-    AccumulateWeightAndBiasGradsForConv,
+    fusedFinalDeltaProjector_ForConv,
 
     transConvForward,
     transConvBackward,
-    accumulateWeightandBiasGradsForTransConv,
+    fusedFinalDeltaProjector_ForTransConv,
 
     element_wise_mul,
     element_wise_sub,
@@ -1143,10 +1128,8 @@ module.exports = {
 
     computeLayerNorm,
     computeLayerNormBackward,
-    AccumulateGammaAndBetaGrads,
 
     cacheOutputLayerDelta,
-    fusedFinalDeltaProjector,
 
     derivatives: {
         relu: drelu,

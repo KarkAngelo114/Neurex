@@ -579,10 +579,6 @@ class Neurex {
         }
     }
 
-    get_task_type() {
-        return this.task || "Task not specified";
-    }
-
     /**
      * 
      * @method sequentialBuild
@@ -818,7 +814,6 @@ class Neurex {
                 const visualizerData = {
                     epoch: 0,
                     loss: 0,
-                    task: this.task,
                     totalEpoch: epoch,
                     totalBatchSize: batchSize,
                     optimizer: this.optimizer.name || "Custom Optimizer",
@@ -828,7 +823,7 @@ class Neurex {
                     lossFunction: lossLower
                 }
 
-                if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
+                if (loss === "categorical_cross_entropy" || loss === "sparse_categorcial_cross_entropy") {
                     visualizerData.accuracy = 0;
                 }
 
@@ -1006,7 +1001,6 @@ class Neurex {
                     const visualizerData = {
                         epoch: current_epoch + 1,
                         loss: AverageEpochLoss,
-                        task: this.task,
                         totalEpoch: epoch,
                         totalBatchSize: batchSize,
                         optimizer: this.optimizer.name || "Custom Optimizer",
@@ -1016,8 +1010,8 @@ class Neurex {
                         lossFunction: lossLower
                     }
 
-                    if (this.task === 'binary_classification' || this.task === 'multi_class_classification') {
-                        visualizerData.accuracy = accuracy;
+                    if (loss === "categorical_cross_entropy" || loss === "sparse_categorcial_cross_entropy") {
+                        visualizerData.accuracy = 0;
                     }
 
                     const modelData = {
@@ -1241,6 +1235,26 @@ class Neurex {
         const deltas = new Array(this.num_layers);
         deltas[this.num_layers - 1] = current_delta;
 
+        const outputLayerIndex = this.num_layers - 1;
+        const outputLayer = this.layers[outputLayerIndex];
+        const outputPointer = layerPointers[outputLayerIndex];
+        
+        if (outputPointer !== -1 && !outputLayer.freezeWeights) {
+            const result = outputLayer.applyDerivativeAndComputeGradients({
+                delta: current_delta,
+                z_value: zs[outputLayerIndex],
+                activatedOutput: activations[outputLayerIndex],
+                pointer: outputPointer,
+                weightGrads: this.weightGrads[outputPointer],
+                biasGrads: this.biasGrads[outputPointer],
+                layerData: outputLayer,
+                modelID: this.modelID,
+                deltaAlreadyIncludesActivationDerivative: true
+            });
+            this.weightGrads[outputPointer] = result.weightGrads;
+            this.biasGrads[outputPointer] = result.biasGrads;
+        }
+
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {
             const current_layer = this.layers[layer_index];
             const next_layer    = this.layers[layer_index + 1];
@@ -1265,45 +1279,25 @@ class Neurex {
             const dLda = next_layer.projectDeltaBackward(backpropObjectData);
 
             // data to dispatch for applying layer derivative (if any)
-            const applyDerivativeObjectData = {
+            const dispatchData = {
                 delta: dLda,
                 z_value: zs[layer_index],
+                activatedOutput: activations[layer_index],
                 pointer: currentPointer,
+                weightGrads: this.weightGrads[currentPointer],
+                biasGrads: this.biasGrads[currentPointer],
                 layerData: current_layer,
                 modelID: this.modelID 
             }
 
-            // dispatch to all layer types in the build having `applyOwnDerivative` (if any)
-            current_delta = current_layer.applyOwnDerivative(applyDerivativeObjectData);
-
+            // dispatch to all layer types in the build having `applyDerivativeAndComputeGradients` (if any)
+            // this is a merged operation of applying derivatives and gradient accumulation. For layers that doesn't have activation function but stil accumulates gradients,
+            // they still need to have this function because they still need to project the delta
+            const result = current_layer.applyDerivativeAndComputeGradients(dispatchData);
+            current_delta = result.delta;
+            this.weightGrads[currentPointer] = result.weightGrads || []; // fallback if a layer has initialzed gradient array template
+            this.biasGrads[currentPointer] = result.biasGrads || []; // fallback if a layer has initialzed gradient array template
             deltas[layer_index] = current_delta;
-        }
-
-        for (let layer_index = this.num_layers - 1; layer_index >= 0; layer_index--) {
-            const pointer = layerPointers[layer_index];
-            const layer = this.layers[layer_index];
-            const a_prev = activations[layer_index];
-            const delta = deltas[layer_index];
-
-            if (pointer === -1) continue;            
-            if (layer.freezeWeights) continue;
-
-            // data used for gradient accumulation of weights adn biases all at once
-            const gradientAccumulationObjectData = {
-                pointer: pointer,
-                activation_outputs: a_prev,
-                deltas: delta,
-                weightGrads: this.weightGrads[pointer],
-                biasGrads: this.biasGrads[pointer],
-                layerData: layer,
-                modelID: this.modelID
-            }
-
-            // dispatch to all layer types in the build having `gradientAccumulation` (if any)
-            const {accumulatedWeightGrads, accumulatedBiasGrads} = layer.gradientAccumulation(gradientAccumulationObjectData);
-
-            this.weightGrads[pointer] = accumulatedWeightGrads;
-            this.biasGrads[pointer] = accumulatedBiasGrads;
         }
 
         return {

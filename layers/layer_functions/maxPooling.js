@@ -79,7 +79,7 @@ const getOutputLayerDelta = () => {
     process.exit(1);
 }
 
-const applyOwnDerivative = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
 
     const layerData = data.layerData;
     const [inputH, inputW, inputD] = layerData.inputShape;
@@ -94,7 +94,11 @@ const applyOwnDerivative = (data) => {
         throw new Error(errFlags.NAN_ERR);
     }
     
-    return output;
+    return {
+        delta: output,
+        weightGrads: [],
+        biasGrads: []
+    }
 }
 
 module.exports = {
@@ -102,5 +106,5 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    applyOwnDerivative,
+    applyDerivativeAndComputeGradients
 }

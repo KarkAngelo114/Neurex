@@ -1,5 +1,4 @@
-const activation = require('../../core/bindings')
-const { ConvolveForward, fusedFinalDeltaProjector, ConvolveBackward, element_wise_mul, AccumulateWeightAndBiasGradsForConv } = require("../../core/bindings");
+const { ConvolveForward, fusedFinalDeltaProjector_ForConv, ConvolveBackward } = require("../../core/bindings");
 const {  calculateTensorShape, createTensorBuffer } = require("../../utils/utils");
 const errFlags = require('../../err_flags');
 
@@ -137,56 +136,38 @@ const projectDeltaBackward = (data) => {
     return result;
 }
 
-const applyOwnDerivative = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const modelID = data.modelID;
-    const delta = data.delta;
+    const incoming_delta = data.delta;
     const z = data.z_value;
+    const wg = data.weightGrads;
+    const bg = data.biasGrads;
+    const activatedOutput = data.activatedOutput;
     const layerID = layerData.layerID;
+    const kernelShape = layerData.weightShape;
+    const inputShape = layerData.inputShape;
+    const outputShape = layerData.outputShape; 
     
-    const dActivation = layerData.activation_function.name;
-    const storedOutput = layerData.cache.layer_output;
+    const activationString = layerData.activation_function.name;
+
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForConv(z, activatedOutput, incoming_delta, wg, bg, inputShape, outputShape, kernelShape, layerData.strides, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
     
-    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
-    
-    if (result.some(v => Number.isNaN(v))) {
-        console.error("NaN detected during derivative application in connected layer");
+    if (delta.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during derivative application in convolutional layer");
         throw new Error(errFlags.NAN_ERR);
     }
     
-    return result;
-}
-
-const gradientAccumulation = (data) => {
-    const layerData = data.layerData;
-    const deltas = data.deltas;
-    const activation_outputs = data.activation_outputs;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
-    const modelID = data.modelID;
-    const layerID = layerData.layerID;
-
-    const kernelShape = layerData.weightShape
-    const inputShape = layerData.inputShape
-    const outputShape = layerData.outputShape
-
-    const {weightGrads: kernelWeightGrads, biasGrads: kernelBiasGrads} = AccumulateWeightAndBiasGradsForConv(activation_outputs, deltas, weightGrads, biasGrads, inputShape, outputShape, kernelShape, modelID, layerID);
-
-    if (kernelWeightGrads.some(v => Number.isNaN(v))) {
-        console.error("NaN detected after kernel weightGrads accumulation in convolutional layer");
+    if (weightGrads.some(v => Number.isNaN(v)) || biasGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during gradient accumulation in convolutional layer");
         throw new Error(errFlags.NAN_ERR);
     }
-
-    if (kernelBiasGrads.some(Number.isNaN)) {
-        console.error("NaN detected after kernel biasGrads accumulation in convolutional layer");
-        throw new Error(errFlags.NAN_ERR);
-    }
-
-
+    
     return {
-        accumulatedWeightGrads: kernelWeightGrads,
-        accumulatedBiasGrads: kernelBiasGrads
-    }
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
 
 module.exports = {
@@ -195,6 +176,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients
 }

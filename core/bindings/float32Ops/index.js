@@ -253,29 +253,6 @@ const DeltaMatMul = (delta, inputSize, outputSize, weights) => {
     return prevDelta;
 }
 
-const fusedFinalDeltaProjector = (zs, cachedActivatedOutput, incoming_delta, activationFuncType) => {
-    const activationFunction = {
-        "relu": DReLu,
-        "sigmoid":DSigmoid,
-        "tanh":DTanh,
-        "linear":DLinear,
-        "softmax":DSoftmax
-    }
-
-    // special case for hidden layers that uses softmax activation (which is uncommon), the 
-    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
-    if (activationFuncType === "softmax") {
-        return DSoftmax(cachedActivatedOutput, incoming_delta);
-    }
-
-    // get the derivatives
-    const dAct = activationFunction[activationFuncType](zs);
-
-    // perform element-wise multiplication for final delta
-    return element_wise_mul(dAct, incoming_delta);
-    
-}
-
 const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weightGrads, biasGrads, weightShape) => {
     const [inputSize, outputSize] = weightShape;
 
@@ -299,6 +276,46 @@ const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weig
         weightGrads: weightGrads,
         biasGrads: biasGrads
     }
+}
+
+const fusedFinalDeltaProjector_ForDense = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, weightShape, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+    const activationFunction = {
+        "relu": DReLu,
+        "sigmoid":DSigmoid,
+        "tanh":DTanh,
+        "linear":DLinear,
+        "softmax":DSoftmax
+    }
+
+    // special case for hidden layers that uses softmax activation (which is uncommon), the 
+    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
+    if (applyActivationDerivative && activationFuncType === "softmax") {
+        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
+
+        const {weightGrads, biasGrads} = accumulateWeightsAndBiasGradsForConnectedLayer(activatedOutput, finalDelta, weight_grads, bias_grads, weightShape)
+    
+        return {
+            delta: finalDelta,
+            weightGrads: weightGrads,
+            biasGrads: biasGrads
+        }
+    }
+
+    // get the derivatives
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        const dAct = activationFunction[activationFuncType](zs);
+        finalDelta = element_wise_mul(dAct, incoming_delta);
+    }
+
+    const {weightGrads, biasGrads} = accumulateWeightsAndBiasGradsForConnectedLayer(activatedOutput, finalDelta, weight_grads, bias_grads, weightShape)
+    
+    return {
+        delta: finalDelta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    }
+
 }
 
 const scale = (input, scalingValue) => {
@@ -398,16 +415,6 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
         "softmax":Softmax
     }
 
-    if (d !== iD) {
-        throw new Error(`ConvolveForward: kernel input depth (${d}) != input depth (${iD})`);
-    }
-    if (f !== oD) {
-        throw new Error(`ConvolveForward: number of filters (${f}) != output depth (${oD})`);
-    }
-    if (weights.length !== f * kh * kw * d) {
-        throw new Error(`ConvolveForward: expected ${f * kh * kw * d} weights, received ${weights.length}`);
-    }
-
     const output = new Float32Array(oH * oW * oD);
     const padTop = oH === iH ? Math.floor((kh - 1) / 2) : 0;
     const padLeft = oW === iW ? Math.floor((kw - 1) / 2) : 0;
@@ -459,19 +466,6 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
     const [inputH, inputW, inputD] = OutputProjectionShape;
     const [deltaH, deltaW, deltaD] = deltaInputShape;
     const [f, kh, kw, d] = kernelShape;
-
-    if (deltaD !== f) {
-        throw new Error(`ConvolveBackward: delta depth (${deltaD}) != number of filters (${f})`);
-    }
-    if (inputD !== d) {
-        throw new Error(`ConvolveBackward: output depth (${inputD}) != kernel input depth (${d})`);
-    }
-    if (input.length !== deltaH * deltaW * deltaD) {
-        throw new Error(`ConvolveBackward: expected ${deltaH * deltaW * deltaD} input values, received ${input.length}`);
-    }
-    if (kernels.length !== f * kh * kw * d) {
-        throw new Error(`ConvolveBackward: expected ${f * kh * kw * d} weights, received ${kernels.length}`);
-    }
 
     const padTop = deltaH === inputH ? Math.floor((kh - 1) / 2) : 0;
     const padLeft = deltaW === inputW ? Math.floor((kw - 1) / 2) : 0;
@@ -592,17 +586,44 @@ const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightG
 
 }
 
-const AccumulateGammaAndBetaGrads = (gammaGrads, dGamma, betaGrads, dBeta) => {
-
-    for (let i = 0; i < dGamma.length; i++) {
-        gammaGrads[i] += dGamma[i];
-        betaGrads[i] += dBeta[i];
+const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+    const activationFunction = {
+        "relu": DReLu,
+        "sigmoid":DSigmoid,
+        "tanh":DTanh,
+        "linear":DLinear,
+        "softmax":DSoftmax
     }
 
+    // special case for hidden layers that uses softmax activation (which is uncommon), the 
+    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
+    if (applyActivationDerivative && activationFuncType === "softmax") {
+        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
+
+        const {weightGrads, biasGrads} = AccumulateWeightAndBiasGradsForConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    
+        return {
+            delta: finalDelta,
+            weightGrads: weightGrads,
+            biasGrads: biasGrads
+        }
+    }
+
+    // get the derivatives
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        const dAct = activationFunction[activationFuncType](zs);
+        finalDelta = element_wise_mul(dAct, incoming_delta);
+    }
+
+    const {weightGrads, biasGrads} = AccumulateWeightAndBiasGradsForConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    
     return {
-        gammaGrads: gammaGrads,
-        betaGrads: betaGrads
+        delta: finalDelta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
+
 }
 
 const MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
@@ -1024,6 +1045,45 @@ const accumulateWeightandBiasGradsForTransConv = (activation_outputs, deltas, we
     };
 }
 
+const fusedFinalDeltaProjector_ForTransConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+    const activationFunction = {
+        "relu": DReLu,
+        "sigmoid":DSigmoid,
+        "tanh":DTanh,
+        "linear":DLinear,
+        "softmax":DSoftmax
+    }
+
+    // special case for hidden layers that uses softmax activation (which is uncommon), the 
+    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
+    if (applyActivationDerivative && activationFuncType === "softmax") {
+        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
+
+        const {weightGrads, biasGrads} = accumulateWeightandBiasGradsForTransConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    
+        return {
+            delta: finalDelta,
+            weightGrads: weightGrads,
+            biasGrads: biasGrads
+        }
+    }
+
+    // get the derivatives
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        const dAct = activationFunction[activationFuncType](zs);
+        finalDelta = element_wise_mul(dAct, incoming_delta);
+    }
+
+    const {weightGrads, biasGrads} = accumulateWeightandBiasGradsForTransConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    
+    return {
+        delta: finalDelta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    }
+}
+
 const dotProduct = (arr1, arr2, inputSize, outputSize) => {
     const output = new Float32Array(outputSize);
 
@@ -1069,7 +1129,20 @@ const computelayerNorm = (input, size, gamma, beta, eps) => {
     return outputs;
 }
 
-function computeLayerNormBackward(dY, X, gamma, size, eps) {
+const AccumulateGammaAndBetaGrads = (gammaGrads, dGamma, betaGrads, dBeta) => {
+
+    for (let i = 0; i < dGamma.length; i++) {
+        gammaGrads[i] += dGamma[i];
+        betaGrads[i] += dBeta[i];
+    }
+
+    return {
+        gammaGrads: gammaGrads,
+        betaGrads: betaGrads
+    }
+}
+
+const computeLayerNormBackward = (dY, X, gamma, weightGrads, biasGrads, size, eps) => {
     const dX = new Float32Array(size);
     const dGamma = new Float32Array(size);
     const dBeta = new Float32Array(size);
@@ -1103,7 +1176,8 @@ function computeLayerNormBackward(dY, X, gamma, size, eps) {
         dGamma[i] = dY[i] * xHat[i];
 
         // Accumulate scalar sums for input gradient equation
-        const dyGamma = dY[i] * gamma[i];sumDy += dyGamma;
+        let dyGamma = dY[i] * gamma[i]; 
+        sumDy += dyGamma;
         sumDyXhat += dyGamma * xHat[i];
     }
 
@@ -1114,7 +1188,13 @@ function computeLayerNormBackward(dY, X, gamma, size, eps) {
         dX[i] = stdInv * (dyGamma - (sumDy * invSize) - (xHat[i] * sumDyXhat * invSize));
     }
 
-    return { dX, dGamma, dBeta };
+    const {gammaGrads, betaGrads} = AccumulateGammaAndBetaGrads(weightGrads, dGamma, biasGrads, dBeta);
+
+    return {
+        delta: dX,
+        weightGrads: gammaGrads,
+        biasGrads: betaGrads
+    }
 }
 
 const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
@@ -1628,17 +1708,22 @@ module.exports = {
     DenseForward,
     DeltaMatMul,
     accumulateWeightsAndBiasGradsForConnectedLayer,
+    fusedFinalDeltaProjector_ForDense,
 
     scale,
     SGD,
     Adam,
     RMSProp,
+
     ConvolveForward,
     ConvolveBackward,
     AccumulateWeightAndBiasGradsForConv,
+    fusedFinalDeltaProjector_ForConv,
+
     transConvForward,
     transConvBackward,
-    accumulateWeightandBiasGradsForTransConv,
+    fusedFinalDeltaProjector_ForTransConv,
+
     MaxPooling,
     MaxPoolDelta,
     element_wise_mul,
@@ -1669,5 +1754,4 @@ module.exports = {
     computeLayerNormBackward,
     AccumulateGammaAndBetaGrads,
 
-    fusedFinalDeltaProjector,
 }

@@ -1,6 +1,6 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
-const {cacheOutputLayerDelta, fusedFinalDeltaProjector, transConvForward, scaleDiff, transConvBackward, element_wise_mul, element_wise_sub, accumulateWeightandBiasGradsForTransConv} = require("../../core/bindings");
+const {cacheOutputLayerDelta, transConvForward, scaleDiff, transConvBackward, element_wise_sub, fusedFinalDeltaProjector_ForTransConv} = require("../../core/bindings");
 const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
@@ -206,67 +206,40 @@ const projectDeltaBackward = (data) => {
     return result;
 }
 
-const applyOwnDerivative = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
-    const delta = data.delta;
+    const modelID = data.modelID;
+    const incoming_delta = data.delta;
     const z = data.z_value;
-    const modelID = data.modelID;
+    const wg = data.weightGrads;
+    const bg = data.biasGrads;
+    const activatedOutput = data.activatedOutput;
     const layerID = layerData.layerID;
+    const kernelShape = layerData.weightShape;
+    const inputShape = layerData.inputShape;
+    const outputShape = layerData.outputShape; 
+    
+    const activationString = layerData.activation_function.name;
 
-    const dActivation = layerData.activation_function.name;
-    const storedOutput = layerData.cache.layer_output;
-
-    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
-    if (result.some(v => Number.isNaN(v))) {
-        console.error("element_wise_mul result has NaNs in applyOwnDerivative (trans conv)");
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForTransConv(z, activatedOutput, incoming_delta, wg, bg, inputShape, outputShape, kernelShape, layerData.strides, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
+    
+    if (delta.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during derivative application in convolutional layer");
         throw new Error(errFlags.NAN_ERR);
-    }
-
-    return result;
-}
-
-const gradientAccumulation = (data) => {
-    const layerData = data.layerData;
-    const deltas = data.deltas;
-    const modelID = data.modelID;
-    const activation_outputs = data.activation_outputs;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
-    const layerID = layerData.layerID;
-
-    const strides = layerData.strides;
-    const inputShape = layerData.inputShape; // [iH, iW, iD]
-    const outputShape = layerData.outputShape; // [oH, oW, oD]
-    const weightShape = layerData.weightShape; // [f, kh, kw, d]
-
-    const {weightGrads: kernelWeightGrads, biasGrads: kernelBiasGrads} = accumulateWeightandBiasGradsForTransConv(
-        activation_outputs,
-        deltas,
-        weightGrads,
-        biasGrads,
-        inputShape,
-        outputShape,
-        weightShape,
-        strides,
-        modelID,
-        layerID
-    );
-
-    if (kernelWeightGrads.some(v => Number.isNaN(v))) {
-        console.error("weight gradient accumulation outputs NaNs (trans conv)");
-        throw new Error(errFlags.NAN_ERR)
     }
     
-    if (kernelBiasGrads.some(v => Number.isNaN(v))) {
-        console.error("bias gradient accumulation result has NaNs in accumulateBiasGradients (trans conv)");
+    if (weightGrads.some(v => Number.isNaN(v)) || biasGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during gradient accumulation in convolutional layer");
         throw new Error(errFlags.NAN_ERR);
     }
-
+    
     return {
-        accumulatedWeightGrads: kernelWeightGrads,
-        accumulatedBiasGrads: kernelBiasGrads
-    }
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
+
 
 
 module.exports = {
@@ -275,6 +248,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients
 }

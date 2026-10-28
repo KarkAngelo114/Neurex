@@ -1,4 +1,4 @@
-const { computeLayerNorm, computeLayerNormBackward, AccumulateGammaAndBetaGrads } = require("../../core/bindings/entry");
+const { computeLayerNorm, computeLayerNormBackward } = require("../../core/bindings/entry");
 const { createTensorBuffer } = require("../../utils/utils");
 const errFlags = require('../../err_flags');
 
@@ -59,55 +59,24 @@ const getOutputLayerDelta = () => {
     throw new Error("[ERROR] LayerNorm cannot be used as an output layer.");
 }
 
-const applyOwnDerivative = (data) => {
-    const delta = data.delta;
-    const layerData = data.layerData;
+const applyDerivativeAndComputeGradients = (data) => {
+    const incoming_delta = data.delta;
     const pointer = data.pointer;
-    const modelID = data.modelID;
-    const layerID = layerData.layerID;
-    const eps = layerData.eps || 1e-5;
-
-    const X = layerData.cache.X;
-    const size = delta.length;
-
-    const { dX, dGamma, dBeta } = computeLayerNormBackward(delta, X, size, eps, pointer, modelID, layerID);
-
-    layerData.cache.dGamma = dGamma;
-    layerData.cache.dBeta = dBeta;
-
-    if (dX.some(v => Number.isNaN(v))) {
-        console.error("layerNorm has NaNs after delta projection");
-        throw new Error(errFlags.NAN_ERR);
-    }
-    
-    return dX;
-};
-
-const gradientAccumulation = (data) => {
+    const weight_grads = data.weightGrads;
+    const bias_grads = data.biasGrads;
     const layerData = data.layerData;
+    const eps = layerData.eps || 1e-5;
+    const X = layerData.cache.X;
+    const size = incoming_delta.length;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
-    const gammaGrads = data.weightGrads;
-    const betaGrads = data.biasGrads;
 
-    const dGamma = layerData.cache.dGamma;
-    const dBeta = layerData.cache.dBeta;
-
-    const {gammaGrads: accumulatedGammaGrads, betaGrads: accumulatedBetaGrads} = AccumulateGammaAndBetaGrads(gammaGrads, dGamma, betaGrads, dBeta, modelID, layerID);
-
-    if (accumulatedGammaGrads.some(v => Number.isNaN(v))) {
-        console.error("NaN detected after accumulating gamma grads");
-        throw new Error(errFlags.NAN_ERR);
-    }
-    
-    if (accumulatedBetaGrads.some(v => Number.isNaN(v))) {
-        console.error("NaN detected after accumulating beta grads");
-        throw new Error(errFlags.NAN_ERR);
-    }
+    const { delta, weightGrads, biasGrads } = computeLayerNormBackward(incoming_delta, X, weight_grads, bias_grads, size, eps, pointer, modelID, layerID);
 
     return {
-        accumulatedWeightGrads: accumulatedGammaGrads,
-        accumulatedBiasGrads: accumulatedBetaGrads
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
 }
 
@@ -116,6 +85,5 @@ module.exports = {
     determineInferenceType,
     feedforward,
     getOutputLayerDelta,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients,
 }

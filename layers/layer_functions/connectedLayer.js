@@ -1,4 +1,4 @@
-const { DenseForward, fusedFinalDeltaProjector, element_wise_sub, element_wise_mul, accumulateWeightsAndBiasGradsForConnectedLayer, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
+const { DenseForward, fusedFinalDeltaProjector_ForDense, element_wise_sub, scaleDiff, DeltaMatMul, cacheOutputLayerDelta } = require("../../core/bindings");
 const { ifOneHotEndcoded, createTensorBuffer } = require("../../utils/utils");
 const activation = require('../../core/bindings');
 const { red, reset } = require("../../color-code");
@@ -175,53 +175,37 @@ const projectDeltaBackward = (data) => {
     return result;
 }
 
-const applyOwnDerivative = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const modelID = data.modelID;
-    const delta = data.delta;
+    const incoming_delta = data.delta;
     const z = data.z_value;
+    const wg = data.weightGrads;
+    const bg = data.biasGrads;
+    const activatedOutput = data.activatedOutput;
+    const weightShape = layerData.weightShape;
     const layerID = layerData.layerID;
 
-    const dActivation = layerData.activation_function.name
-    const storedOutput = layerData.cache.layer_output;
+    const activationString = layerData.activation_function.name
+    
 
-    const result = fusedFinalDeltaProjector(z, storedOutput, delta, dActivation, modelID, layerID);
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForDense(z, activatedOutput, incoming_delta, wg, bg, weightShape, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
 
-    if (result.some(v => Number.isNaN(v))) {
+    if (delta.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in connected layer");
         throw new Error(errFlags.NAN_ERR);
     }
 
-    return result;
-}
-
-const gradientAccumulation = (data) => {
-    const layerData = data.layerData;
-    const modelID = data.modelID;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
-    const activation_outputs = data.activation_outputs;
-    const deltas = data.deltas;
-    const layerID = layerData.layerID;
-
-    const weightShape = layerData.weightShape;
-
-    const {weightGrads: accumulatedWeightGrads, biasGrads: accumulatedBiasGrads } = accumulateWeightsAndBiasGradsForConnectedLayer(activation_outputs, deltas, weightGrads, biasGrads, weightShape, modelID, layerID);
-
-    if (accumulatedWeightGrads.some(v => Number.isNaN(v))) {
-        console.error("NaN detected during weightGrads accumulation in connected layer");
+    if (weightGrads.some(v => Number.isNaN(v)) || biasGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during gradient accumulation in connected layer");
         throw new Error(errFlags.NAN_ERR);
-    };
-
-    if (accumulatedBiasGrads.some(v => Number.isNaN(v))) {
-        console.error("NaN detected during biasGrads accumulation in connected layer");
-        throw new Error(errFlags.NAN_ERR);
-    };
+    }
 
     return {
-        accumulatedWeightGrads: accumulatedWeightGrads,
-        accumulatedBiasGrads: accumulatedBiasGrads
-    }
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
 
 
@@ -231,6 +215,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients,
 }
