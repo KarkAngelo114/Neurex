@@ -1435,112 +1435,6 @@ const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHea
     return output_object;
 }
 
-const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking) => {
-    const {Q_weights, K_weights, V_weights, O_weights} = unpackQKVO(weights, null, null, null, embedDim, true);
-
-    // first we get the dMHAoutput by projecting the incoming delta to transposed O_weights
-    const transposed_O = transpose2D(O_weights, embedDim, embedDim);
-    const dMhaOutput = new Float32Array(embedDim * seqLen);
-    for (let i = 0; i < seqLen; i++) {
-        const incomingDeltaRow = incomingDelta.subarray(i * embedDim, (i + 1) * embedDim);
-        dMhaOutput.set(dotProduct(incomingDeltaRow, transposed_O, embedDim, embedDim), i * embedDim);
-    }
-
-    // Per head
-    const dQ = new Float32Array(seqLen * embedDim);
-    const dK = new Float32Array(seqLen * embedDim);
-    const dV = new Float32Array(seqLen * embedDim);
-
-    for (let h = 0; h < numHeads; h++) {
-        const headOffset = h * headDim;
-
-        const S = S_perHead.subarray(h * seqLen * seqLen, (h + 1) * seqLen * seqLen);
-
-        // slice this head's Q_h, K_h, V_h, and its share of dMhaOutput
-        const Q_h = new Float32Array(seqLen * headDim);
-        const K_h = new Float32Array(seqLen * headDim);
-        const V_h = new Float32Array(seqLen * headDim);
-        const dHeadOut = new Float32Array(seqLen * headDim);
-        for (let t = 0; t < seqLen; t++) {
-            Q_h.set(Q.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
-            K_h.set(K.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
-            V_h.set(V.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
-            dHeadOut.set(dMhaOutput.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
-        }
-
-        const transpose_Vh = transpose2D(V_h, seqLen, headDim);
-        const dS = new Float32Array(seqLen * seqLen);
-        for (let t = 0; t < seqLen; t++) {
-            dS.set(dotProduct(dHeadOut.subarray(t * headDim, (t + 1) * headDim), transpose_Vh, headDim, seqLen), t * seqLen);
-        }
-
-        const transpose_S = transpose2D(S, seqLen, seqLen);
-        const dV_h = new Float32Array(seqLen * headDim);
-        for (let k = 0; k < seqLen; k++) {
-            dV_h.set(dotProduct(transpose_S.subarray(k * seqLen, (k + 1) * seqLen), dHeadOut, seqLen, headDim), k * headDim);
-        }
-
-        const dScaled = new Float32Array(seqLen * seqLen);
-        for (let t = 0; t < seqLen; t++) {
-            const sRow = S.subarray(t * seqLen, (t + 1) * seqLen);
-            const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
-            dScaled.set(DSoftmax(sRow, dSRow), t * seqLen);
-        }
-
-        const dScores = scale(dScaled, dkRoot);
-
-        if (useCausalMasking) {
-            for (let i = 0; i < seqLen; i++) {
-                for (let j = i + 1; j < seqLen; j++) {
-                    dScores[i * seqLen + j] = 0;
-                }
-            }
-        }
-
-        const dQ_h = new Float32Array(seqLen * headDim);
-        for (let t = 0; t < seqLen; t++) {
-            dQ_h.set(dotProduct(dScores.subarray(t * seqLen, (t + 1) * seqLen), K_h, seqLen, headDim), t * headDim);
-        }
-        
-        const transpose_dScores = transpose2D(dScores, seqLen, seqLen);
-        const dK_h = new Float32Array(seqLen * headDim);
-        for (let k = 0; k < seqLen; k++) {
-            dK_h.set(dotProduct(transpose_dScores.subarray(k * seqLen, (k + 1) * seqLen), Q_h, seqLen, headDim), k * headDim);
-        }
-
-        // write this head's contribution back into the FULL embedDim-wide buffers
-        for (let t = 0; t < seqLen; t++) {
-            dQ.set(dQ_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
-            dK.set(dK_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
-            dV.set(dV_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
-        }
-    }
-
-    const transpose_Qw = transpose2D(Q_weights, embedDim, embedDim);
-    const transpose_Kw = transpose2D(K_weights, embedDim, embedDim);
-    const transpose_Vw = transpose2D(V_weights, embedDim, embedDim);
-    const dX = new Float32Array(seqLen * embedDim);
-    for (let t = 0; t < seqLen; t++) {
-        const fromQ = dotProduct(dQ.subarray(t * embedDim, (t + 1) * embedDim), transpose_Qw, embedDim, embedDim);
-        const fromK = dotProduct(dK.subarray(t * embedDim, (t + 1) * embedDim), transpose_Kw, embedDim, embedDim);
-        const fromV = dotProduct(dV.subarray(t * embedDim, (t + 1) * embedDim), transpose_Vw, embedDim, embedDim);
-        for (let d = 0; d < embedDim; d++) {
-            dX[t * embedDim + d] = fromQ[d] + fromK[d] + fromV[d]
-        };
-    }
-
-
-    const data = {
-        dQ: dQ,
-        dK: dK,
-        dV: dV,
-        dMhaOutput: dMhaOutput,
-        dX: dX
-    }
-
-    return data;
-}
-
 const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, biasGrads, embedDim, seqLen) => {
     const {Q_weightGrads, K_weightGrads, V_weightGrads, O_weightGrads, Q_biasGrads, K_biasGrads, V_biasGrads, O_biasGrads} = unpackQKVO(null, null, weightGrads, biasGrads, embedDim, true);
     let QwG, KwG, VwG, OwG, QbG, KbG, VbG, ObG;
@@ -1578,6 +1472,118 @@ const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, a
     return {
         weightGrads: concatenateFloat32Array([QwG, KwG, VwG, OwG]),
         biasGrads: concatenateFloat32Array([QbG, KbG, VbG, ObG])
+    }
+
+}
+
+const CoreMultiHeadAttentionBackward = (incomingDelta, weights, Q, K, V, S_perHead, mhaOutput, activated_output, weight_grads, bias_grads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking) => {
+    const {Q_weights, K_weights, V_weights, O_weights} = unpackQKVO(weights, null, null, null, embedDim, true);
+
+    // first we get the dMHAoutput by projecting the incoming delta to transposed O_weights
+    const transposed_O = transpose2D(O_weights, embedDim, embedDim);
+    const dMhaOutput = new Float32Array(embedDim * seqLen);
+
+    for (let i = 0; i < seqLen; i++) {
+        const incomingDeltaRow = incomingDelta.subarray(i * embedDim, (i + 1) * embedDim);
+        dMhaOutput.set(dotProduct(incomingDeltaRow, transposed_O, embedDim, embedDim), i * embedDim);
+    }
+
+    // Per head
+    const dQ = new Float32Array(seqLen * embedDim);
+    const dK = new Float32Array(seqLen * embedDim);
+    const dV = new Float32Array(seqLen * embedDim);
+
+    for (let h = 0; h < numHeads; h++) {
+        const headOffset = h * headDim;
+
+        const S = S_perHead.subarray(h * seqLen * seqLen, (h + 1) * seqLen * seqLen);
+
+        // slice this head's Q_h, K_h, V_h, and its share of dMhaOutput
+        const Q_h = new Float32Array(seqLen * headDim);
+        const K_h = new Float32Array(seqLen * headDim);
+        const V_h = new Float32Array(seqLen * headDim);
+        const dHeadOut = new Float32Array(seqLen * headDim);
+
+        for (let t = 0; t < seqLen; t++) {
+            Q_h.set(Q.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            K_h.set(K.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            V_h.set(V.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+            dHeadOut.set(dMhaOutput.subarray(t * embedDim + headOffset, t * embedDim + headOffset + headDim), t * headDim);
+        }
+
+        const transpose_Vh = transpose2D(V_h, seqLen, headDim);
+        const dS = new Float32Array(seqLen * seqLen);
+
+        for (let t = 0; t < seqLen; t++) {
+            dS.set(dotProduct(dHeadOut.subarray(t * headDim, (t + 1) * headDim), transpose_Vh, headDim, seqLen), t * seqLen);
+        }
+
+        const transpose_S = transpose2D(S, seqLen, seqLen);
+
+        const dV_h = new Float32Array(seqLen * headDim);
+
+        for (let k = 0; k < seqLen; k++) {
+            dV_h.set(dotProduct(transpose_S.subarray(k * seqLen, (k + 1) * seqLen), dHeadOut, seqLen, headDim), k * headDim);
+        }
+
+        const dScaled = new Float32Array(seqLen * seqLen);
+
+        for (let t = 0; t < seqLen; t++) {
+            const sRow = S.subarray(t * seqLen, (t + 1) * seqLen);
+            const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
+            dScaled.set(DSoftmax(sRow, dSRow), t * seqLen);
+        }
+
+        const dScores = scale(dScaled, dkRoot);
+
+        if (useCausalMasking) {
+            for (let i = 0; i < seqLen; i++) {
+                for (let j = i + 1; j < seqLen; j++) {
+                    dScores[i * seqLen + j] = 0;
+                }
+            }
+        }
+
+        const dQ_h = new Float32Array(seqLen * headDim);
+
+        for (let t = 0; t < seqLen; t++) {
+            dQ_h.set(dotProduct(dScores.subarray(t * seqLen, (t + 1) * seqLen), K_h, seqLen, headDim), t * headDim);
+        }
+        
+        const transpose_dScores = transpose2D(dScores, seqLen, seqLen);
+        const dK_h = new Float32Array(seqLen * headDim);
+        for (let k = 0; k < seqLen; k++) {
+            dK_h.set(dotProduct(transpose_dScores.subarray(k * seqLen, (k + 1) * seqLen), Q_h, seqLen, headDim), k * headDim);
+        }
+
+        // write this head's contribution back into the FULL embedDim-wide buffers
+        for (let t = 0; t < seqLen; t++) {
+            dQ.set(dQ_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+            dK.set(dK_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+            dV.set(dV_h.subarray(t * headDim, (t + 1) * headDim), t * embedDim + headOffset);
+        }
+    }
+
+    const transpose_Qw = transpose2D(Q_weights, embedDim, embedDim);
+    const transpose_Kw = transpose2D(K_weights, embedDim, embedDim);
+    const transpose_Vw = transpose2D(V_weights, embedDim, embedDim);
+
+    const dX = new Float32Array(seqLen * embedDim);
+    for (let t = 0; t < seqLen; t++) {
+        const fromQ = dotProduct(dQ.subarray(t * embedDim, (t + 1) * embedDim), transpose_Qw, embedDim, embedDim);
+        const fromK = dotProduct(dK.subarray(t * embedDim, (t + 1) * embedDim), transpose_Kw, embedDim, embedDim);
+        const fromV = dotProduct(dV.subarray(t * embedDim, (t + 1) * embedDim), transpose_Vw, embedDim, embedDim);
+        for (let d = 0; d < embedDim; d++) {
+            dX[t * embedDim + d] = fromQ[d] + fromK[d] + fromV[d]
+        };
+    }
+
+    const {weightGrads, biasGrads} = accumulate_MHA_WeightsAndBiasGrads(dQ, dK, dV, dMhaOutput, mhaOutput, activated_output, weight_grads, bias_grads, embedDim, seqLen);
+
+    return {
+        delta: dX,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
 
 }
@@ -1742,15 +1748,18 @@ module.exports = {
     gradientClipping,
     computelayerNorm,
     jaccard,
+
     CoreAttention,
     CoreAttentionBackward,
-    CoreMultiHeadAttention,
-    CoreMultiHeadAttentionBackward,
-    accumulate_MHA_WeightsAndBiasGrads,
-    element_wise_add,
-    SinusoidalPositionalEncoding,
     accumulateSimpleAttentionWeightGrads,
     accumulateSimpleAttentionBiasGrads,
+
+    CoreMultiHeadAttention,
+    CoreMultiHeadAttentionBackward,
+
+    element_wise_add,
+    SinusoidalPositionalEncoding,
+    
     computeLayerNormBackward,
     AccumulateGammaAndBetaGrads,
 

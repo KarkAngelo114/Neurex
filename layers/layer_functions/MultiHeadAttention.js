@@ -1,4 +1,4 @@
-const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward, accumulate_MHA_WeightsAndBiasGrads} = require('../../core/bindings/entry');
+const { CoreMultiHeadAttention, CoreMultiHeadAttentionBackward} = require('../../core/bindings/entry');
 const { createTensorBuffer, concatenateFloat32Array } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
@@ -100,75 +100,26 @@ const projectDeltaBackward = (data) => {
     return data.delta;
 }
 
-
-const applyOwnDerivative = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const pointer = data.pointer;
     const modelID = data.modelID;
-    const delta = data.delta;
+    const incoming_delta = data.delta;
     const layerID = layerData.layerID;
+    const weight_grads = data.weightGrads;
+    const bias_grads = data.biasGrads;
+    const activatedOutput = data.activatedOutput;
 
     const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
-    const { Q, K, V, S_perHead } = cache;
-    const {dQ, dK, dV, dMhaOutput, dX} = CoreMultiHeadAttentionBackward(delta, Q, K, V, S_perHead, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
+    const { Q, K, V, S_perHead, mhaOutput } = cache;
 
-    layerData.cache = {
-        ...cache,
-        dQ: dQ,
-        dK: dK,
-        dV: dV,
-        dMhaOutput: dMhaOutput,
-        dX: dX
-    };
+    const {delta, weightGrads, biasGrads} = CoreMultiHeadAttentionBackward(incoming_delta, Q, K, V, S_perHead, mhaOutput, activatedOutput, weight_grads, bias_grads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
-    if (dX.some(v => Number.isNaN(v))) {
-        console.error("[ERROR] output array has NaNs (Multi-Head Attention during projecting delta backward)");
-        throw new Error(errFlags.NAN_ERR);
-    }
     
-    return dX;
-}
-
-
-const gradientAccumulation = (data) => {
-    const layerData = data.layerData;
-    const modelID = data.modelID;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
-    const activation_outputs = data.activation_outputs;
-    const layerID = layerData.layerID;
-
-    const { embedDim, seqLen, cache } = layerData;
-    const { dQ, dK, dV, dMhaOutput, mhaOutput } = cache;
-
-    const {weightGrads: accumulatedAttentionWeightGrads, biasGrads: accumulatedAttentionBiasGrads } = accumulate_MHA_WeightsAndBiasGrads(
-        dQ,
-        dK,
-        dV,
-        dMhaOutput,
-        mhaOutput,
-        activation_outputs,
-        weightGrads,
-        biasGrads,
-        embedDim,
-        seqLen,
-        modelID,
-        layerID
-    );
-
-    if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) {
-        console.error("[ERROR] output array has NaNs (Multi-Head Attention during weight gradient accumulation)");
-        throw new Error(errFlags.NAN_ERR);
-    }
-    
-    if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) {
-        console.error("[ERROR] output array has NaNs (Multi-Head Attention during bias gradient accumulation)");
-        throw new Error(errFlags.NAN_ERR);
-    }
-
     return {
-        accumulatedWeightGrads: accumulatedAttentionWeightGrads,
-        accumulatedBiasGrads: accumulatedAttentionBiasGrads
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
 }
 
@@ -178,6 +129,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients,
 }

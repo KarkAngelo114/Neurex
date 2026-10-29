@@ -416,8 +416,7 @@ class Layers {
                 feedforward: (data) => mha.feedforward(data),
                 getOutputLayerDelta: (data) => mha.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => mha.projectDeltaBackward(data),
-                applyOwnDerivative: (data) => mha.applyOwnDerivative(data),
-                gradientAccumulation: (data) => mha.gradientAccumulation(data),
+                applyDerivativeAndComputeGradients: (data) => mha.applyDerivativeAndComputeGradients(data),
             }
 
         }

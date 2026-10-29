@@ -938,30 +938,38 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
 );
 
 /**
- * "✅☑️"
- * @param {Float32Array} delta incoming delta
- * @param {Float32Array} Q cached Q
- * @param {Float32Array} K cached K
- * @param {Float32Array} V cached V
- * @param {Float32Array} S cached softmax output per head, flattened head-major
- * @param {Number} embedDim embedding dimension
- * @param {Number} seqLen sequence length value 
- * @param {Number} numHeads number of heads that process scaled dot product in parallel
- * @param {Number} headDim head dim value
- * @param {Number} dkRoot dkRoot value. Used for scaling attention delta scores
- * @param {Boolean} useCasualMasking casual masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
- * @param {Number} pointer pointer value to reference corresponding layer parameter 
- * @param {String} modelID string value to reference model's unique parameters
- * @param {String} layerID string value to reference model's unique parameters
- * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dMhaOutput: Float32Array, dX: Float32Array}}
+ * "☑️" performs the calculation of gradients for a multi-head attention layer. 
+ * @param {Float32Array} delta 
+ * @param {Float32Array} Q 
+ * @param {Float32Array} K 
+ * @param {Float32Array} V 
+ * @param {Float32Array} S 
+ * @param {Float32Array} mhaOutput 
+ * @param {Float32Array} activatedOutput 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biasGrads 
+ * @param {Number} embedDim 
+ * @param {Number} seqLen 
+ * @param {Number} numHeads 
+ * @param {Number} headDim 
+ * @param {Number} dkRoot 
+ * @param {Boolean} useCausalMasking 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => functions.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, mhaOutput, activatedOutput, weightGrads, biasGrads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => float32_Modules.CoreMultiHeadAttentionBackward(
     delta,
     getGlobalParams(modelID).globalWeights[pointer],
     Q,
     K,
     V,
     S,
+    mhaOutput,
+    activatedOutput,
+    weightGrads,
+    biasGrads,
     embedDim,
     seqLen,
     numHeads,
@@ -969,37 +977,6 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, num
     dkRoot,
     useCausalMasking,
     pointer,
-    modelID,
-    layerID
-);
-
-/**
- * "☑️"
- * @param {Float32Array} dQ 
- * @param {Float32Array} dK 
- * @param {Float32Array} dV 
- * @param {Float32Array} dMhaOutput 
- * @param {Float32Array} mhaOutput 
- * @param {Float32Array} activation_outputs 
- * @param {Float32Array} weightGrads 
- * @param {Float32Array} biasGrads 
- * @param {Number} embedDim 
- * @param {Number} seqLen 
- * @param {String} modelID 
- * @param {String} layerID 
- * @returns {{weightGrdas: Float32Array, biasGrads: Float32Array}}
- */
-const accumulate_MHA_WeightsAndBiasGrads = (dQ, dK, dV, dMhaOutput, mhaOutput, activation_outputs, weightGrads, biasGrads, embedDim, seqLen, modelID, layerID) => functions.accumulate_MHA_WeightsAndBiasGrads(
-    dQ,
-    dK,
-    dV,
-    dMhaOutput,
-    mhaOutput,
-    activation_outputs,
-    weightGrads,
-    biasGrads,
-    embedDim,
-    seqLen,
     modelID,
     layerID
 );
@@ -1124,7 +1101,6 @@ module.exports = {
 
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,
-    accumulate_MHA_WeightsAndBiasGrads,
 
     computeLayerNorm,
     computeLayerNormBackward,
