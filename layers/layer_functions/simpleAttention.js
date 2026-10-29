@@ -1,5 +1,6 @@
-const { CoreAttention, CoreAttentionBackward, accumulateSimpleAttentionWeightGrads, accumulateSimpleAttentionBiasGrads } = require('../../core/bindings');
+const { CoreSimpleAttention, CoreSimpleAttentionBackward, accumulateSimpleAttentionWeightGrads, accumulateSimpleAttentionBiasGrads } = require('../../core/bindings');
 const { createTensorBuffer, concatenateFloat32Array } = require('../../utils');
+const err_flags = require('../../err_flags');
 
 /**
  * Initialized parameters for this layer
@@ -57,9 +58,9 @@ const feedforward = (data) => {
     const modelID = data.modelID;
     const layerID = layerData.layerID;
 
-    const { embedDim, dkRoot, seqLen } = layerData;
+    const { embedDim, dkRoot, seqLen, useCausalMasking } = layerData;
 
-    const {X, Q, K, V, S, output} = CoreAttention(input, embedDim, seqLen, dkRoot, pointer, modelID, layerID);
+    const {X, Q, K, V, S, output} = CoreSimpleAttention(input, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
     layerData.cache = {
         X: X,
@@ -83,55 +84,41 @@ const getOutputLayerDelta = () => {
 }
 
 const projectDeltaBackward = (data) => {
-    const layerData = data.layerData;
-    const pointer = data.pointer;
-    const modelID = data.modelID;
-    const delta = data.delta;
-    const layerID = layerData.layerID;
-
-    const {cache, embedDim, seqLen, dkRoot} = layerData;
-    const {Q, K, V, S } = cache;
-    const { dQ, dK, dV, dX} = CoreAttentionBackward(delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID, layerID);
-
-    layerData.cache = {
-        ...cache,
-        dQ,
-        dK, 
-        dV
-    };
-
-    if (dX.some(v => Number.isNaN(v))) throw new Error("[ERROR]---- output array has NaNs (Simple Attention during projecting delta backward)");
-    return dX;
-}
-
-const applyOwnDerivative = (data) => {
     return data.delta;
 }
 
-const gradientAccumulation = (data) => {
+const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
-    const deltas = data.deltas;
     const pointer = data.pointer;
     const modelID = data.modelID;
-    const activation_outputs = data.activation_outputs;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
+    const incoming_delta = data.delta;
+    const weight_grads = data.weightGrads;
+    const bias_grads = data.biasGrads;
+    const activatedOutput = data.activatedOutput;
+
     const layerID = layerData.layerID;
 
-    const { embedDim, seqLen, cache } = layerData;
-    const { dQ, dK, dV } = cache;
-    
-    const accumulatedAttentionWeightGrads = accumulateSimpleAttentionWeightGrads(dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID);
-    if (accumulatedAttentionWeightGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during weight gradient accumulation)");
+    const {cache, embedDim, seqLen, dkRoot, useCausalMasking} = layerData;
+    const {Q, K, V, S } = cache;
+    const {delta, weightGrads, biasGrads} = CoreSimpleAttentionBackward(incoming_delta, Q, K, V, S, weight_grads, bias_grads, activatedOutput, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
-    const accumulatedAttentionBiasGrads = accumulateSimpleAttentionBiasGrads(dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID);
-    if (accumulatedAttentionBiasGrads.some(v => Number.isNaN(v))) throw new Error("[ERROR] output array has NaNs (Simple Attention during bias gradient accumulation)");
+    if (delta.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] output array has NaNs (Simple Attention during projecting delta backward)");
+        throw new Error(err_flags.NAN_ERR);
+    }
+
+    if (weightGrads.some(v => Number.isNaN(v)) || biasGrads.some(v => Number.isNaN(v))) {
+        console.error("[ERROR] gradients has NaNs in Simple Attention layer after gradient accumulation");
+        throw new Error(err_flags.NAN_ERR);
+    }
 
     return {
-        accumulatedWeightGrads: accumulatedAttentionWeightGrads,
-        accumulatedBiasGrads: accumulatedAttentionBiasGrads
-    }
+        delta: delta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
+
 
 module.exports = {
     initParams,
@@ -139,6 +126,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients,
 }

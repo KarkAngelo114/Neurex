@@ -1234,7 +1234,7 @@ const projectToQKV = (
     }
 }
 
-const CoreAttention = (input, weights, biases, embedDim, seqLen, dkRoot) => {
+const CoreSimpleAttention = (input, weights, biases, embedDim, seqLen, dkRoot, useCausalMasking) => {
     const {Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias} = unpackQKVO(weights, biases, null, null, embedDim);
 
     const {Q, K, V} = projectToQKV(input, Q_weights, Q_bias, K_weights, K_bias, V_weights, V_bias, embedDim, seqLen);
@@ -1253,6 +1253,12 @@ const CoreAttention = (input, weights, biases, embedDim, seqLen, dkRoot) => {
     const softmaxOutput = new Float32Array(seqLen * seqLen);
     for (let t = 0; t < seqLen; t++) {
         const row = scaledvals.subarray(t * seqLen, (t + 1) * seqLen);
+
+        if (useCausalMasking) {
+            for (let future = t + 1; future < seqLen; future++) {
+                row[future] = -1e9;
+            }
+        }
         softmaxOutput.set(Softmax(row), t * seqLen);
     }
 
@@ -1275,7 +1281,38 @@ const CoreAttention = (input, weights, biases, embedDim, seqLen, dkRoot) => {
     return output_object;
 }
 
-const CoreAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, embedDim, seqLen, dkRoot) => {
+const accumulate_simple_attention_gradients = (dQ, dK, dV, activatedOutput, weight_grads, bias_grads, embedDim, seqLen) => {
+    const {Q_weightGrads, K_weightGrads, V_weightGrads, Q_biasGrads, K_biasGrads, V_biasGrads} = unpackQKVO(null, null, weight_grads, bias_grads, embedDim);
+
+    let QwG, KwG, VwG, QbG, KbG, VbG;
+
+    for (let t = 0; t < seqLen; t++) {
+        const Xrow  = activatedOutput.subarray(t * embedDim, (t + 1) * embedDim);
+        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
+        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
+        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
+        const weightShape = [embedDim, embedDim];
+
+        const {weightGrads: a_QwG, biasGrads: a_QbG} = accumulateWeightsAndBiasGradsForConnectedLayer(Xrow, dQrow, Q_weightGrads, Q_biasGrads, weightShape);
+        const {weightGrads: a_KwG, biasGrads: a_KbG}  = accumulateWeightsAndBiasGradsForConnectedLayer(Xrow, dKrow, K_weightGrads, K_biasGrads, weightShape);
+        const {weightGrads: a_VwG, biasGrads: a_VbG}  = accumulateWeightsAndBiasGradsForConnectedLayer(Xrow, dVrow, V_weightGrads, V_biasGrads, weightShape);
+
+        QwG = a_QwG;
+        KwG = a_KwG;
+        VwG = a_VwG;
+        QbG = a_QbG;
+        KbG = a_KbG;
+        VbG = a_VbG;
+
+    } 
+
+    return {
+        weightGrads: concatenateFloat32Array([QwG, KwG, VwG]),
+        biasGrads: concatenateFloat32Array([QbG, KbG, VbG]),
+    }
+}
+
+const CoreSimpleAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, weight_grads, bias_grads, activated_output, embedDim, seqLen, dkRoot, useCausalMasking) => {
     // just like in feedforward, we unpack the weights, but we pass "null" to the 2nd - 4th argument of the function because we only want the weights for QKV
     const {Q_weights, K_weights, V_weights} = unpackQKVO(weights, null, null, null, embedDim);
 
@@ -1300,7 +1337,14 @@ const CoreAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, embedDi
         const dSRow = dS.subarray(t * seqLen, (t + 1) * seqLen);
         
         // we pass the sRow (storedS during feedfoward) and dSRow
-        dScaled.set(DSoftmax(sRow, dSRow), t * seqLen);
+        const dScaledRow = DSoftmax(sRow, dSRow);
+        if (useCausalMasking) {
+            for (let future = t + 1; future < seqLen; future++) {
+                dScaledRow[future] = 0;
+            }
+        }
+
+        dScaled.set(dScaledRow, t * seqLen);
     }
 
     const dScores = scale(dScaled, dkRoot);
@@ -1337,15 +1381,13 @@ const CoreAttentionBackward = (incomingDelta, Q, K, V, storedS, weights, embedDi
         }
     }
 
+    const {weightGrads, biasGrads} = accumulate_simple_attention_gradients(dQ, dK, dV, activated_output, weight_grads, bias_grads, embedDim, seqLen);
 
-    const data_object = {
-        dQ: dQ,
-        dK: dK,
-        dV: dV,
-        dX: dX
+    return {
+        delta: dX,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
     }
-
-    return data_object;
 }
 
 const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking) => {
@@ -1660,43 +1702,6 @@ const SinusoidalPositionalEncoding = (input, embeddingDim, sequenceLength) => {
     return output;
 }
 
-const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen) => {
-    const { Q_weightGrads: QwGrads, K_weightGrads: KwGrads, V_weightGrads: VwGrads } = unpackQKVO(null, null, weightGrads, null, embedDim);
-
-    let QwG;
-    let KwG;
-    let VwG;
-
-    for (let t = 0; t < seqLen; t++) {
-        const Xrow  = activation_outputs.subarray(t * embedDim, (t + 1) * embedDim);
-        const dQrow = dQ.subarray(t * embedDim, (t + 1) * embedDim);
-        const dKrow = dK.subarray(t * embedDim, (t + 1) * embedDim);
-        const dVrow = dV.subarray(t * embedDim, (t + 1) * embedDim);
-
-        QwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dQrow, QwGrads, embedDim, embedDim);
-        KwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dKrow, KwGrads, embedDim, embedDim);
-        VwG = computeWeightGradientsForWeightsInConnectedLayer(Xrow, dVrow, VwGrads, embedDim, embedDim);
-    }
-
-    return concatenateFloat32Array([QwG, KwG, VwG]);
-}
-
-const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen) => {
-    const { Q_biasGrads: QbGrads, K_biasGrads: KbGrads, V_biasGrads: VbGrads } = unpackQKVO(null, null, null, biasGrads, embedDim);
-    
-    let QbG;
-    let KbG;
-    let VbG;
-
-    for (let t = 0; t < seqLen; t++) {
-        QbG = computeBiasGradsForConnected_Layer(QbGrads, dQ.subarray(t * embedDim, (t + 1) * embedDim));
-        KbG = computeBiasGradsForConnected_Layer(KbGrads, dK.subarray(t * embedDim, (t + 1) * embedDim));
-        VbG = computeBiasGradsForConnected_Layer(VbGrads, dV.subarray(t * embedDim, (t + 1) * embedDim));
-    }
-    
-    return concatenateFloat32Array([QbG, KbG, VbG]);
-}
-
 module.exports = {
     Relu,
     Sigmoid,
@@ -1732,6 +1737,7 @@ module.exports = {
 
     MaxPooling,
     MaxPoolDelta,
+
     element_wise_mul,
     accumulate_element_wise_mul,
     scaleDiff,
@@ -1749,10 +1755,8 @@ module.exports = {
     computelayerNorm,
     jaccard,
 
-    CoreAttention,
-    CoreAttentionBackward,
-    accumulateSimpleAttentionWeightGrads,
-    accumulateSimpleAttentionBiasGrads,
+    CoreSimpleAttention,
+    CoreSimpleAttentionBackward,
 
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,

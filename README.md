@@ -107,10 +107,10 @@ transConvLayer(`filters: number, strides: number, kernel_size: number[], activat
 layer.transConvLayer(3, 2, [3, 3], 'linear', 'same', false),
 ```
 
-simpleAttention(`useBias: boolean`)
-- `simpleAttention` is the implementation of an attention layer in its simpliest and basic form.
+simpleAttention(`useCasualMasking: boolean, useBias: boolean`)
+- `simpleAttention` is the implementation of an attention layer in its simpliest and basic form. This is just a single head scaled-dot product attention
 ```JavaScript
-layer.simpleAttention()
+layer.simpleAttention(true, true)
 ```
 
 multiHeadAttention(`numHeads: number, useCasualMasking: boolean, useBias: boolean`)

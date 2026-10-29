@@ -856,53 +856,63 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer
 };
 
 /**
- * "✅☑️"
+ * "☑️"
  * @param {Float32Array} input the input tensor
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
+ * @param {Boolean} useCausalMasking cacusal masking boolean value
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns {{ X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, S: Float32Array, output: Float32Array}}
  */
-const CoreAttention = (input, embedDim, seqLen, dkRoot, pointer, modelID, layerID) => functions.CoreAttention(
+const CoreSimpleAttention = (input, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID) => float32_Modules.CoreSimpleAttention(
     input, 
     getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
     embedDim,
     seqLen,
     dkRoot,
+    useCausalMasking,
     pointer,
     modelID,
     layerID
 );
 
 /**
- * "✅☑️"
+ * "☑️"
  * @param {Float32Array} delta incoming delta
  * @param {Float32Array} Q cached Q
  * @param {Float32Array} K cached K
  * @param {Float32Array} V cached V
  * @param {Float32Array} S cached softmax outputs
+ * @param {Float32Array} weightGrads weight gradients to accumulate
+ * @param {Float32Array} biasGrads bias gradients to accumulate
+ * @param {Float32Array} activated_output the final output vector of this layer during feedforward
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention delta scores
+ * @param {Boolean} useCausalMasking cacusal masking boolean value
  * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID model ID
  * @param {String} layerID layerID
- * @returns {{dQ: Float32Array, dK: Float32Array, dV: Float32Array, dX: Float32Array}}
+ * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const CoreAttentionBackward = (delta, Q, K, V, S, embedDim, seqLen, dkRoot, pointer, modelID, layerID) => functions.CoreAttentionBackward(
+const CoreSimpleAttentionBackward = (delta, Q, K, V, S, weightGrads, biasGrads, activated_output, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID) => float32_Modules.CoreSimpleAttentionBackward(
     delta, 
     Q, 
     K,
     V, 
     S,
     getGlobalParams(modelID).globalWeights[pointer],
+    weightGrads,
+    biasGrads,
+    activated_output,
     embedDim,
     seqLen,
     dkRoot,
+    useCausalMasking,
     pointer,
     modelID,
     layerID
@@ -982,54 +992,6 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, mhaOutput, activatedO
 );
 
 /**
- * "☑️"
- * @param {Float32Array} dQ 
- * @param {Float32Array} dK 
- * @param {Float32Array} dV 
- * @param {Float32Array} activation_outputs 
- * @param {Float32Array} weightGrads 
- * @param {Number} embedDim 
- * @param {Number} seqLen 
- * @param {String} modelID model ID
- * @param {String} layerID layerID
- * @returns 
- */
-const accumulateSimpleAttentionWeightGrads = (dQ, dK, dV, activation_outputs, weightGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionWeightGrads(
-    dQ,
-    dK,
-    dV,
-    activation_outputs,
-    weightGrads,
-    embedDim,
-    seqLen,
-    modelID,
-    layerID
-);
-
-/**
- * "☑️"
- * @param {Float32Array} dQ 
- * @param {Float32Array} dK 
- * @param {Float32Array} dV 
- * @param {Float32Array} biasGrads 
- * @param {Number} embedDim 
- * @param {Number} seqLen 
- * @param {String} modelID model ID
- * @param {String} layerID layerID
- * @returns 
- */
-const accumulateSimpleAttentionBiasGrads = (dQ, dK, dV, biasGrads, embedDim, seqLen, modelID, layerID) => float32_Modules.accumulateSimpleAttentionBiasGrads(
-    dQ,
-    dK,
-    dV,
-    biasGrads,
-    embedDim,
-    seqLen,
-    modelID,
-    layerID
-);
-
-/**
  * "✅☑️"
  * @param {Float32Array} delta 
  * @param {String} modelID  
@@ -1094,10 +1056,8 @@ module.exports = {
 
     gradientClipping,
 
-    CoreAttention,
-    CoreAttentionBackward,
-    accumulateSimpleAttentionWeightGrads,
-    accumulateSimpleAttentionBiasGrads,
+    CoreSimpleAttention,
+    CoreSimpleAttentionBackward,
 
     CoreMultiHeadAttention,
     CoreMultiHeadAttentionBackward,

@@ -363,10 +363,11 @@ class Layers {
 
     /**
      * @method `simpleAttention` layer is the implementation of an attention mechanism in its basic form.
+     * @param {Boolean} useCausalMasking A boolean indicating whether to apply a causal mask to prevent tokens from attending to future tokens . Default is `false`
      * @param {Boolean} useBias when set to `false`, the layer will not use bias and will skip bias initialization. Default value is `true`. 
      * @return {Object} simple attention layer configs
      */
-    simpleAttention(useBias = true) {
+    simpleAttention(useCausalMasking = false, useBias = true) {
 
         let function_name = "softmax";// default is softmax
 
@@ -377,13 +378,13 @@ class Layers {
             derivative_activation_function: activation.derivatives[function_name],
             isParametric: true,
             useBias: useBias,
+            useCausalMasking: useCausalMasking,
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => simple_attention.initParams(size, shape, layer_data),
             feedforward: (data) => simple_attention.feedforward(data),
             getOutputLayerDelta: () => simple_attention.getOutputLayerDelta(),
             projectDeltaBackward: (data) => simple_attention.projectDeltaBackward(data),
-            applyOwnDerivative: (data) => simple_attention.applyOwnDerivative(data),
-            gradientAccumulation: (data) => simple_attention.gradientAccumulation(data),
+            applyDerivativeAndComputeGradients: (data) => simple_attention.applyDerivativeAndComputeGradients(data),
         };
     }
 

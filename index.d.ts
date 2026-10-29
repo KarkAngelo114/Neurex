@@ -599,6 +599,7 @@ declare module 'neurex' {
         * 
         *   Attention(Q, K, V) = softmax( (Q * K^T) / sqrt(d_k) ) * V
         *
+        * @param {Boolean} useCausalMasking A boolean indicating whether to apply a causal mask to prevent tokens from attending to future tokens . Default is `false`
         * @param {Boolean} useBias  Dictates whether linear projections for Q, K, and V initialize and apply additive bias parameters. Default is `true`.
         * @returns {Object} Layer configuration object for model architecture assembly, backpropagation, and execution.
         * 
@@ -612,7 +613,7 @@ declare module 'neurex' {
         *   layer.connectedLayer(10, "softmax")
         * ]);
         */
-        simpleAttention(useBias: boolean): object;
+        simpleAttention(useCausalMasking: boolean, useBias: boolean): object;
 
         /**
         * The `multiHeadAttention` is the advance and improved variant of the existing `simpleAttention`. It splits Query, Key, and Value projections into multiple independent attention heads.
