@@ -1242,6 +1242,7 @@ class Neurex {
         if (outputPointer !== -1 && !outputLayer.freezeWeights) {
             const result = outputLayer.applyDerivativeAndComputeGradients({
                 delta: current_delta,
+                input: activations[outputLayerIndex],
                 z_value: zs[outputLayerIndex],
                 activatedOutput: activations[outputLayerIndex],
                 pointer: outputPointer,
@@ -1285,6 +1286,7 @@ class Neurex {
             // data to dispatch for applying layer derivative (if any)
             const dispatchData = {
                 delta: dLda,
+                input: activations[layer_index],
                 z_value: zs[layer_index],
                 activatedOutput: activations[layer_index],
                 pointer: currentPointer,

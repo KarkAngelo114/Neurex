@@ -816,128 +816,106 @@ const recurrentForward = (input, weightShape, weights, biases, seqLen, returnSeq
 
 }
 
-
-const recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
-    const a = inputWeightShape[0];
-    const b = inputWeightShape[1];
-    const c = recurrentWeightShape[0];
-    const d = recurrentWeightShape[1];
-
-    const offset = a * b;
-    const length = c * d;
-
-    const weights = weightParams.subarray(offset, offset + length); // get the array of recurrent weights
-    
-    const prevDelta = new Float32Array(delta);
-
-
-    for (let i = 0; i < c; i++) {
-        let sum = 0;
-        const offset = i * c;
-
-        for (let j = 0; j < d; j++) {
-
-            sum += weights[offset + j]  * delta[j];
-        }
-        prevDelta[i] = sum;
-    }
-
-    return prevDelta;
-
-
-}
-
-const recurrentBackward = (delta, hidden_states, z_per_timesteps, weights, weight_grads, bias_grads, weightShape, seqLen, activationFunc, returnSequence) => {
-    const activationFunction = {
+const recurrentBackward = (
+    delta,
+    input,
+    zValues,
+    weights,
+    weightGrads,
+    biasGrads,
+    weightShape,
+    seqLen,
+    activationFunc,
+    returnSequence,
+    deltaAlreadyIncludesActivationDerivative = false
+) => {
+    const activationDerivative = {
         "relu": DReLu,
-        "sigmoid":DSigmoid,
-        "tanh":DTanh,
-        "linear":DLinear,
-        "softmax":DSoftmax
+        "sigmoid": DSigmoid,
+        "tanh": DTanh,
+        "linear": DLinear,
+        "softmax": DSoftmax
+    };
+    const activation = {
+        "relu": Relu,
+        "sigmoid": Sigmoid,
+        "tanh": Tanh,
+        "linear": Linear,
+        "softmax": Softmax
+    };
+
+    const [featureSize, units] = weightShape;
+    const inputWeightCount = featureSize * units;
+    const recurrentWeightOffset = inputWeightCount;
+
+    const inputWeights = weights.subarray(0, inputWeightCount);
+    const recurrentWeights = weights.subarray(recurrentWeightOffset);
+    const hiddenStates = new Float32Array(seqLen * units);
+    const inputDelta = new Float32Array(seqLen * featureSize);
+    const initialHiddenState = new Float32Array(units);
+    let deltaFromFuture = new Float32Array(units);
+
+    for (let t = 0; t < seqLen; t++) {
+        const offset = t * units;
+        hiddenStates.set(activation[activationFunc](zValues.subarray(offset, offset + units)), offset);
     }
-
-    const [feature_size, units] = weightShape;
-    const inputWeights_range = feature_size * units;
-    const recurrentWeights_range = units * units;
-
-    const inputWeights = weights.subarray(0, inputWeights_range);
-    const inputWeights_grads = weight_grads.subarray(0, inputWeights_range);
-    const recurrentWeights = weights.subarray(-recurrentWeights_range);
-    const recurrentWeights_grads = weight_grads.subarray(-recurrentWeights_range);
-
-    let all_delta_per_timestep = new Float32Array(units * seqLen); // this will be use for gradient accumulation
-    let delta_per_timesteps = new Float32Array(units);
-    let finalDelta = new Float32Array(feature_size * seqLen);
 
     for (let t = seqLen - 1; t >= 0; t--) {
-        const hiddentState = hidden_states.subarray(t * seqLen, (t + 1) * seqLen);
-        const z_time_steps = z_per_timesteps.subarray(t * seqLen, (t + 1) * seqLen);
-        let dUpper = !returnSequence ? delta : delta.subarray(t * units, (t + 1) * units);
-        let dtotal = element_wise_add(dUpper, delta_per_timesteps);
+        const timestepOffset = t * units;
+        const z_t = zValues.subarray(timestepOffset, timestepOffset + units);
+        const h_t = hiddenStates.subarray(timestepOffset, timestepOffset + units);
+
+        const hasDirectDelta = returnSequence || t === seqLen - 1;
+        const dUpper = hasDirectDelta ? returnSequence ? delta.subarray(timestepOffset, timestepOffset + units) : delta : initialHiddenState;
         let delta_t;
 
-        if (activationFunc === "softmax") {
-            delta_t = activationFunction[activationFunc](z_time_steps, hiddentState);
+        if (deltaAlreadyIncludesActivationDerivative && hasDirectDelta) {
+            const futureDelta = activationFunc === "softmax"
+                ? DSoftmax(h_t, deltaFromFuture)
+                : element_wise_mul(deltaFromFuture, activationDerivative[activationFunc](z_t));
+            
+            delta_t = element_wise_add(dUpper, futureDelta);
         }
         else {
-            const dAct = activationFunction[activationFunc](z_time_steps);
-            delta_t = element_wise_mul(dtotal, dAct);
+            const totalHiddenDelta = element_wise_add(dUpper, deltaFromFuture);
+            delta_t = activationFunc === "softmax" ?
+                DSoftmax(h_t, totalHiddenDelta) : 
+                element_wise_mul(totalHiddenDelta, activationDerivative[activationFunc](z_t));
         }
 
-        all_delta_per_timestep.set(delta_t, t * units);
+        const previousHiddenState = t === 0 ? initialHiddenState : hiddenStates.subarray((t - 1) * units, t * units);
 
-        
-    }
-}
+        const inputOffset = t * featureSize;
 
-
-const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
-    let [featureSize, units] = weightShape;
-    let output = weightGrads;
-
-    const totalInputWeights = featureSize * units; // offset where recurrent-weight block starts
-
-    for (let t = 0; t < sequenceLength; t++) {
-        const x_t = activation_outputs.subarray(t * featureSize, (t + 1) * featureSize);
-        const h_prev = t === 0 ? new Float32Array(units) : hiddenStates[t - 1];
-        const delta_t = deltaTs[t];
-
-        // dL/dW_x += outer(x_t, delta_t)      -- W_x is [featureSize, units], row-major
         for (let i = 0; i < featureSize; i++) {
-            const xi = x_t[i];
-            const rowOffset = i * units;
+            let inputGradient = 0;
+            const weightRowOffset = i * units;
             for (let j = 0; j < units; j++) {
-                output[rowOffset + j] += xi * delta_t[j]
-            };
-        }
-
-        // dL/dW_h += outer(h_prev, delta_t)   -- W_h is [units, units], stored right after W_x
-        for (let i = 0; i < units; i++) {
-            const hi = h_prev[i];
-            const rowOffset = totalInputWeights + i * units;
-            for (let j = 0; j < units; j++) {
-                output[rowOffset + j] += hi * delta_t[j];
+                inputGradient += inputWeights[weightRowOffset + j] * delta_t[j];
+                weightGrads[weightRowOffset + j] += input[inputOffset + i] * delta_t[j];
             }
+            inputDelta[inputOffset + i] = inputGradient;
+        }
+
+        for (let i = 0; i < units; i++) {
+            let previousHiddenDelta = 0;
+            const weightRowOffset = i * units;
+            for (let j = 0; j < units; j++) {
+                previousHiddenDelta += recurrentWeights[weightRowOffset + j] * delta_t[j];
+                weightGrads[recurrentWeightOffset + weightRowOffset + j] += previousHiddenState[i] * delta_t[j];
+            }
+            biasGrads[i] += delta_t[i];
+            deltaFromFuture[i] = previousHiddenDelta;
         }
     }
 
-    return output;
-
+    return {
+        delta: inputDelta,
+        weightGrads: weightGrads,
+        biasGrads: biasGrads
+    };
 }
 
-const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => {
-    let output = biasGrads;
-
-    for (let t = 0; t < sequenceLength; t++) {
-        const delta_t = deltaTs[t];
-
-        for (let j = 0; j < units; j++) {
-            output[j] += delta_t[j];
-        }
-    }
-
-    return output;
-}
 
 const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, weights, biases) => {
     
@@ -1841,9 +1819,6 @@ module.exports = {
     recurrentForward,
     recurrentBackward,
 
-    recurrentTimeDelta,
-    recurrentWeightGradsAccumulation,
-    recurrentBiasGradsAccumulation,
     gradientClipping,
     computelayerNorm,
     jaccard,

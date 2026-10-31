@@ -636,59 +636,52 @@ const recurrentForward = (input, weightShape, seqLen, activationFunc, returnSequ
     layerID
 );
 
-const recurrentBackward = () => float32_Modules.recurrentBackward();
-
 /**
- * "✅☑️"
+ * "☑️"
+ * @param {Float32Array} delta 
  * @param {Float32Array} input 
- * @param {Array<Number>} inputWeightShape 
- * @param {Array<Number>} recurrentWeightShape 
- * @param {Number} pointer 
- * @param {String} modelID model ID
- * @returns 
- */
-const recurrentTimeDelta = (input, inputWeightShape, recurrentWeightShape, pointer, modelID) => functions.recurrentTimeDelta(
-    input, 
-    inputWeightShape,
-    recurrentWeightShape,
-    getGlobalParams(modelID).globalWeights[pointer],
-    modelID
-);
-
-/**
- * "✅☑️"
- * @param {Float32Array} activation_outputs 
- * @param {Float32Array} deltas 
- * @param {Array<Float32Array>} hiddenStates 
- * @param {Array<Float32Array>} deltaTs 
+ * @param {Float32Array} zValues 
  * @param {Float32Array} weightGrads 
- * @param {Array<Number>} weightShape 
- * @param {Number} sequenceLength 
- * @returns 
- */
-const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => functions.recurrentWeightGradsAccumulation(
-    activation_outputs, 
-    deltas, 
-    hiddenStates, 
-    deltaTs, 
-    weightGrads, 
-    weightShape, 
-    sequenceLength
-);
-
-/**
- * "✅☑️"
  * @param {Float32Array} biasGrads 
- * @param {Array<Float32Array>} deltaTs 
- * @param {Number} sequenceLength 
- * @param {Number} units 
- * @returns 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} seqLen 
+ * @param {String} activationFunc 
+ * @param {Boolean} returnSequence 
+ * @param {Boolean} deltaAlreadyIncludesActivationDerivative 
+ * @param {Number} pointer 
+ * @param {String} modelID
+ * @param {String} layerID
+ * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const recurrentBiasGradsAccumulation = (biasGrads, deltaTs, sequenceLength, units) => functions.recurrentBiasGradsAccumulation(
-    biasGrads, 
-    deltaTs, 
-    sequenceLength, 
-    units
+const recurrentBackward = (
+    delta,
+    input,
+    zValues,
+    weightGrads,
+    biasGrads,
+    weightShape,
+    seqLen,
+    activationFunc,
+    returnSequence,
+    deltaAlreadyIncludesActivationDerivative = false,
+    pointer,
+    modelID,
+    layerID,
+) => float32_Modules.recurrentBackward(
+    delta,
+    input,
+    zValues,
+    getGlobalParams(modelID).globalWeights[pointer],
+    weightGrads,
+    biasGrads,
+    weightShape,
+    seqLen,
+    activationFunc.toLowerCase(),
+    returnSequence,
+    deltaAlreadyIncludesActivationDerivative,
+    pointer,
+    modelID,
+    layerID
 );
 
 /**
@@ -1057,9 +1050,6 @@ module.exports = {
 
     recurrentForward,
     recurrentBackward,
-    recurrentTimeDelta,
-    recurrentWeightGradsAccumulation,
-    recurrentBiasGradsAccumulation,
 
     gradientClipping,
 
