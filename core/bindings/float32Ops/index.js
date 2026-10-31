@@ -134,6 +134,16 @@ const element_wise_sub = (arr1, arr2) => {
     return output;
 };
 
+const element_wise_add = (arr1, arr2) => {
+    const output = new Float32Array(arr1.length);
+
+    for (let i = 0; i < arr1.length; i++) {
+        output[i] = arr1[i] + arr2[i];
+    }
+
+    return output;
+}
+
 const getEmbeddings = (tokenVector, embeddingDim, lookup) => {
 
     const output = new Float32Array(tokenVector.length * embeddingDim);
@@ -729,17 +739,11 @@ const binary_cross_entropy = (predictions, actuals, epsilon) => {
     return sum / predictions.length;
 }
 
-const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases) => {
-    // The weights were concatenated during initialization as:
-    // [input_weights..., recurrent_weights...]
-    const inputSize = inputWeightShape[0];
-    const units = inputWeightShape[1];
-    const range_input_weights = inputSize * units;
+const recurrentMatMul = (input, prevHiddenState, weightShape, input_weights, recurrent_weights, biases) => {
+
+    const [inputSize, units] = weightShape 
 
     const output = new Float32Array(units);
-
-    const input_weights = weights.subarray(0, range_input_weights);
-    const recurrent_weights = weights.subarray(range_input_weights, range_input_weights + recurrentWeightShape[0] * recurrentWeightShape[1]);
 
     for (let j = 0; j < units; j++) {
         let z = biases[j];
@@ -758,9 +762,62 @@ const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWei
     return output;
 }
 
+const recurrentForward = (input, weightShape, weights, biases, seqLen, returnSequence, activationFunc) => {
+
+    // map activation function string to the activation functions above
+    const activationFunction = {
+        "relu": Relu,
+        "sigmoid":Sigmoid,
+        "tanh":Tanh,
+        "linear":Linear,
+        "softmax":Softmax
+    }
+
+    const [featureSize, units] = weightShape; // [featureSize, units, units, units] or just [featureSize, units]. Featuresize * units is for input recurrent weights and units * units is for recurrent weights.
+
+    const input_weights_Size = featureSize * units;
+    const recurrent_weights_size = units * units;
+
+    const input_weights = weights.subarray(0, input_weights_Size);
+    const recurrent_weights = weights.subarray(-recurrent_weights_size); // get the remaining weights
+
+    // initialized hidden state
+    let hidden_state = new Float32Array(units).fill(0);
+
+    const all_z_values = new Float32Array(units * seqLen);
+    const all_hidden_states = new Float32Array(units * seqLen);
+
+    // loop through sequence
+    for (let t = 0; t < seqLen; t++) {
+        const input_featureOffset = t * featureSize;
+        const input_feature = input.subarray(input_featureOffset, input_featureOffset + featureSize);
+
+        // run recurrent matmul
+        const z_per_timeStep = recurrentMatMul(input_feature, hidden_state, weightShape, input_weights, recurrent_weights, biases);
+
+        // after the recurrent matmul, perform the activation function and it will become the prev hidden state
+        hidden_state = activationFunction[activationFunc](z_per_timeStep);
+
+        // write the z_per_timeStep (the pre-activated vector) to the `all_z_values` buffer for backprop derivative and BPTT
+        all_z_values.set(z_per_timeStep, t * units);
+        // write the hidden state to the `all_hidden_state` buffer.
+        all_hidden_states.set(hidden_state, t * units);
+    }
+
+    // if `returnSequence` is true, return the entire hidden states, otherwise return only the last N elements representing the last vector
+    const finalOutput = returnSequence ? all_hidden_states : all_hidden_states.subarray(-units);
+    const final_z_values = all_z_values;
+
+
+    return {
+        activatedOutput: finalOutput,
+        z_values: final_z_values
+    }
+
+}
+
+
 const recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weightParams) => {
-    // input weight shape [feature_size, units]
-    // recurrent weight shape [units, units]
     const a = inputWeightShape[0];
     const b = inputWeightShape[1];
     const c = recurrentWeightShape[0];
@@ -786,11 +843,55 @@ const recurrentTimeDelta = (delta, inputWeightShape, recurrentWeightShape, weigh
     }
 
     return prevDelta;
+
+
 }
 
+const recurrentBackward = (delta, hidden_states, z_per_timesteps, weights, weight_grads, bias_grads, weightShape, seqLen, activationFunc, returnSequence) => {
+    const activationFunction = {
+        "relu": DReLu,
+        "sigmoid":DSigmoid,
+        "tanh":DTanh,
+        "linear":DLinear,
+        "softmax":DSoftmax
+    }
+
+    const [feature_size, units] = weightShape;
+    const inputWeights_range = feature_size * units;
+    const recurrentWeights_range = units * units;
+
+    const inputWeights = weights.subarray(0, inputWeights_range);
+    const inputWeights_grads = weight_grads.subarray(0, inputWeights_range);
+    const recurrentWeights = weights.subarray(-recurrentWeights_range);
+    const recurrentWeights_grads = weight_grads.subarray(-recurrentWeights_range);
+
+    let all_delta_per_timestep = new Float32Array(units * seqLen); // this will be use for gradient accumulation
+    let delta_per_timesteps = new Float32Array(units);
+    let finalDelta = new Float32Array(feature_size * seqLen);
+
+    for (let t = seqLen - 1; t >= 0; t--) {
+        const hiddentState = hidden_states.subarray(t * seqLen, (t + 1) * seqLen);
+        const z_time_steps = z_per_timesteps.subarray(t * seqLen, (t + 1) * seqLen);
+        let dUpper = !returnSequence ? delta : delta.subarray(t * units, (t + 1) * units);
+        let dtotal = element_wise_add(dUpper, delta_per_timesteps);
+        let delta_t;
+
+        if (activationFunc === "softmax") {
+            delta_t = activationFunction[activationFunc](z_time_steps, hiddentState);
+        }
+        else {
+            const dAct = activationFunction[activationFunc](z_time_steps);
+            delta_t = element_wise_mul(dtotal, dAct);
+        }
+
+        all_delta_per_timestep.set(delta_t, t * units);
+
+        
+    }
+}
+
+
 const recurrentWeightGradsAccumulation = (activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength) => {
-
-
     let [featureSize, units] = weightShape;
     let output = weightGrads;
 
@@ -1203,7 +1304,6 @@ const accumulate_element_wise_mul = (arr1, arr2, arr3) => {
     }
     return arr3;
 }
-
 
 const projectToQKV = (
     input, 
@@ -1641,16 +1741,6 @@ const jaccard = (arr1, arr2) => {
     return Math.abs(union.size === 0 ? 0 : intersection.length / union.size);
 }
 
-const element_wise_add = (arr1, arr2) => {
-    const output = new Float32Array(arr1.length);
-
-    for (let i = 0; i < arr1.length; i++) {
-        output[i] = arr1[i] + arr2[i];
-    }
-
-    return output;
-}
-
 const SinusoidalPositionalEncoding = (input, embeddingDim, sequenceLength) => {
    if (input.length !== embeddingDim * sequenceLength) {
         throw new Error(
@@ -1747,7 +1837,10 @@ module.exports = {
     categorical_cross_entropy,
     sparse_categorical_cross_entropy,
     binary_cross_entropy,
-    recurrentMatMul,
+    
+    recurrentForward,
+    recurrentBackward,
+
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,

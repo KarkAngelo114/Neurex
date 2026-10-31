@@ -20,6 +20,7 @@ const VALUE_TYPE_ERR = "ERR_INVALID_VALUE_DATA_TYPE"; // error flag for value ty
 const COMPUTE_BACKEND_ERR = "ERR_COMPUTE_BACKEND_SETTING"; // error flag for setting compute backend
 const LABEL_MODE_ERR = "ERR_LABEL_MODE_ERR"; // error flag used when error triggered during data preprocessing
 const ERR_UNRESOLVED_DIR_PATH = "ERR_UNRESOLVED_PATH_TO_DIR"; // error flag used if an error triggered navigating to a filesystem path
+const ERR_TENSOR_SHAPE_INCOMPATIBLE = "ERR_TENSOR_SHAPE_INCOMPATIBLE"; // error flag for incompatible tensor shape
 
 module.exports = {
     NAN_ERR,
@@ -41,7 +42,8 @@ module.exports = {
     VALUE_TYPE_ERR,
     COMPUTE_BACKEND_ERR,
     LABEL_MODE_ERR,
-    ERR_UNRESOLVED_DIR_PATH
+    ERR_UNRESOLVED_DIR_PATH,
+    ERR_TENSOR_SHAPE_INCOMPATIBLE
 }
 
 

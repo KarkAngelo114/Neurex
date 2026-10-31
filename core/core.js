@@ -473,7 +473,7 @@ class Neurex {
                     newLayer.weightShape = layerData.weightShape;
                     newLayer.inputShape = layerData.inputShape;
                     newLayer.outputShape = layerData.outputShape;
-                    newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
+                    newLayer.seqLen = layerData.maxSequenceLength || 1;
                     newLayer.freezeWeights = freezeWeights;
                     newLayer.layerID = UUID.randomUUID();
                 }
@@ -1254,6 +1254,9 @@ class Neurex {
             
             this.weightGrads[outputPointer] = result.weightGrads;
             this.biasGrads[outputPointer] = result.biasGrads;
+            if (outputLayer.layer_name === "Recurrent Cell") {
+                current_delta = result.delta;
+            }
         }
 
         for (let layer_index = this.num_layers - 2; layer_index >= 0; layer_index--) {

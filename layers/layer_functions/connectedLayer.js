@@ -186,7 +186,7 @@ const applyDerivativeAndComputeGradients = (data) => {
     const weightShape = layerData.weightShape;
     const layerID = layerData.layerID;
 
-    const activationString = layerData.activation_function.name
+    const activationString = layerData.activation_function.name;
     
 
     const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForDense(z, activatedOutput, incoming_delta, wg, bg, weightShape, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);

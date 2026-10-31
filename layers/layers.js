@@ -293,8 +293,7 @@ class Layers {
                 feedforward: (data) => rnn.feedforward(data),
                 getOutputLayerDelta: (data) => rnn.getOutputLayerDelta(data),
                 projectDeltaBackward: (data) => rnn.projectDeltaBackward(data),
-                applyOwnDerivative: (data) => rnn.applyOwnDerivative(data),
-                gradientAccumulation: (data) => rnn.gradientAccumulation(data) 
+                applyDerivativeAndComputeGradients: (data) => rnn.applyDerivativeAndComputeGradients(data), 
             }
         }
         catch (error) {

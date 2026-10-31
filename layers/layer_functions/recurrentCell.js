@@ -1,6 +1,7 @@
 const { createTensorBuffer, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const activation = require('../../core/bindings');
-const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMatMul, recurrentTimeDelta, recurrentWeightGradsAccumulation, recurrentBiasGradsAccumulation, cacheOutputLayerDelta } = require('../../core/bindings');
+const errFlag = require('../../err_flags');
+const { recurrentForward, recurrentBackward, element_wise_sub, cacheOutputLayerDelta } = require('../../core/bindings');
 /**
  * Initialized parameters for this layer
  * @param {Number} size number of neurons for this layer 
@@ -11,12 +12,18 @@ const { recurrentMatMul, element_wise_sub, scaleDiff, element_wise_mul, DeltaMat
 const initParams = (size, shape, layer_data) => {
     const units = layer_data.units;
     const useBias = layer_data.useBias;
-    
-    // 1. Correctly extract the sequence length and feature size from the embedding layer's output shape
-    // shape format from embedding is: [1, 1, embeddingDim, maxSequenceLength]
-    const feature_size = shape[2] || size; 
-    const spatialSteps = (shape[0] || 1) * (shape[1] || 1);
-    let maxSequenceLength = layer_data.maxSequenceLength || shape[3] || (spatialSteps > 1 ? spatialSteps : 1);
+    // incoming shape is [H, W, D, S] if before the recurrent cell is another layer that works on sequential data, otherwise it's [H, W, D]
+    // To properly connect layers that works differently, use reshape()
+
+    if (shape.length < 3) {
+        console.error(`Incoming tensor shape is not compatible to this layer type ${layer_data.layer_name} as this layer has different tensor shape representation of incoming tensor data. Ensure you connect with layer.reshape() first before connecting to this layer type`);
+        console.log("Expecting [H, W, D, S], received [H, W, D] instead.");
+        throw new Error(errFlag.ERR_TENSOR_SHAPE_INCOMPATIBLE);
+    }
+
+
+    const feature_size = shape[2];
+    const seqLen = shape[3];
     
     const return_sequence = layer_data.return_sequence || false;
 
@@ -27,17 +34,8 @@ const initParams = (size, shape, layer_data) => {
 
     const input_weights = createTensorBuffer([total_input_weights],{ prefilledWith: "xavier", min: feature_size, max: units }).data;
     const recurrent_weights = createTensorBuffer([total_recurrent_weights], { prefilledWith: "xavier", min: units, max: units }).data;
-    const biases = useBias
-        ? createTensorBuffer([totalBiases], {
-            prefilledWith: "xavier",
-            min: feature_size,
-            max: units
-        }).data
-        : createTensorBuffer([totalBiases], { prefilledWith: "zeroes" }).data;
-    const weightGrads = createTensorBuffer(
-        [total_input_weights + total_recurrent_weights],
-        { prefilledWith: "zeroes" }
-    ).data;
+    const biases = useBias ? createTensorBuffer([totalBiases], { prefilledWith: "xavier", min: feature_size, max: units }).data : createTensorBuffer([totalBiases], { prefilledWith: "zeroes" }).data;
+    const weightGrads = createTensorBuffer([total_input_weights + total_recurrent_weights], { prefilledWith: "zeroes" }).data;
     const biasGrads = createTensorBuffer([totalBiases], { prefilledWith: "zeroes" }).data;
     
 
@@ -46,12 +44,12 @@ const initParams = (size, shape, layer_data) => {
     // 3. Keep track of the actual step feature size here
     const weightShape = [feature_size, units, units, units]; 
 
-    layer_data.maxSequenceLength = return_sequence ? maxSequenceLength : 1;
-    const updatedShape = return_sequence
-        ? [1, 1, units, maxSequenceLength]   // matches attention's expected [_, _, embedDim, seqLen]
-        : [1, 1, units];                      // no sequence dimension left, this is fine as-is
+    layer_data.seqLen = return_sequence ? seqLen : 1;
+    const updatedShape = return_sequence ? 
+        [1, 1, units, seqLen] : // preserve the sequence length
+        [1, 1, units, 1]; // return only the output unit size, sequence length will become 1 and if the next layer works on sequential data, that layer will process this layer's output as one vector for timestep
 
-    const outputUnits = return_sequence ? (units * maxSequenceLength) : units;
+    const outputUnits = return_sequence ? (units * seqLen) : units;
 
     return {
         updatedSize: outputUnits,
@@ -123,70 +121,26 @@ const feedforward = (data) => {
     const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
+    const seqLen = layerData.seqLen || 1; 
+    const weightShape = layerData.weightShape;
+    const activationFuncString = layerData.activation_function.name;
+    const returnSequence = layerData.return_sequence;
 
-    const units = layerData.units;
-
-    // Assume inputSequence is flat: [units * sequence_length]
-    const sequence_length = layerData.maxSequenceLength || 1; 
-    const feature_size = layerData.weightShape[0]; // [feature_size/size, units]
-
-    // 1. Initialize a clean hidden state vector for the start of THIS sequence sample
-    let current_hidden = new Float32Array(units).fill(0); 
-
-    // 2. Arrays to store history for Backpropagation Through Time (BPTT)
-    const all_z_values = [];
-    const all_hidden_states = []; 
-
-    // 3. Loop through each time step sequentially
-    for (let t = 0; t < sequence_length; t++) {
-        
-        // Extract x_t for the current time step
-        let offset = t * feature_size;
-        const sequence_data = inputSequence.subarray(offset, offset + feature_size);
-
-        // Compute z_t = (x_t * W_x) + (current_hidden * W_h) + bias
-        // Pass current_hidden explicitly so it doesn't leak between global samples
-        const z_t = recurrentMatMul(
-            sequence_data, 
-            current_hidden, 
-            [layerData.weightShape[0], layerData.weightShape[1]], 
-            [layerData.weightShape[2], layerData.weightShape[3]], 
-            pointer,
-            modelID,
-            layerID
-        );
-
-        if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
-        
-        // Update hidden state for the next step
-        current_hidden = activation[layerData.activation_function.name](z_t, modelID, layerID);
-
-        // Record history for backprop
-        all_z_values.push(z_t);
-        all_hidden_states.push(new Float32Array(current_hidden));
+    const {activatedOutput, z_values} = recurrentForward(inputSequence, weightShape, seqLen, activationFuncString, returnSequence, pointer, modelID, layerID);
+    
+    if (activatedOutput.some(v => Number.isNaN(v))) {
+        console.error('NaN detected in activated outputs during feedfoward in Recurrent Cell');
+        throw new Error(errFlag.NAN_ERR);
     }
 
-    // cache recurrent layer cell feedforward data
-    layerData.cache = {
-        hidden_states: all_hidden_states,
-        recurrentZs: all_z_values
+    if (z_values.some(v => Number.isNaN(v))) {
+        console.error('NaN detected in z values during feedfoward in Recurrent Cell');
+        throw new Error(errFlag.NAN_ERR);
     }
-
-    let final_output;
-    if (layerData.return_sequence) {
-        // Concatenate all hidden states into one big flat array if return_sequence is true
-        final_output = concatenateFloat32Array(all_hidden_states);
-    } 
-    else {
-        // Just return the very last hidden state vector
-        final_output = all_hidden_states[sequence_length - 1];
-    }
-
-    layerData.cache.storedOutput = final_output;
 
     return {
-        outputs: final_output, 
-        z_values: all_z_values,
+        outputs: activatedOutput, // used in recurrentBackward for gradient caculation. `activatedOutput` are the activated hidden states per timestep. it just uses the name `activatedOutput` as naming convention
+        z_values: z_values, // used in BPTT. These are the z per timesteps (pre-activated zs)
         incrementor_value: 1
     };
 }
@@ -241,95 +195,119 @@ const getOutputLayerDelta = (data) => {
 
 const projectDeltaBackward = (data) => {
 
-    return data.delta;
+    return data.delta; // just a pass through. No operations here
 
 };
 
-
-const applyOwnDerivative = (data) => {
-    const layer_data = data.layerData;
-    const delta = data.delta;
+const applyDerivativeAndComputeGradients = (data) => {
+    
+    const incoming_delta = data.delta; // incoming delta
+    const hiddenStates = data.activatedOutput; // activated outputs are the hidden states per timesteps
+    const z_per_timeSteps = data.z_value; // z_values are the z_values per timesteps
+    const weight_grads = data.weightGrads; // weightGrads: [inputWeights..., recurrentWeights]
+    const bias_grads = data.biasGrads; // size equal to units
     const pointer = data.pointer;
     const modelID = data.modelID;
-    const layerID = layer_data.layerID;
 
-    const sequenceLength = layer_data.maxSequenceLength;
-    const units = layer_data.units;
-    const featureSize = layer_data.weightShape[0];
-    const hiddenStates = layer_data.cache.hidden_states; // Array of Float32Array
-    const recurrentZs = layer_data.cache.recurrentZs; // Array of Float32Array
-    const dActivation = activation.derivatives[layer_data.activation_function.name];
+    const layerData = data.layerData;
+    const seqLen = layerData.seqLen;
+    const weightShape = layerData.wweightShape;
+    const layerID = layerData.layerID;
 
-    const inputDeltas = new Float32Array(sequenceLength * featureSize);
-    const deltaTs = new Array(sequenceLength);
-    let dNextTime = new Float32Array(units).fill(0);
-
-    for (let t = sequenceLength - 1; t >= 0; t--) {
-        let dUpper = new Float32Array(units);
-
-        if (layer_data.return_sequence) {
-            dUpper.set(delta.subarray(t * units, (t + 1) * units));
-        } else if (t === sequenceLength - 1) {
-            dUpper.set(delta);
-        }
-
-        let dTotal = new Float32Array(units);
-        for (let i = 0; i < units; i++) {
-            dTotal[i] = dUpper[i] + dNextTime[i];
-        }
-
-        // pass both recurrentZs[t] and hiddenStates[t]
-        // the recurrenZs are array of float32array that are not yet passed through an activation function. While the hidden states are the activated outputs
-        const dAct = dActivation(recurrentZs[t], hiddenStates[t], modelID, layerID);
-        
-        // For element-wise activations, dAct is dL/dz. 
-        // For Softmax, dsoftmax(a_t, dTotal) computes the Jacobian-vector product J^T * dTotal directly.
-        const delta_t = (layer_data.activation_function.name === "softmax") 
-            ? dAct // dsoftmax already calculates the vector product if passed (a, delta)
-            : element_wise_mul(dTotal, dAct, modelID, layerID);
-
-        if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrent cell projectDeltaBackward");
-
-        deltaTs[t] = delta_t;
-        dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer, modelID);
-        const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer, modelID, layerID);
-        inputDeltas.set(dInput_t, t * featureSize);
-    }
-
-    layer_data.cache.deltaTs = deltaTs;
-
-    return inputDeltas;
-};
-
-const gradientAccumulation = (data) => {
-    const layer_data = data.layerData;
-    const activation_outputs = data.activation_outputs;
-    const deltas = data.deltas;
-    const pointer = data.pointer;
-    const modelID = data.modelID;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
-    const layerID = layer_data.layerID;
-
-    const units = layer_data.units;
-    const weightShape = layer_data.weightShape;
-    const sequenceLength = layer_data.maxSequenceLength;
-    const hiddenStates = layer_data.cache.hidden_states;
-    const deltaTs = layer_data.cache.deltaTs;
-
-    if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeWeightGradients — missing cached per-timestep deltas");
-
-    const recurrentWeightGrads = recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
-    if (recurrentWeightGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell weight grads have NaNs");
-
-    const recurrentBiasGrads = recurrentBiasGradsAccumulation(biasGrads, deltaTs, sequenceLength, units);
-    if (recurrentBiasGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell bias grads have NaNs");
+    const {delta, weightGrads, biasGrads} = recurrentBackward();
 
     return {
-        accumulatedWeightGrads: recurrentWeightGrads,
-        accumulatedBiasGrads: recurrentBiasGrads
+        weightGrads: [],
+        biasGrasds: [],
+        delta: []
     }
 }
+
+
+// const applyOwnDerivative = (data) => {
+//     const layer_data = data.layerData;
+//     const delta = data.delta;
+//     const pointer = data.pointer;
+//     const modelID = data.modelID;
+//     const layerID = layer_data.layerID;
+
+    
+//     const units = layer_data.units;
+//     const featureSize = layer_data.weightShape[0];
+//     const hiddenStates = layer_data.cache.hidden_states; // Array of Float32Array
+//     const recurrentZs = layer_data.cache.recurrentZs; // Array of Float32Array
+//     const dActivation = activation.derivatives[layer_data.activation_function.name];
+
+//     const inputDeltas = new Float32Array(sequenceLength * featureSize);
+//     const deltaTs = new Array(sequenceLength);
+//     let dNextTime = new Float32Array(units).fill(0);
+
+//     for (let t = sequenceLength - 1; t >= 0; t--) {
+//         let dUpper = new Float32Array(units);
+
+//         if (layer_data.return_sequence) {
+//             dUpper.set(delta.subarray(t * units, (t + 1) * units));
+//         } else if (t === sequenceLength - 1) {
+//             dUpper.set(delta);
+//         }
+
+//         let dTotal = new Float32Array(units);
+//         for (let i = 0; i < units; i++) {
+//             dTotal[i] = dUpper[i] + dNextTime[i];
+//         }
+
+//         // pass both recurrentZs[t] and hiddenStates[t]
+//         // the recurrenZs are array of float32array that are not yet passed through an activation function. While the hidden states are the activated outputs
+//         const dAct = dActivation(recurrentZs[t], hiddenStates[t], modelID, layerID);
+        
+//         // For element-wise activations, dAct is dL/dz. 
+//         // For Softmax, dsoftmax(a_t, dTotal) computes the Jacobian-vector product J^T * dTotal directly.
+//         const delta_t = (layer_data.activation_function.name === "softmax") 
+//             ? dAct // dsoftmax already calculates the vector product if passed (a, delta)
+//             : element_wise_mul(dTotal, dAct, modelID, layerID);
+
+//         if (delta_t.some(v => Number.isNaN(v))) throw new Error("delta_t has NaNs in recurrent cell projectDeltaBackward");
+
+//         deltaTs[t] = delta_t;
+//         dNextTime = recurrentTimeDelta(delta_t, [featureSize, units], [units, units], pointer, modelID);
+//         const dInput_t = DeltaMatMul(delta_t, featureSize, units, pointer, modelID, layerID);
+//         inputDeltas.set(dInput_t, t * featureSize);
+//     }
+
+//     layer_data.cache.deltaTs = deltaTs;
+
+//     return inputDeltas;
+// };
+
+// const gradientAccumulation = (data) => {
+//     const layer_data = data.layerData;
+//     const activation_outputs = data.activation_outputs;
+//     const deltas = data.deltas;
+//     const pointer = data.pointer;
+//     const modelID = data.modelID;
+//     const weightGrads = data.weightGrads;
+//     const biasGrads = data.biasGrads;
+//     const layerID = layer_data.layerID;
+
+//     const units = layer_data.units;
+//     const weightShape = layer_data.weightShape;
+//     const sequenceLength = layer_data.maxSequenceLength;
+//     const hiddenStates = layer_data.cache.hidden_states;
+//     const deltaTs = layer_data.cache.deltaTs;
+
+//     if (!deltaTs) throw new Error("recurrentCell: projectDeltaBackward must run before computeWeightGradients — missing cached per-timestep deltas");
+
+//     const recurrentWeightGrads = recurrentWeightGradsAccumulation(activation_outputs, deltas, hiddenStates, deltaTs, weightGrads, weightShape, sequenceLength);
+//     if (recurrentWeightGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell weight grads have NaNs");
+
+//     const recurrentBiasGrads = recurrentBiasGradsAccumulation(biasGrads, deltaTs, sequenceLength, units);
+//     if (recurrentBiasGrads.some(v => Number.isNaN(v))) throw new Error("recurrentCell bias grads have NaNs");
+
+//     return {
+//         accumulatedWeightGrads: recurrentWeightGrads,
+//         accumulatedBiasGrads: recurrentBiasGrads
+//     }
+// }
 
 module.exports = {
     initParams,
@@ -337,6 +315,5 @@ module.exports = {
     feedforward,
     getOutputLayerDelta,
     projectDeltaBackward,
-    applyOwnDerivative,
-    gradientAccumulation
+    applyDerivativeAndComputeGradients,
 }

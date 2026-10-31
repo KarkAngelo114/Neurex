@@ -611,26 +611,32 @@ const MaxPoolDelta = (delta, indices, h, w, d, modelID, layerID) => functions.Ma
     layerID
 );
 
-
 /**
- * "✅☑️"
- * @param {Float32Array} input input vector
- * @param {Float32Array} prevHiddenState hidden temporal state
- * @param {Array<Number>} inputWeightShape input weight shape
- * @param {Array<Number>} recurrentWeightShape recurrent weight shape
- * @param {Number} pointer value to reference the weights and biases
- * @param {String} modelID model ID 
- * @returns 
+ * "☑️"
+ * @param {Float32Array} input 
+ * @param {Array<Number>} weightShape 
+ * @param {Number} seqLen 
+ * @param {String} activationFunc 
+ * @param {Boolean} returnSequence 
+ * @param {Number} pointer 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @returns {{activatedOutput: Float32Array, z_values: Float32Array}}
  */
-const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer, modelID) => functions.recurrentMatMul(
-    input, 
-    prevHiddenState,
-    inputWeightShape, 
-    recurrentWeightShape, 
-    getGlobalParams(modelID).globalWeights[pointer], 
+const recurrentForward = (input, weightShape, seqLen, activationFunc, returnSequence, pointer, modelID, layerID) => float32_Modules.recurrentForward(
+    input,
+    weightShape,
+    getGlobalParams(modelID).globalWeights[pointer],
     getGlobalParams(modelID).globalBiases[pointer],
-    modelID
+    seqLen,
+    returnSequence,
+    activationFunc.toLowerCase(),
+    pointer,
+    modelID,
+    layerID
 );
+
+const recurrentBackward = () => float32_Modules.recurrentBackward();
 
 /**
  * "✅☑️"
@@ -1049,7 +1055,8 @@ module.exports = {
     sparse_categorical_cross_entropy,
     binary_cross_entropy,
 
-    recurrentMatMul,
+    recurrentForward,
+    recurrentBackward,
     recurrentTimeDelta,
     recurrentWeightGradsAccumulation,
     recurrentBiasGradsAccumulation,
