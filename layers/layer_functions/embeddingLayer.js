@@ -1,4 +1,4 @@
-const { XavierInitialization } = require("../../utils/utils");
+const { XavierInitialization, createTensorBuffer } = require("../../utils/utils");
 const { getEmbeddings, returnEmbeddings } = require('../../core/bindings');
 const errFlags = require('../../err_flags');
 
@@ -40,17 +40,14 @@ const initParams = (size, shape, layer_data) => {
     // we just initialize it with 0s equal to embedding size so that the weights and biases has no decrepancy when indexing and still match together
     const biases = new Float32Array(embeddingDim).fill(0);
                 
-    const weightGrads = new Float32Array(vocabSize * embeddingDim).fill(0);
 
-    const biasGrads = new Float32Array(embeddingDim).fill(0);
+    layer_data.weightShape = weightShape;
 
     return {
         updatedSize: updatedSize,
         updatedShape: updatedShape,
         weights: weights,
         biases: biases,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads,
         inputShape: shape,
         outputShape: updatedShape,
         paramShape: weightShape,
@@ -105,12 +102,13 @@ const getOutputLayerDelta = () => {
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const modelID = data.modelID;
-    const weightGrads = data.weightGrads;
-    const biasGrads = data.biasGrads;
     const activation_outputs = data.activatedOutput;
     const deltas = data.delta;
     const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;
+    const weightShape = layerData.weightShape
+
+    const weightGrads = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith: "zeroes"}).data;
 
     const accumulatedGrads = returnEmbeddings(activation_outputs, deltas, weightGrads, embedDim, modelID, layerID);
 
@@ -119,11 +117,11 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(errFlags.NAN_ERR);
     };
 
-    return {
-        weightGrads: accumulatedGrads,
-        biasGrads: biasGrads,
-        delta: deltas
-    }
+    layerData.weightGrads = accumulatedGrads;
+
+    return deltas;
+
+
 }
 
 module.exports = {

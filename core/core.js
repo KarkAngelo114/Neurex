@@ -62,8 +62,6 @@ class Neurex {
         };
 
         this.isfailed = false;
-        this.weightGrads = [];
-        this.biasGrads = [];
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
         this.layerPointers = [];
@@ -561,11 +559,6 @@ class Neurex {
             });
             
             this.#recalculateShape();
-
-            for (let i = 0; i < this.weights.length; i++) {
-                this.weightGrads.push(new Float32Array(this.weights[i].length).fill(0));
-                this.biasGrads.push(new Float32Array(this.biases[i].length).fill(0));
-            }
             
             if (showLog) {
                 console.log(`${color.lime}[SUCCESS]${color.reset} Model ${model} successfully loaded\n`);
@@ -659,9 +652,7 @@ class Neurex {
         if (parametric.includes(removedLayer.layer_name)) {
             const weightIndex = this.layers.filter(l => parametric.includes(l.layer_name)).length;
             this.weights.splice(weightIndex, 1);
-            this.weightGrads.splice(weightIndex, 1);
             this.biases.splice(weightIndex, 1);
-            this.biasGrads.splice(weightIndex, 1);
         }
 
         this.lastLayerObject = this.layers[this.layers.length - 1];
@@ -921,10 +912,7 @@ class Neurex {
                         batchLoss += loss
 
                         // backprogate
-                        const {accumulatedWeightGrads, accumulatedBiasGrads} = this.backpropagation(activations, zs, outputLayerDelta);
-
-                        this.weightGrads = accumulatedWeightGrads;
-                        this.biasGrads = accumulatedBiasGrads;
+                        this.backpropagation(activations, zs, outputLayerDelta);
                     }
 
                     batchLoss /= actualBatchSize;
@@ -943,13 +931,15 @@ class Neurex {
                     // This section is the for updating weights and biases.
                     // The remaining steps ahead are scaling accumulated gradients, gradient clipping and using the optimizer for param updates
                     // before uploading to global store and resets gradient accumulators back to zeroes.
-                    this.updateParams(this.weightGrads, this.biasGrads, {
+                    this.updateParams({
                         batchSize: batchSize, 
                         previousEpochLoss: previousEpochLoss, 
                         epoch: epoch, 
                         current_epoch: current_epoch, 
                         trainingFeatureSize: trainX[0].length
                     });
+
+                    this.zeroGrads();
 
                 }
 
@@ -1240,23 +1230,19 @@ class Neurex {
         const outputPointer = layerPointers[outputLayerIndex];
         
         if (outputPointer !== -1 && !outputLayer.freezeWeights) {
-            const result = outputLayer.applyDerivativeAndComputeGradients({
+            const delta = outputLayer.applyDerivativeAndComputeGradients({
                 delta: current_delta,
                 input: activations[outputLayerIndex],
                 z_value: zs[outputLayerIndex],
                 activatedOutput: activations[outputLayerIndex],
                 pointer: outputPointer,
-                weightGrads: this.weightGrads[outputPointer],
-                biasGrads: this.biasGrads[outputPointer],
                 layerData: outputLayer,
                 modelID: this.modelID,
                 deltaAlreadyIncludesActivationDerivative: true
             });
             
-            this.weightGrads[outputPointer] = result.weightGrads;
-            this.biasGrads[outputPointer] = result.biasGrads;
             if (outputLayer.layer_name === "Recurrent Cell") {
-                current_delta = result.delta;
+                current_delta = delta;
             }
         }
 
@@ -1290,8 +1276,6 @@ class Neurex {
                 z_value: zs[layer_index],
                 activatedOutput: activations[layer_index],
                 pointer: currentPointer,
-                weightGrads: this.weightGrads[currentPointer],
-                biasGrads: this.biasGrads[currentPointer],
                 layerData: current_layer,
                 modelID: this.modelID 
             }
@@ -1299,11 +1283,9 @@ class Neurex {
             // dispatch to all layer types in the build having `applyDerivativeAndComputeGradients` (if any)
             // this is a merged operation of applying derivatives and gradient accumulation. For layers that doesn't have activation function but stil accumulates gradients,
             // they still need to have this function because they still need to project the delta
-            const result = current_layer.applyDerivativeAndComputeGradients(dispatchData);
-            current_delta = result.delta;
+            const delta = current_layer.applyDerivativeAndComputeGradients(dispatchData);
+            current_delta = delta;
             deltas[layer_index] = current_delta;
-            this.weightGrads[currentPointer] = result.weightGrads || []; // fallback if a layer has initialzed gradient array template
-            this.biasGrads[currentPointer] = result.biasGrads || []; // fallback if a layer has initialzed gradient array template
         }
 
         return {
@@ -1317,9 +1299,7 @@ class Neurex {
      * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
      * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
      */
-    updateParams(accumulatedWeightGrads, accumulatedBiasGrads, options) {
-        let weightGrads = accumulatedWeightGrads;
-        let biasGrads = accumulatedBiasGrads;
+    updateParams(options) {
         let batchSize = options?.batchSize || 1;
         let optimize = options?.optimizer || this.optimizer;
 
@@ -1337,15 +1317,15 @@ class Neurex {
             
             if (this.gradient_normalizers.length > 0) {
                 for (const normalizer of this.gradient_normalizers) {
-                    weightGrads[layerPointer] = normalizer(weightGrads[layerPointer]);
-                    biasGrads[layerPointer] = normalizer(biasGrads[layerPointer]);
+                    layer_data_obj.weightGrads = normalizer(layer_data_obj.weightGrads);
+                    layer_data_obj.biasGrads = normalizer(layer_data_obj.biasGrads);
                 }
             }
 
             // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
             const res1 = optimize({
                 params: this.weights[layerPointer],
-                grads: weightGrads[layerPointer],
+                grads: layer_data_obj.weightGrads,
                 state: this.optimizerStates.weights[layerPointer],
                 lr: this.learning_rate,
                 previousEpochLoss: options?.previousEpochLoss || 0,
@@ -1370,7 +1350,7 @@ class Neurex {
 
                 const res2 = optimize({
                     params: this.biases[layerPointer],
-                    grads: biasGrads[layerPointer],
+                    grads: layer_data_obj.biasGrads,
                     state: this.optimizerStates.biases[layerPointer],
                     lr: this.learning_rate,
                     previousEpochLoss: options?.previousEpochLoss || 0,
@@ -1391,13 +1371,23 @@ class Neurex {
             }
         }
 
-        this.#reinitiateWeightSBiasGrads(); // reset grads (weights and biases grads) to 0s
-
         setGlobalParams(
             this.modelID,
             this.weights, 
             this.biases, 
         );
+    }
+
+    zeroGrads() {
+        for (const layer of this.layers) {
+            if (layer.isParametric && !layer.freezeWeights) {
+                layer.weightGrads.fill(0);
+
+                if (layer.useBias) {
+                    layer.biasGrads.fill(0);
+                }
+            }
+        }
     }
 
     // ========= Private methods =======
@@ -1435,8 +1425,6 @@ class Neurex {
                     updatedShape, 
                     weights, 
                     biases, 
-                    weightGrads, 
-                    biasGrads, 
                     inputShape, 
                     outputShape, 
                     paramShape, overrides, } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
@@ -1447,8 +1435,6 @@ class Neurex {
 
                 if (weights.length > 0) this.weights.push(weights);
                 if (biases.length > 0) this.biases.push(biases);
-                if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
-                if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
                 if (isParametric) this.parametric_layers.push(layer_data.layer_name);
                 
                 layer_data.weightShape = paramShape || [];
@@ -1507,8 +1493,6 @@ class Neurex {
             updatedShape, 
             weights, 
             biases, 
-            weightGrads, 
-            biasGrads, 
             inputShape, 
             outputShape, 
             isParametric,
@@ -1519,8 +1503,6 @@ class Neurex {
 
         if (weights.length > 0) this.weights.push(weights);
         if (biases.length > 0) this.biases.push(biases);
-        if (weightGrads.length > 0) this.weightGrads.push(weightGrads);
-        if (biasGrads.length > 0) this.biasGrads.push(biasGrads);
         if (isParametric) this.parametric_layers.push(layer_data.layer_name); 
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
@@ -1700,14 +1682,6 @@ class Neurex {
 
         this.currentShape = [H, W, D, S];
         this.currentSize = H * W * D * S;
-    }
-
-   #reinitiateWeightSBiasGrads() {
-
-        for (let i = 0; i < this.weights.length; i ++) {
-            this.weightGrads[i].fill(0);
-            this.biasGrads[i].fill(0);
-        }
     }
 
     #validateShapeTransition(prevLayer, currentLayer) {

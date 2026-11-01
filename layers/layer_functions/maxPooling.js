@@ -94,11 +94,7 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(errFlags.NAN_ERR);
     }
     
-    return {
-        delta: output,
-        weightGrads: [],
-        biasGrads: []
-    }
+    return output;
 }
 
 module.exports = {

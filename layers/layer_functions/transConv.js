@@ -1,7 +1,7 @@
 const { red, reset, yellow } = require('../../color-code');
 const activation = require('../../core/bindings');
 const {cacheOutputLayerDelta, transConvForward, scaleDiff, transConvBackward, element_wise_sub, fusedFinalDeltaProjector_ForTransConv} = require("../../core/bindings");
-const { XavierInitialization, calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
+const { calculateTransposedTensorShape, createTensorBuffer } = require('../../utils/utils');
 const errFlags = require('../../err_flags');
 
 const initParams = (size, shape, layer_data) => {
@@ -29,39 +29,20 @@ const initParams = (size, shape, layer_data) => {
         let weights = createTensorBuffer([TotalSize], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
         let biases = useBias ? createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data : new Float32Array(filters);
 
-        const weightGrads = new Float32Array(weights.length);
-        const biasGrads =  new Float32Array(biases.length);
-
-
-        const limit = XavierInitialization(fanIn, fanOut);
-
-        // weights
-        for (let i = 0; i < TotalSize; i++) {
-            weights[i] =  (Math.random() * 2 - 1) * limit;
-        }
-
-        // biases
-        if (useBias) {
-            for (let i = 0; i < filters; i++) {
-                biases[i] =  (Math.random() * 2 - 1) * limit;
-            }
-        }
-        
-
         // calculate output shape
         const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
 
         // output shape and weight shape
         const outputShape = [OutputHeight, OutputWidth, filters];
         const weightShape = [filters, kh, kw, iD];
+
+        layer_data.weightShape = weightShape;
                         
         return {
             updatedSize: CalculatedTensorShape,
             updatedShape: outputShape,
             weights: weights,
             biases: biases,
-            weightGrads: weightGrads,
-            biasGrads: biasGrads,
             inputShape: shape,
             outputShape: outputShape,
             paramShape: weightShape,
@@ -211,13 +192,14 @@ const applyDerivativeAndComputeGradients = (data) => {
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const z = data.z_value;
-    const wg = data.weightGrads;
-    const bg = data.biasGrads;
     const activatedOutput = data.activatedOutput;
     const layerID = layerData.layerID;
     const kernelShape = layerData.weightShape;
     const inputShape = layerData.inputShape;
     const outputShape = layerData.outputShape; 
+
+    const wg = layerData.weightGrads || createTensorBuffer(kernelShape, {prefilledWith:"zeroes"}).data;
+    const bg = layerData.biasGrads || createTensorBuffer([layerData.filters], {prefilledWith:"zeroes"}).data;
     
     const activationString = layerData.activation_function.name;
 
@@ -233,11 +215,10 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(errFlags.NAN_ERR);
     }
     
-    return {
-        delta: delta,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads
-    };
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 }
 
 

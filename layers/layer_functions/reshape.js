@@ -37,11 +37,7 @@ const feedforward = (data) => {
 }
 
 const applyDerivativeAndComputeGradients = (data) => {
-    return {
-        delta: data.delta,
-        weightGrads: [],
-        biasGrads: []
-    }
+    return data.delta;
 }
 
 

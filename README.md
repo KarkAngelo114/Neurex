@@ -252,44 +252,39 @@ nrx.backend.setComputeBackend("cpu");
 
     model.setParams(); // <- this is a MUST!
 
-    let batchSize = 12;
+    let batchSize = 2;
     let totalEpoch = 10000;
 
-    // epoch loop:
+    // epoch loop.
     for (let epoch = 0; epoch < totalEpoch; epoch++) {
         let batchLoss = 0;
 
-        // batch loop:
+        // batch loop.
         for (let batchStart = 0; batchStart < trainX.length; batchStart += batchSize) {
 
-            let weightGrads, biasGrads; // instantiate accumulator variables to be reference later
-
-            // loop through datasets:
+            // loop through datasets.
             for (let j = batchStart; j < batchStart + batchSize && j < trainX.length; j++) {
 
                 let input = trainX[j];
                 let label = trainY[j];
 
-                // feedforward:
+                // run feedforward loop.
                 const {predictions, activations, zs} = model.feedforward(new Float32Array(input));
 
-                // get output layer delta:
+                // get output layer delta.
                 const { outputLayerDelta, loss } = model.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
                 batchLoss += loss;
 
-                // backprop:
                 // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally before returnig the accumulated gradients.
-                const {accumulatedWeightGrads, accumulatedBiasGrads} = model.backpropagation(activations, zs, outputLayerDelta);
-
-                weightGrads = accumulatedWeightGrads;
-                biasGrads = accumulatedBiasGrads;
+                model.backpropagation(activations, zs, outputLayerDelta);
 
             }
 
-            // model param update:
-            // model parameter update must be placed outside mini-batch loop to get the accumulated gradients across batches
-            // internally, this method do scaling gradients and normalizing gradients before updating them using an optimizer.
-            model.updateParams(weightGrads, biasGrads);
+            // updates the parameters for every layer.
+            model.updateParams();
+
+            // reset gradient tensors back to zeroes to avoid continous accumulation.
+            model.zeroGrads();
         }
 
         console.log(`Epoch ${epoch+1} finished... Loss: ${((batchLoss /= batchSize).toFixed(7))}`);

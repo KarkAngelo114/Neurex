@@ -11,9 +11,7 @@ const initParams = (size, shape, layer_data) => {
     const useBias = layer_data.useBias;
     
     let weights = createTensorBuffer([TotalWeightSize], {prefilledWith:'xavier', min: inputSize, max: outputSize}).data;
-    let weightGrads = createTensorBuffer([TotalWeightSize], {prefilledWith:'zeroes'}).data;
     let biases = createTensorBuffer([outputSize], {prefilledWith:'zeroes'}).data;
-    let biasGrads = createTensorBuffer([outputSize], {prefilledWith:'zeroes'}).data;
     
     if (useBias) {
         biases = createTensorBuffer([outputSize], {prefilledWith:'xavier', min: inputSize, max: outputSize}).data;
@@ -27,8 +25,6 @@ const initParams = (size, shape, layer_data) => {
         updatedShape: updatedShape,
         weights: weights,
         biases: biases,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads,
         inputShape: [1, 1, size],
         outputShape: updatedShape,
         paramShape: weightShape,
@@ -180,12 +176,12 @@ const applyDerivativeAndComputeGradients = (data) => {
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const z = data.z_value;
-    const wg = data.weightGrads;
-    const bg = data.biasGrads;
     const activatedOutput = data.activatedOutput;
     const weightShape = layerData.weightShape;
     const layerID = layerData.layerID;
 
+    const wg = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
+    const bg = layerData.biasGrads || createTensorBuffer([layerData.layer_size], {prefilledWith:'zeroes'}).data;
     const activationString = layerData.activation_function.name;
     
 
@@ -201,11 +197,10 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(errFlags.NAN_ERR);
     }
 
-    return {
-        delta: delta,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads
-    };
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 }
 
 

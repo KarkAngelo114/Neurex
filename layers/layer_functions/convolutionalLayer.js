@@ -9,7 +9,7 @@ const errFlags = require('../../err_flags');
  * @param {Number} size number of neurons for this layer 
  * @param {Array<Number>} shape shape of the incoming input
  * @param {Object} layer_data layer_data
- * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
+ * @returns {{updatedSize: Number, updatedShape: Array<Number>, weights: Float32Array, biases: Float32Array, inputShape: Array<Number>, outputShape: Array<Number>, paramShape: Array<Number>}}
  */
 const initParams = (size, shape, layer_data) => {
     const filters = layer_data.filters;
@@ -30,9 +30,7 @@ const initParams = (size, shape, layer_data) => {
     const fanOut = kH * kW * filters;
 
     let kernels = createTensorBuffer([TotalSize], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
-    let kernelGrads = createTensorBuffer([TotalSize], {prefilledWith:'zeroes'}).data;
     let biases = createTensorBuffer([filters], {prefilledWith:'zeroes'}).data;
-    let biasGrads = createTensorBuffer([filters], {prefilledWith:'zeroes'}).data;
 
     if (useBias) {
         biases = createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
@@ -51,8 +49,6 @@ const initParams = (size, shape, layer_data) => {
         updatedShape: outputShape,
         weights: kernels,
         biases: biases,
-        weightGrads: kernelGrads,
-        biasGrads: biasGrads,
         inputShape: inputShape,
         outputShape: outputShape,
         paramShape: weightShape,
@@ -141,13 +137,13 @@ const applyDerivativeAndComputeGradients = (data) => {
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const z = data.z_value;
-    const wg = data.weightGrads;
-    const bg = data.biasGrads;
     const activatedOutput = data.activatedOutput;
     const layerID = layerData.layerID;
     const kernelShape = layerData.weightShape;
     const inputShape = layerData.inputShape;
     const outputShape = layerData.outputShape; 
+    const wg = layerData.weightGrads || createTensorBuffer(kernelShape, {prefilledWith:"zeroes"}).data;
+    const bg = layerData.biasGrads || createTensorBuffer([layerData.filters], {prefilledWith:"zeroes"}).data;
     
     const activationString = layerData.activation_function.name;
 
@@ -163,11 +159,10 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(errFlags.NAN_ERR);
     }
     
-    return {
-        delta: delta,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads
-    };
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 }
 
 module.exports = {

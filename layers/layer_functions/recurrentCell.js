@@ -195,13 +195,17 @@ const projectDeltaBackward = (data) => data.delta;
  */
 const applyDerivativeAndComputeGradients = (data) => {
     const { layerData } = data;
+    const [featureSize, units] = layerData.weightShape
+
+    const weight_grads = layerData.weightGrads || createTensorBuffer([featureSize * units + units * units], {prefilledWith:"zeroes"}).data;
+    const bias_grads = layerData.biasGrads || createTensorBuffer([units], {prefilledWith:"zeroes"}).data;
 
     const { delta, weightGrads, biasGrads } = recurrentBackward(
         data.delta,                                   
         data.input,          
         data.z_value,
-        data.weightGrads,
-        data.biasGrads,
+        weight_grads,
+        bias_grads,
         layerData.weightShape,
         layerData.seqLen,
         layerData.activation_function.name,
@@ -212,7 +216,20 @@ const applyDerivativeAndComputeGradients = (data) => {
         layerData.layerID
     );
 
-    return { delta: delta, weightGrads: weightGrads, biasGrads: biasGrads };
+    if (delta.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during derivative application in recurrent Cell");
+        throw new Error(errFlag.NAN_ERR);
+    }
+
+    if (weightGrads.some(v => Number.isNaN(v)) || biasGrads.some(v => Number.isNaN(v))) {
+        console.error("NaN detected during gradient accumulation in recurrent Cell");
+        throw new Error(errFlag.NAN_ERR);
+    }
+
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 };
 
 module.exports = {

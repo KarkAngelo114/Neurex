@@ -464,17 +464,19 @@ declare module 'neurex' {
         * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
         * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
         * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
-        * @returns {{accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}}
         */
-        backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): {accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[]}
+        backpropagation(activations: Float32Array[], zs: Float32Array[], outputLayerDelta: Float32Array): void;
         
         /**
         * Scaling gradients and paramters takes in this method. Note: If you're writing your custom training loop and implementing mini-batch training, you showld call this method outside your batch loop.
-        * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
-        * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
         * @param {updateParamsOptions} options update params options
         */
-        updateParams(accumulatedWeightGrads: Float32Array[], accumulatedBiasGrads: Float32Array[], options: updateParamsOptions): void;
+        updateParams(options: updateParamsOptions): void;
+
+        /**
+         * Resets gradient tesnors back to zeroes for the next accumulation cycle. Must be called after parameter updates to avoid continous gradient accumulation.
+         */
+        zeroGrads(): void;
     
         /**
         * The `getOutputLayerDelta` calculates the error of the output layer predictions towards the actuals or target outputs.
@@ -942,7 +944,7 @@ declare module 'neurex' {
 
         /**
          *  A vanilla recurrent neural network with 3 recurrent cells.
-         * @param {Number} units_per_cell number of units per recurrent cells. Default is `3` 
+         * @param {Number} units_per_cell number of units per recurrent cells. Default is `128` 
          * @param {String} activation_function activation function to be used by recurrent cells. Default is `tanh`
          * 
          *

@@ -40,10 +40,8 @@ const initParams = (size, shape, layer_data) => {
         return {
             updatedSize: embeddingDim * shape[3],
             updatedShape: [1, 1, embeddingDim, shape[3]], // seqLen unchanged, embedDim unchanged
-            weights,
-            biases,
-            weightGrads: new Float32Array(weights.length),
-            biasGrads: new Float32Array(biases.length),
+            weights: weights,
+            biases: biases,
             inputShape: shape,
             outputShape: [1, 1, embeddingDim, shape[3]],
             paramShape: weightShape,
@@ -106,21 +104,22 @@ const applyDerivativeAndComputeGradients = (data) => {
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const layerID = layerData.layerID;
-    const weight_grads = data.weightGrads;
-    const bias_grads = data.biasGrads;
     const activatedOutput = data.activatedOutput;
+    
 
     const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
     const { Q, K, V, S_perHead, mhaOutput } = cache;
+    const weightShape = layerData.weightShape;
+
+    const weight_grads = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
+    const bias_grads = layerData.biasGrads || createTensorBuffer([embedDim * 4], {prefilledWith:"zeroes"}).data; 
 
     const {delta, weightGrads, biasGrads} = CoreMultiHeadAttentionBackward(incoming_delta, Q, K, V, S_perHead, mhaOutput, activatedOutput, weight_grads, bias_grads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
-
     
-    return {
-        delta: delta,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads
-    }
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 }
 
 module.exports = {

@@ -92,14 +92,16 @@ const applyDerivativeAndComputeGradients = (data) => {
     const pointer = data.pointer;
     const modelID = data.modelID;
     const incoming_delta = data.delta;
-    const weight_grads = data.weightGrads;
-    const bias_grads = data.biasGrads;
     const activatedOutput = data.activatedOutput;
 
     const layerID = layerData.layerID;
 
     const {cache, embedDim, seqLen, dkRoot, useCausalMasking} = layerData;
     const {Q, K, V, S } = cache;
+    const weightShape = layerData.weightShape;
+    const weight_grads = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
+    const bias_grads = layerData.biasGrads || createTensorBuffer([embedDim * 3], {prefilledWith:"zeroes"}).data; 
+
     const {delta, weightGrads, biasGrads} = CoreSimpleAttentionBackward(incoming_delta, Q, K, V, S, weight_grads, bias_grads, activatedOutput, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID);
 
     if (delta.some(v => Number.isNaN(v))) {
@@ -112,11 +114,10 @@ const applyDerivativeAndComputeGradients = (data) => {
         throw new Error(err_flags.NAN_ERR);
     }
 
-    return {
-        delta: delta,
-        weightGrads: weightGrads,
-        biasGrads: biasGrads
-    };
+    layerData.weightGrads = weightGrads;
+    layerData.biasGrads = biasGrads;
+
+    return delta;
 }
 
 
