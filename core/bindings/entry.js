@@ -279,7 +279,7 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
  * @param {Boolean} applyActivationDerivative
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector_ForDense = (zs, storedActivatedOutput, incoming_delta, weightGrads, biasGrads, weightShape, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForDense(
+const fusedFinalDeltaProjector_ForDense = (zs, storedActivatedOutput, incoming_delta, weightGrads, biasGrads, weightShape, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForDense(
     zs,
     storedActivatedOutput,
     incoming_delta,
@@ -287,9 +287,9 @@ const fusedFinalDeltaProjector_ForDense = (zs, storedActivatedOutput, incoming_d
     biasGrads,
     weightShape,
     activationFunc.toLowerCase(),
+    applyActivationDerivative,
     modelID,
     layerID,
-    applyActivationDerivative
 );
 
 /**

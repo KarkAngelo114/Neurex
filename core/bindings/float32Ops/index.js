@@ -288,7 +288,7 @@ const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weig
     }
 }
 
-const fusedFinalDeltaProjector_ForDense = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, weightShape, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+const fusedFinalDeltaProjector_ForDense = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, weightShape, activationFuncType, applyActivationDerivative = true) => {
     const activationFunction = {
         "relu": DReLu,
         "sigmoid":DSigmoid,

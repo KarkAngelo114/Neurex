@@ -14,7 +14,9 @@ __kernel void accumulateWeightsAndBiasGradsDense (
         float input = activations[i];
         int offset = i * outputSize;
         weightGrads[offset + j] += input * deltas[j];
-        biasGrads[j] += deltas[j];
+        if (i == 0) {
+            biasGrads[j] += deltas[j];
+        }
     }
 
 }
