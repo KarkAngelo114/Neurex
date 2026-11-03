@@ -266,7 +266,7 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
 
 
 /**
- * "☑️" A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
+ * "✅☑️" A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
  * @param {Float32Array} zs 
  * @param {Float32Array} storedActivatedOutput 
  * @param {Float32Array} incoming_delta 
@@ -379,7 +379,7 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
 );
 
 /**
- * 
+ * "✅☑️"
  * @param {Float32Array} zs 
  * @param {Float32Array} activatedOutput 
  * @param {Float32Array} incomingDelta 
@@ -395,7 +395,7 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
  * @param {Boolean} applyActivationDerivative
  * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForConv(
+const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForConv(
     zs,
     activatedOutput,
     incomingDelta,
@@ -406,9 +406,10 @@ const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, we
     kernelShape,
     strides,
     activationFunc.toLowerCase(),
+    applyActivationDerivative,
     modelID,
     layerID,
-    applyActivationDerivative
+    
 );
 
 

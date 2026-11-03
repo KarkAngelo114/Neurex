@@ -596,7 +596,7 @@ const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightG
 
 }
 
-const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, applyActivationDerivative = true) => {
     const activationFunction = {
         "relu": DReLu,
         "sigmoid":DSigmoid,
