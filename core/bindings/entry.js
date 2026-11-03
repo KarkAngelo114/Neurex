@@ -810,7 +810,7 @@ const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functi
 );
 
 /**
- * 
+ * "✅☑️"
  * @param {Float32Array} dY incoming delta 
  * @param {Float32Array} X cached input during forward pass 
  * @param {Float32Array} weightGrads
@@ -821,7 +821,7 @@ const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functi
  * @param {String} layerID 
  * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, weightGrads, biasGrads , size, eps, pointer, modelID, layerID) => float32_Modules.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, weightGrads, biasGrads , size, eps, pointer, modelID, layerID) => functions.computeLayerNormBackward(
     dY,
     X,
     getGlobalParams(modelID).globalWeights[pointer],
