@@ -415,73 +415,115 @@ const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, we
 
 /**
  * 
- * "✅☑️"
- * @param {Float32Array} params flattened array of parameters 
- * @param {Float32Array} grads flattened array of grads 
- * @param {Float32Array} velocity array of calculated velocity
+ * "☑️"
+ * @param {Float32Array} weights flattened weight parameters
+ * @param {Float32Array} weightGrads flattened weight gradients
+ * @param {Float32Array} weightVelocity weight momentum state
+ * @param {Float32Array} biases bias parameters
+ * @param {Float32Array} biasGrads bias gradients
+ * @param {Float32Array} biasVelocity bias momentum state
  * @param {Number} learning_rate learning rate value
  * @param {Number} momentum momentum value
  * @param {Number} batchSize batchSize
- * @param {number} pointer pointer value to access corresponding parameters based on Model ID
- * @param {String} paramType specify if it's a weights or biases parameter
- * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
- * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
- * @returns {{params: Float32Array, velocity: Float32Array}}
+ * @param {Boolean} useBias whether bias parameters should be updated
+ * @param {Number} pointer a pointer value use to access from the global store (deprecated)
+ * @param {String} modelID model identifier to fetch data using a model ID from the global store
+ * @param {String} layeerID layer type identifier to fetch data using a layer ID from the global store
+ * @returns {{weights: Float32Array, weightVelocity: Float32Array, biases: Float32Array, biasVelocity: Float32Array}}
  */
-const ApplySGD = (params, grads, velocity, lr, momentum = 0.9, batchSize, pointer, paramType, modelID, layerID) => functions.SGD(params, grads, velocity, lr, momentum, batchSize, pointer, paramType, modelID, layerID);
+const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true,  pointer, modelID, layerID) => float32_Modules.SGD(
+    weights,
+    weightGrads,
+    weightVelocity,
+    biases,
+    biasGrads,
+    biasVelocity,
+    lr,
+    momentum,
+    batchSize,
+    useBias,
+    pointer,
+    modelID,
+    layerID
+);
 
 /**
- * 
- * "✅☑️"
- * @param {Float32Array} params - flattened array of parameters 
- * @param {Float32Array} grads - flattened array of grads
- * @param {Number} learning_rate - learning rate value 
- * @param {Float32Array} m - first momentum of average gradients vector
- * @param {Float32Array} v - second momentum of squared average gradients vector
- * @param {Number} t - Time step counter 
- * @param {Number} epsilon - epsilon constant value
- * @param {Number} beta1 - beta1 value
- * @param {Number} beta2 - beta2 value
- * @param {Number} batchSize batchSize
- * @param {number} pointer pointer value to access corresponding parameters based on Model ID
- * @param {String} paramType specify if it's a weights or biases parameter
- * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
- * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
- * @returns 
+ * "☑️"
+ * @param {Float32Array} weights 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biases 
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} m_weights 
+ * @param {Float32Array} m_biases 
+ * @param {Float32Array} v_weights 
+ * @param {Float32Array} v_biases 
+ * @param {Number} t 
+ * @param {Number} learning_rate 
+ * @param {Number} beta1 
+ * @param {Number} beta2 
+ * @param {Number} epsilon 
+ * @param {Number} batchSize 
+ * @param {Boolean} useBias 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @param {Number} pointer 
+ * @returns {{weights: Float32Array, biases: Float32Array, m_weights: Float32Array, m_biases: Float32Array, v_weights: Float32Array, v_biases: Float32Array}}
  */
-const ApplyAdam = (params, grads, learning_rate, m, v, t, epsilon, beta1, beta2, batchSize, pointer, paramType, modelID, layerID) => functions.Adam(
-    params, 
-    grads, 
-    m, 
-    v, 
+const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID, pointer) => float32_Modules.Adam(
+    weights,
+    weightGrads, 
+    biases,
+    biasGrads, 
+    m_weights, 
+    m_biases,
+    v_weights,
+    v_biases, 
     t, 
     learning_rate, 
     beta1, 
     beta2, 
     epsilon, 
-    batchSize, 
-    pointer, 
-    paramType, 
+    batchSize,
+    useBias,
     modelID, 
-    layerID
+    layerID,
+    pointer  
 );
-
+ 
 /**
- * "✅☑️"
- * @param {Float32Array} params flattened array of parameters 
- * @param {Float32Array} grads flattened array of grads
- * @param {Float32Array} sqAvg flattened array of moving squared average
- * @param {Number} lr learning rate value 
- * @param {Number} epsilon epsilon value
- * @param {Number} decayRate decay rate value
- * @param {Number} batchSize batchSize
- * @param {number} pointer pointer value to access corresponding parameters based on Model ID
- * @param {String} paramType specify if it's a weights or biases parameter
- * @param {String} modelID unique indentification string to use a model's corresponding structured parameters
- * @param {String} layerID unique indentification string to use a layer's corresponding structured parameters
- * @returns {{ params: Float32Array, sqAvg: Float32Array }}
+ * "☑️"
+ * @param {Float32Array} weights 
+ * @param {Float32Array} weightGrads 
+ * @param {Float32Array} biases 
+ * @param {Float32Array} biasGrads 
+ * @param {Float32Array} sqAvg_weights 
+ * @param {Float32Array} sqAvg_biases 
+ * @param {Number} lr 
+ * @param {Number} epsilon 
+ * @param {Number} decayRate 
+ * @param {Number} batchSize 
+ * @param {Boolean} useBias 
+ * @param {String} modelID 
+ * @param {String} layerID 
+ * @param {Number} pointer 
+ * @returns {{weights: Float32Array, biases: Float32Array, sqAvg_weights: Float32Array, sqAvg_biases: Float32Array}}
  */
-const ApplyRMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, batchSize, pointer, paramType, modelID, layerID) => functions.RMSProp(params, grads, sqAvg, lr, epsilon, decayRate, batchSize, pointer, paramType, modelID, layerID);
+const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias, modelID, layerID, pointer) => float32_Modules.RMSProp(
+    weights,
+    weightGrads,
+    biases,
+    biasGrads,
+    sqAvg_weights,
+    sqAvg_biases,
+    lr,
+    epsilon,
+    decayRate,
+    batchSize,
+    useBias,
+    modelID,
+    layerID,
+    pointer
+);
 
 /**
  * "✅☑️" performs X[i] /= scaling_value

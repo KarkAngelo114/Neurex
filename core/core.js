@@ -55,12 +55,6 @@ class Neurex {
         this.shuffle = true;
         this.modelID = null;
 
-        // Optimizer state for each layer (weights and biases)
-        this.optimizerStates = {
-            weights: [],
-            biases: []
-        };
-
         this.isfailed = false;
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
@@ -1302,6 +1296,7 @@ class Neurex {
     updateParams(options) {
         let batchSize = options?.batchSize || 1;
         let optimize = options?.optimizer || this.optimizer;
+        let learning_rate = options?.learning_rate ?? this.learning_rate;
 
         let pointer = 0;
         for (let l = 0; l < this.num_layers; l++) {
@@ -1322,53 +1317,28 @@ class Neurex {
                 }
             }
 
-            // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object. 
-            const res1 = optimize({
-                params: this.weights[layerPointer],
-                grads: layer_data_obj.weightGrads,
-                state: this.optimizerStates.weights[layerPointer],
-                lr: this.learning_rate,
+            const optimizerData = {
+                weights: this.weights[layerPointer],
+                biases: this.biases[layerPointer],
+                layerData: layer_data_obj,
+                learning_rate: learning_rate,
                 previousEpochLoss: options?.previousEpochLoss || 0,
                 current_epoch: options?.current_epoch || 1,
                 batchSize: batchSize,
                 totalEpoch: options?.totalEpoch || 1,
                 trainingFeatureSize: options?.trainingFeatureSize || 1,
                 pointer: layerPointer,
-                paramType: "weights",
                 modelID: this.modelID,
                 layerID: layerID
-            });
-
-            // update weights corresponding a parametric layer using a pointer
-            this.weights[layerPointer] = res1.params;
-
-            // store states
-            this.optimizerStates.weights[layerPointer] = res1.state;
-
-            // Update bias only if the layer actually has a bias and has the property `useBias`
-            if (layer_data_obj?.useBias) {
-
-                const res2 = optimize({
-                    params: this.biases[layerPointer],
-                    grads: layer_data_obj.biasGrads,
-                    state: this.optimizerStates.biases[layerPointer],
-                    lr: this.learning_rate,
-                    previousEpochLoss: options?.previousEpochLoss || 0,
-                    current_epoch: options?.current_epoch || 1,
-                    batchSize: batchSize,
-                    totalEpoch: options?.totalEpoch || 1,
-                    trainingFeatureSize: options?.trainingFeatureSize || 1,
-                    pointer: layerPointer,
-                    paramType: "biases",
-                    modelID: this.modelID,
-                    layerID: layerID
-                });
-
-                this.biases[layerPointer] = res2.params;
-
-                this.optimizerStates.biases[layerPointer] = res2.state;
-
             }
+
+            // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object.
+            const {weights, biases} = optimize(optimizerData);
+
+            // update weights and biases corresponding a parametric layer using a pointer
+            this.weights[layerPointer] = weights || [];
+            this.biases[layerPointer] = biases || [];
+
         }
 
         setGlobalParams(

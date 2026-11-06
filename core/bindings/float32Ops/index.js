@@ -356,58 +356,90 @@ const gradientClipping = (grads, threshold) => {
     return grads;
 }
 
-const SGD = (params, grads, velocity, lr, momentum = 0.9, batchSize) => {
+const SGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true) => {
+    for (let i = 0; i < weights.length; i++) {
+        weightVelocity[i] = momentum * weightVelocity[i] + (weightGrads[i] / batchSize);
+        weights[i] -= lr * weightVelocity[i];
+    }
 
-    for (let i = 0; i < params.length; i++) {
-
-        velocity[i] = momentum * velocity[i] + (grads[i] / batchSize);
-
-        params[i] -= lr * velocity[i];
+    if (useBias) {
+        for (let i = 0; i < biases.length; i++) {
+            biasVelocity[i] = momentum * biasVelocity[i] + (biasGrads[i] / batchSize);
+            biases[i] -= lr * biasVelocity[i];
+        }
     }
 
     return {
-        params: params,
-        velocity: velocity
+        weights: weights,
+        weightVelocity: weightVelocity,
+        biases: biases,
+        biasVelocity: biasVelocity
     };
 };
 
-const Adam = (params, grads, m, v, t, learning_rate, beta1, beta2, epsilon, batchSize) => {
-    const output = params;
-    const output_M = m;
-    const output_V = v;
+const Adam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias) => {
 
-    for (let i = 0; i < grads.length; i++) {
-        let g = (grads[i] / batchSize);
+    for (let i = 0; i < weights.length; i++) {
+        let g = (weightGrads[i] / batchSize);
 
-        m[i] = beta1 * m[i] + (1 - beta1) * g;
-        v[i] = beta2 * v[i] + (1 - beta2) * g * g;
+        m_weights[i] = beta1 * m_weights[i] + (1 - beta1) * g;
+        v_weights[i] = beta2 * v_weights[i] + (1 - beta2) * g * g;
 
-        let mHat = m[i] / (1.00 - Math.pow(beta1, t));
-        let vHat = v[i] / (1.00 - Math.pow(beta2, t));
+        let mHat = m_weights[i] / (1.00 - Math.pow(beta1, t));
+        let vHat = v_weights[i] / (1.00 - Math.pow(beta2, t));
 
-        output[i] -= learning_rate * mHat / (Math.sqrt(vHat) + epsilon);
+        weights[i] -= learning_rate * mHat / (Math.sqrt(vHat) + epsilon);
 
     }
 
+    if (useBias) {
+        for (let i = 0; i < biases.length; i++) {
+            let g = (biasGrads[i] / batchSize);
+
+            m_biases[i] = beta1 * m_biases[i] + (1 - beta1) * g;
+            v_biases[i] = beta2 * v_biases[i] + (1 - beta2) * g * g;
+
+            let mHat = m_biases[i] / (1.00 - Math.pow(beta1, t));
+            let vHat = v_biases[i] / (1.00 - Math.pow(beta2, t));
+
+            biases[i] -= learning_rate * mHat / (Math.sqrt(vHat) + epsilon);
+
+        }
+    }
+    
+
     return {
-        params: output,
-        m: output_M,
-        v: output_V
+        weights: weights,
+        biases: biases,
+        m_weights: m_weights,
+        m_biases: m_biases,
+        v_weights: v_weights,
+        v_biases: v_biases
         
     }
 }
 
-const RMSProp = (params, grads, sqAvg, lr, epsilon, decayRate, batchSize) => {
+const RMSProp = (weights, weightGrads, biases , biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias) => {
 
-    for (let i = 0; i < params.length; i++) {
-        const g = (grads[i] / batchSize);
-        sqAvg[i] = decayRate * sqAvg[i] + (1 - decayRate) * (g * g);
-        params[i] -= (lr / (Math.sqrt(sqAvg[i]) + epsilon)) * g;
+    for (let i = 0; i < weights.length; i++) {
+        const g = (weightGrads[i] / batchSize);
+        sqAvg_weights[i] = decayRate * sqAvg_weights[i] + (1 - decayRate) * (g * g);
+        weights[i] -= (lr / (Math.sqrt(sqAvg_weights[i]) + epsilon)) * g;
+    }
+
+    if (useBias) {
+        for (let i = 0; i < biases.length; i++) {
+            const g = (biasGrads[i] / batchSize);
+            sqAvg_biases[i] = decayRate * sqAvg_biases[i] + (1 - decayRate) * (g * g);
+            biases[i] -= (lr / (Math.sqrt(sqAvg_biases[i]) + epsilon)) * g;
+        }
     }
 
     return {
-        params: params,
-        sqAvg: sqAvg
+        weights: weights,
+        biases: biases,
+        sqAvg_weights: sqAvg_weights,
+        sqAvg_biases: sqAvg_biases
     }
 }
 
