@@ -256,19 +256,17 @@ declare module 'neurex' {
 
     export interface updateParamsOptions {
         /** the size per batch */ 
-        batchSize?: number,
+        batchSize?: number;
         /** total training epoch  */
-        totalEpoch?: number,
+        totalEpoch?: number;
         /** previous epoch loss  */
-        previousEpochLoss?: number,
+        previousEpochLoss?: number;
         /** current epoch  */
-        current_epoch?: number
+        current_epoch?: number;
         /** training feature size  */
-        trainingFeatureSize?: number,
+        trainingFeatureSize?: number;
         /** optimizer to use. Once set, it by will use the optimizer you've set in this option rather on the `configure()` */
-        optimizer?: (params: any) => Function
-
-
+        optimizer?: (params: any) => Function;
     }
 
     /**

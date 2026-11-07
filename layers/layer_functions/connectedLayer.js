@@ -176,7 +176,8 @@ const applyDerivativeAndComputeGradients = (data) => {
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const z = data.z_value;
-    const activatedOutput = data.activatedOutput;
+    const layerInput = data.input;
+    const layerOutput = layerData.cache.layer_output;
     const weightShape = layerData.weightShape;
     const layerID = layerData.layerID;
 
@@ -185,7 +186,7 @@ const applyDerivativeAndComputeGradients = (data) => {
     const activationString = layerData.activation_function.name;
     
 
-    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForDense(z, activatedOutput, incoming_delta, wg, bg, weightShape, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForDense(z, layerInput, layerOutput, incoming_delta, wg, bg, weightShape, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
 
     if (delta.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in connected layer");

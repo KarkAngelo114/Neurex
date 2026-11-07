@@ -189,11 +189,10 @@ const projectDeltaBackward = (data) => {
 
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
-    const modelID = data.modelID;
     const incoming_delta = data.delta;
     const z = data.z_value;
-    const activatedOutput = data.activatedOutput;
-    const layerID = layerData.layerID;
+    const layerInput = data.input;
+    const layerOutput = layerData.cache.layer_output;
     const kernelShape = layerData.weightShape;
     const inputShape = layerData.inputShape;
     const outputShape = layerData.outputShape; 
@@ -203,7 +202,7 @@ const applyDerivativeAndComputeGradients = (data) => {
     
     const activationString = layerData.activation_function.name;
 
-    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForTransConv(z, activatedOutput, incoming_delta, wg, bg, inputShape, outputShape, kernelShape, layerData.strides, activationString, modelID, layerID, !data.deltaAlreadyIncludesActivationDerivative);
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForTransConv(z, layerInput, layerOutput, incoming_delta, wg, bg, inputShape, outputShape, kernelShape, layerData.strides, activationString, !data.deltaAlreadyIncludesActivationDerivative, data.modelID, layerData.layerID);
     
     if (delta.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in convolutional layer");

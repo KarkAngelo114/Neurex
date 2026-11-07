@@ -1281,17 +1281,10 @@ class Neurex {
             current_delta = delta;
             deltas[layer_index] = current_delta;
         }
-
-        return {
-            accumulatedWeightGrads: this.weightGrads, 
-            accumulatedBiasGrads: this.biasGrads 
-        };
     }
 
     /**
      * @method `updateParams` is the method to update the parameters of your model.
-     * @param {Array<Float32Array>} accumulatedWeightGrads the accumulated weight gradients returned by `backpropagation()`
-     * @param {Array<Float32Array>} accumulatedBiasGrads the accumulated bias gradients returned by `backpropagation()`
      */
     updateParams(options) {
         let batchSize = options?.batchSize || 1;

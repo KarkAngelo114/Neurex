@@ -275,7 +275,7 @@ nrx.backend.setComputeBackend("cpu");
                 const { outputLayerDelta, loss } = model.getOutputLayerDelta(predictions, label, zs, 'binary_cross_entropy');
                 batchLoss += loss;
 
-                // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally before returnig the accumulated gradients.
+                // the backprop must be placed inside the mini-batch loop to properly accumulate gradients internally
                 model.backpropagation(activations, zs, outputLayerDelta);
 
             }

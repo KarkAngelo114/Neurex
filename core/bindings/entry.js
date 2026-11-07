@@ -268,7 +268,8 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
 /**
  * "✅☑️" A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
  * @param {Float32Array} zs 
- * @param {Float32Array} storedActivatedOutput 
+ * @param {Float32Array} layerInput The activation entering this layer, used for weight gradients
+ * @param {Float32Array} layerOutput This layer's activated output, used by the softmax derivative
  * @param {Float32Array} incoming_delta 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads
@@ -279,9 +280,10 @@ const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) =
  * @param {Boolean} applyActivationDerivative
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector_ForDense = (zs, storedActivatedOutput, incoming_delta, weightGrads, biasGrads, weightShape, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForDense(
+const fusedFinalDeltaProjector_ForDense = (zs, layerInput, layerOutput, incoming_delta, weightGrads, biasGrads, weightShape, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForDense(
     zs,
-    storedActivatedOutput,
+    layerInput,
+    layerOutput,
     incoming_delta,
     weightGrads, 
     biasGrads,
@@ -381,7 +383,8 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
 /**
  * "✅☑️"
  * @param {Float32Array} zs 
- * @param {Float32Array} activatedOutput 
+ * @param {Float32Array} layerInput The activation entering this layer, used for weight gradients
+ * @param {Float32Array} layerOutput This layer's activated output, used by the softmax derivative
  * @param {Float32Array} incomingDelta 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
@@ -395,9 +398,10 @@ const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelS
  * @param {Boolean} applyActivationDerivative
  * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForConv(
+const fusedFinalDeltaProjector_ForConv = (zs, layerInput, layerOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => functions.fusedFinalDeltaProjector_ForConv(
     zs,
-    activatedOutput,
+    layerInput,
+    layerOutput,
     incomingDelta,
     weightGrads,
     biasGrads,
@@ -800,7 +804,8 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
 /**
  * "☑️" A specialized operation for transconv layer that performs derivative activation and gradient computation as one bulk operation
  * @param {Float32Array} zs 
- * @param {Float32Array} activatedOutput 
+ * @param {Float32Array} layerInput The activation entering this layer, used for weight gradients
+ * @param {Float32Array} layerOutput This layer's activated output, used by the softmax derivative
  * @param {Float32Array} incomingDelta 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
@@ -809,14 +814,15 @@ const transConvBackward = (input, inputShape, outputShape, strides, filters, wei
  * @param {Array<Number>} kernelShape 
  * @param {Number} strides
  * @param {String} activationFunc 
+ * @param {Boolean} applyActivationDerivative
  * @param {String} modelID 
  * @param {String} layerID 
- * @param {Boolean} applyActivationDerivative
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const fusedFinalDeltaProjector_ForTransConv = (zs, activatedOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, modelID, layerID, applyActivationDerivative = true) => float32_Modules.fusedFinalDeltaProjector_ForTransConv(
+const fusedFinalDeltaProjector_ForTransConv = (zs, layerInput, layerOutput, incomingDelta, weightGrads, biasGrads, inputShape, outputShape, kernelShape, strides, activationFunc, applyActivationDerivative = true, modelID, layerID) => functions.fusedFinalDeltaProjector_ForTransConv(
     zs,
-    activatedOutput,
+    layerInput,
+    layerOutput,
     incomingDelta,
     weightGrads,
     biasGrads,
@@ -825,9 +831,9 @@ const fusedFinalDeltaProjector_ForTransConv = (zs, activatedOutput, incomingDelt
     kernelShape,
     strides,
     activationFunc.toLowerCase(),
+    applyActivationDerivative,
     modelID,
-    layerID,
-    applyActivationDerivative
+    layerID
 );
 
 /**

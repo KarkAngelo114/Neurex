@@ -288,37 +288,28 @@ const accumulateWeightsAndBiasGradsForConnectedLayer = (activations, delta, weig
     }
 }
 
-const fusedFinalDeltaProjector_ForDense = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, weightShape, activationFuncType, applyActivationDerivative = true) => {
+const fusedFinalDeltaProjector_ForDense = (zs, layerInput, layerOutput, incoming_delta, weight_grads, bias_grads, weightShape, activationFuncType, applyActivationDerivative = true) => {
     const activationFunction = {
         "relu": DReLu,
         "sigmoid":DSigmoid,
         "tanh":DTanh,
-        "linear":DLinear,
-        "softmax":DSoftmax
+        "linear":DLinear
     }
 
-    // special case for hidden layers that uses softmax activation (which is uncommon), the 
-    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
-    if (applyActivationDerivative && activationFuncType === "softmax") {
-        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
-
-        const {weightGrads, biasGrads} = accumulateWeightsAndBiasGradsForConnectedLayer(activatedOutput, finalDelta, weight_grads, bias_grads, weightShape)
-    
-        return {
-            delta: finalDelta,
-            weightGrads: weightGrads,
-            biasGrads: biasGrads
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        if (activationFuncType === "softmax") {
+            finalDelta = DSoftmax(layerOutput, incoming_delta);
+        } else {
+            const derivative = activationFunction[activationFuncType];
+            if (!derivative) {
+                throw new TypeError(`Unsupported dense activation derivative: ${activationFuncType}`);
+            }
+            finalDelta = element_wise_mul(derivative(zs), incoming_delta);
         }
     }
 
-    // get the derivatives
-    let finalDelta = incoming_delta;
-    if (applyActivationDerivative) {
-        const dAct = activationFunction[activationFuncType](zs);
-        finalDelta = element_wise_mul(dAct, incoming_delta);
-    }
-
-    const {weightGrads, biasGrads} = accumulateWeightsAndBiasGradsForConnectedLayer(activatedOutput, finalDelta, weight_grads, bias_grads, weightShape)
+    const {weightGrads, biasGrads} = accumulateWeightsAndBiasGradsForConnectedLayer(layerInput, finalDelta, weight_grads, bias_grads, weightShape)
     
     return {
         delta: finalDelta,
@@ -628,37 +619,28 @@ const AccumulateWeightAndBiasGradsForConv = (activations_outputs, delta, weightG
 
 }
 
-const fusedFinalDeltaProjector_ForConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, applyActivationDerivative = true) => {
+const fusedFinalDeltaProjector_ForConv = (zs, layerInput, layerOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, applyActivationDerivative = true) => {
     const activationFunction = {
         "relu": DReLu,
         "sigmoid":DSigmoid,
         "tanh":DTanh,
-        "linear":DLinear,
-        "softmax":DSoftmax
+        "linear":DLinear
     }
 
-    // special case for hidden layers that uses softmax activation (which is uncommon), the 
-    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
-    if (applyActivationDerivative && activationFuncType === "softmax") {
-        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
-
-        const {weightGrads, biasGrads} = AccumulateWeightAndBiasGradsForConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
-    
-        return {
-            delta: finalDelta,
-            weightGrads: weightGrads,
-            biasGrads: biasGrads
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        if (activationFuncType === "softmax") {
+            finalDelta = DSoftmax(layerOutput, incoming_delta);
+        } else {
+            const derivative = activationFunction[activationFuncType];
+            if (!derivative) {
+                throw new TypeError(`Unsupported convolution activation derivative: ${activationFuncType}`);
+            }
+            finalDelta = element_wise_mul(derivative(zs), incoming_delta);
         }
     }
 
-    // get the derivatives
-    let finalDelta = incoming_delta;
-    if (applyActivationDerivative) {
-        const dAct = activationFunction[activationFuncType](zs);
-        finalDelta = element_wise_mul(dAct, incoming_delta);
-    }
-
-    const {weightGrads, biasGrads} = AccumulateWeightAndBiasGradsForConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    const {weightGrads, biasGrads} = AccumulateWeightAndBiasGradsForConv(layerInput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
     
     return {
         delta: finalDelta,
@@ -1156,37 +1138,28 @@ const accumulateWeightandBiasGradsForTransConv = (activation_outputs, deltas, we
     };
 }
 
-const fusedFinalDeltaProjector_ForTransConv = (zs, activatedOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, modelID, layerID, applyActivationDerivative = true) => {
+const fusedFinalDeltaProjector_ForTransConv = (zs, layerInput, layerOutput, incoming_delta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides, activationFuncType, applyActivationDerivative = true) => {
     const activationFunction = {
         "relu": DReLu,
         "sigmoid":DSigmoid,
         "tanh":DTanh,
-        "linear":DLinear,
-        "softmax":DSoftmax
+        "linear":DLinear
     }
 
-    // special case for hidden layers that uses softmax activation (which is uncommon), the 
-    // DSoftmax (Jacobian equation) requires 2 vectors which is the cached activated output of a layer and the incoming delta
-    if (applyActivationDerivative && activationFuncType === "softmax") {
-        const finalDelta = DSoftmax(activatedOutput, incoming_delta);
-
-        const {weightGrads, biasGrads} = accumulateWeightandBiasGradsForTransConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
-    
-        return {
-            delta: finalDelta,
-            weightGrads: weightGrads,
-            biasGrads: biasGrads
+    let finalDelta = incoming_delta;
+    if (applyActivationDerivative) {
+        if (activationFuncType === "softmax") {
+            finalDelta = DSoftmax(layerOutput, incoming_delta);
+        } else {
+            const derivative = activationFunction[activationFuncType];
+            if (!derivative) {
+                throw new TypeError(`Unsupported transposed convolution activation derivative: ${activationFuncType}`);
+            }
+            finalDelta = element_wise_mul(derivative(zs), incoming_delta);
         }
     }
 
-    // get the derivatives
-    let finalDelta = incoming_delta;
-    if (applyActivationDerivative) {
-        const dAct = activationFunction[activationFuncType](zs);
-        finalDelta = element_wise_mul(dAct, incoming_delta);
-    }
-
-    const {weightGrads, biasGrads} = accumulateWeightandBiasGradsForTransConv(activatedOutput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
+    const {weightGrads, biasGrads} = accumulateWeightandBiasGradsForTransConv(layerInput, finalDelta, weight_grads, bias_grads, inputShape, outputShape, kernelShape, strides);
     
     return {
         delta: finalDelta,
@@ -1852,7 +1825,6 @@ module.exports = {
     recurrentBackward,
 
     gradientClipping,
-    computelayerNorm,
     jaccard,
 
     CoreSimpleAttention,
@@ -1864,6 +1836,7 @@ module.exports = {
     element_wise_add,
     SinusoidalPositionalEncoding,
     
+    computelayerNorm,
     computeLayerNormBackward,
     AccumulateGammaAndBetaGrads,
 
