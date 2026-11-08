@@ -178,17 +178,17 @@ const dlinear = (input, _, modelID, layerID) => functions.DLinear(input, modelID
  *  "✅☑️"
  * @function getEmbeddings
  * @param {Array<Number>} tokenVector an array of token vector 
+ * @param {Array<Number>} weights
  * @param {Number} embeddingDim embedding dim value
  * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, embeddingDim, pointer, modelID, layerID) => functions.getEmbeddings(
+const getEmbeddings = (tokenVector, weights, embeddingDim, modelID, layerID) => float32_Modules.getEmbeddings(
     Array.from(tokenVector), 
     embeddingDim, 
-    getGlobalParams(modelID).globalWeights[pointer], 
-    pointer,
+    weights, 
     modelID,
     layerID
 )
@@ -226,18 +226,18 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, l
  * @param {Float32Array} input 
  * @param {Array<Number>} weightShape 
  * @param {String} activationFunc 
- * @param {Number} pointer 
+ * @param {Float32Array} weights
+ * @param {Float32Array} biases
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const DenseForward = (input, weightShape, activationFunc, pointer, modelID, layerID) =>  functions.DenseForward(
+const DenseForward = (input, weights, biases, weightShape, activationFunc, modelID, layerID) =>  float32_Modules.DenseForward(
     input, 
     weightShape,
     activationFunc.toLowerCase(),
-    getGlobalParams(modelID).globalWeights[pointer], 
-    getGlobalParams(modelID).globalBiases[pointer],
-    pointer,
+    weights, 
+    biases,
     modelID, 
     layerID
 );
@@ -246,20 +246,18 @@ const DenseForward = (input, weightShape, activationFunc, pointer, modelID, laye
 /**
  * "✅☑️"
  * @function DeltaMatMul
- * @param {Float32Array} deltas - Float32Array array of output deltas from the previous layer
- * @param {Float32Array} weights - Float32Array array of weights
- * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
- * @param {Number} outputSize - the layer size of this layer
- * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
- * @param {String} modelID model ID
+ * @param {Float32Array} deltas
+ * @param {Float32Array} weights 
+ * @param {Number} inputSize 
+ * @param {Number} outputSize 
+ * @param {String} modelID
  * @param {String} layerID
  */
-const DeltaMatMul = (deltas, inputSize, outputSize, pointer, modelID, layerID) => functions.DeltaMatMul(
+const DeltaMatMul = (deltas, inputSize, outputSize, weights, modelID, layerID) => float32_Modules.DeltaMatMul(
     deltas, 
     inputSize, 
     outputSize, 
-    getGlobalParams(modelID).globalWeights[pointer],
-    pointer,
+    weights,
     modelID,
     layerID
 );
@@ -336,23 +334,24 @@ const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_c
 /**
  * "☑️" Performs the classic operation of a convolution layer and applies activation function directly to the output as one bulk operation
  * @param {Float32Array} input 
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Array<Number>} kernelShape 
  * @param {String} activationFunc 
- * @param {Number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns {{z_values: Float32Array,activated_output: Float32Array }}
  */
-const ConvolveForward = (input, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => functions.ConvolveForward(
+const ConvolveForward = (input, weights, biases, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => float32_Modules.ConvolveForward(
     input,
     inputShape,
     outputShape,
     kernelShape,
     activationFunc.toLowerCase(),
-    getGlobalParams(modelID).globalWeights[pointer], 
-    getGlobalParams(modelID).globalBiases[pointer],
+    weights, 
+    biases,
     pointer,
     modelID,
     layerID
@@ -361,6 +360,7 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
 /**
  * "✅☑️"
  * @param {Float32Array} input 
+ * @param {Float32Array} weights
  * @param {Array<Number>} OutputProjectionShape 
  * @param {Array<Number>} deltaInputShape 
  * @param {Array<Number>} kernelShape 
@@ -369,13 +369,12 @@ const ConvolveForward = (input, inputShape, outputShape, kernelShape, activation
  * @param {String} layerID 
  * @returns 
  */
-const ConvolveBackward = (input, OutputProjectionShape, deltaInputShape, kernelShape, pointer, modelID, layerID) => functions.ConvolveBackward(
+const ConvolveBackward = (input, weights, OutputProjectionShape, deltaInputShape, kernelShape, modelID, layerID) => float32_Modules.ConvolveBackward(
     input,
     OutputProjectionShape,
     deltaInputShape,
     kernelShape,
-    getGlobalParams(modelID).globalWeights[pointer],
-    pointer,
+    weights,
     modelID,
     layerID
 );
@@ -661,24 +660,25 @@ const MaxPoolDelta = (delta, indices, h, w, d, modelID, layerID) => functions.Ma
 /**
  * "☑️"
  * @param {Float32Array} input 
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases 
  * @param {Array<Number>} weightShape 
  * @param {Number} seqLen 
  * @param {String} activationFunc 
  * @param {Boolean} returnSequence 
- * @param {Number} pointer 
+
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns {{activatedOutput: Float32Array, z_values: Float32Array}}
  */
-const recurrentForward = (input, weightShape, seqLen, activationFunc, returnSequence, pointer, modelID, layerID) => float32_Modules.recurrentForward(
+const recurrentForward = (input, weights, biases, weightShape, seqLen, activationFunc, returnSequence, modelID, layerID) => float32_Modules.recurrentForward(
     input,
     weightShape,
-    getGlobalParams(modelID).globalWeights[pointer],
-    getGlobalParams(modelID).globalBiases[pointer],
+    weights,
+    biases,
     seqLen,
     returnSequence,
     activationFunc.toLowerCase(),
-    pointer,
     modelID,
     layerID
 );
@@ -688,6 +688,7 @@ const recurrentForward = (input, weightShape, seqLen, activationFunc, returnSequ
  * @param {Float32Array} delta 
  * @param {Float32Array} input 
  * @param {Float32Array} zValues 
+ * @param {Float32Array} weights
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biasGrads 
  * @param {Array<Number>} weightShape 
@@ -695,7 +696,6 @@ const recurrentForward = (input, weightShape, seqLen, activationFunc, returnSequ
  * @param {String} activationFunc 
  * @param {Boolean} returnSequence 
  * @param {Boolean} deltaAlreadyIncludesActivationDerivative 
- * @param {Number} pointer 
  * @param {String} modelID
  * @param {String} layerID
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
@@ -704,6 +704,7 @@ const recurrentBackward = (
     delta,
     input,
     zValues,
+    weights,
     weightGrads,
     biasGrads,
     weightShape,
@@ -711,14 +712,13 @@ const recurrentBackward = (
     activationFunc,
     returnSequence,
     deltaAlreadyIncludesActivationDerivative = false,
-    pointer,
     modelID,
     layerID,
 ) => float32_Modules.recurrentBackward(
     delta,
     input,
     zValues,
-    getGlobalParams(modelID).globalWeights[pointer],
+    weights,
     weightGrads,
     biasGrads,
     weightShape,
@@ -726,7 +726,6 @@ const recurrentBackward = (
     activationFunc.toLowerCase(),
     returnSequence,
     deltaAlreadyIncludesActivationDerivative,
-    pointer,
     modelID,
     layerID
 );
@@ -749,18 +748,19 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
 /**
  * "✅☑️" Performs the transpose convolution operation and applies activation output directly as one bulk operation
  * @param {Float32Array} input 
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases 
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Number} strides 
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
  * @param {String} activationType
- * @param {Number} pointer 
  * @param {String} modelID model ID
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const transConvForward = (input, inputShape, outputShape, strides, filters, weightShape, activationType, pointer, modelID, layerID) => functions.transConvForward(
+const transConvForward = (input, weights, biases, inputShape, outputShape, strides, filters, weightShape, activationType, modelID, layerID) => float32_Modules.transConvForward(
     input, 
     inputShape, 
     outputShape, 
@@ -768,9 +768,8 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
     filters, 
     weightShape,
     activationType.toLowerCase(),
-    getGlobalParams(modelID).globalWeights[pointer], 
-    getGlobalParams(modelID).globalBiases[pointer],
-    pointer,
+    weights, 
+    biases,
     modelID,
     layerID
 );
@@ -778,25 +777,24 @@ const transConvForward = (input, inputShape, outputShape, strides, filters, weig
 /**
  * "✅☑️"
  * @param {Float32Array} input 
+ * @param {Float32Array} weights
  * @param {Array<Number>} inputShape 
  * @param {Array<Number>} outputShape 
  * @param {Number} strides 
  * @param {Number} filters 
  * @param {Array<Number>} weightShape 
- * @param {pointer} pointer 
  * @param {String} modelID
  * @param {String} layerID
  * @returns {Float32Array}
  */
-const transConvBackward = (input, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID) => functions.transConvBackward(
+const transConvBackward = (input, weights, inputShape, outputShape, strides, filters, weightShape,  modelID, layerID) => float32_Modules.transConvBackward(
     input,
     inputShape,
     outputShape,
     strides,
     filters,
     weightShape,
-    getGlobalParams(modelID).globalWeights[pointer],
-    pointer,
+    weights,
     modelID,
     layerID
 );
@@ -839,6 +837,8 @@ const fusedFinalDeltaProjector_ForTransConv = (zs, layerInput, layerOutput, inco
 /**
  * "✅☑️"
  * @param {Float32Array} input 
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases 
  * @param {number} size 
  * @param {number} eps
  * @param {number} pointer 
@@ -846,13 +846,12 @@ const fusedFinalDeltaProjector_ForTransConv = (zs, layerInput, layerOutput, inco
  * @param {String} layerID 
  * @returns 
  */
-const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functions.computelayerNorm(
+const computeLayerNorm = (input, weights, biases, size, eps, modelID, layerID) => float32_Modules.computelayerNorm(
     input, 
     size, 
-    getGlobalParams(modelID).globalWeights[pointer], 
-    getGlobalParams(modelID).globalBiases[pointer], 
+    weights, 
+    biases, 
     eps,
-    pointer,
     modelID,
     layerID
 );
@@ -861,23 +860,22 @@ const computeLayerNorm = (input, size, eps, pointer, modelID, layerID) => functi
  * "✅☑️"
  * @param {Float32Array} dY incoming delta 
  * @param {Float32Array} X cached input during forward pass 
+ * @param {Float32Array} weights
  * @param {Float32Array} weightGrads
  * @param {Float32Array} biasGrads
  * @param {Number} size feature size 
- * @param {number} pointer 
  * @param {String} modelID
  * @param {String} layerID 
  * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, weightGrads, biasGrads , size, eps, pointer, modelID, layerID) => functions.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, weights, weightGrads, biasGrads , size, eps, modelID, layerID) => float32_Modules.computeLayerNormBackward(
     dY,
     X,
-    getGlobalParams(modelID).globalWeights[pointer],
+    weights,
     weightGrads,
     biasGrads,
     size, 
     eps,
-    pointer,
     modelID,
     layerID
 );
@@ -906,24 +904,24 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer
 /**
  * "☑️"
  * @param {Float32Array} input the input tensor
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
- * @param {Boolean} useCausalMasking cacusal masking boolean value
- * @param {Number} pointer pointer value to reference corresponding layer parameter 
+ * @param {Boolean} useCausalMasking cacusal masking boolean value 
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns {{ X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, S: Float32Array, output: Float32Array}}
  */
-const CoreSimpleAttention = (input, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID) => float32_Modules.CoreSimpleAttention(
+const CoreSimpleAttention = (input, weights, biases, embedDim, seqLen, dkRoot, useCausalMasking, modelID, layerID) => float32_Modules.CoreSimpleAttention(
     input, 
-    getGlobalParams(modelID).globalWeights[pointer],
-    getGlobalParams(modelID).globalBiases[pointer],
+    weights,
+    biases,
     embedDim,
     seqLen,
     dkRoot,
     useCausalMasking,
-    pointer,
     modelID,
     layerID
 );
@@ -931,6 +929,7 @@ const CoreSimpleAttention = (input, embedDim, seqLen, dkRoot, useCausalMasking, 
 /**
  * "☑️"
  * @param {Float32Array} delta incoming delta
+ * @param {Float32Array} weights
  * @param {Float32Array} Q cached Q
  * @param {Float32Array} K cached K
  * @param {Float32Array} V cached V
@@ -942,18 +941,17 @@ const CoreSimpleAttention = (input, embedDim, seqLen, dkRoot, useCausalMasking, 
  * @param {Number} seqLen sequence length value 
  * @param {Number} dkRoot dkRoot value. Used for scaling attention delta scores
  * @param {Boolean} useCausalMasking cacusal masking boolean value
- * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const CoreSimpleAttentionBackward = (delta, Q, K, V, S, weightGrads, biasGrads, activated_output, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID) => float32_Modules.CoreSimpleAttentionBackward(
+const CoreSimpleAttentionBackward = (delta, weights, Q, K, V, S, weightGrads, biasGrads, activated_output, embedDim, seqLen, dkRoot, useCausalMasking,  modelID, layerID) => float32_Modules.CoreSimpleAttentionBackward(
     delta, 
     Q, 
     K,
     V, 
     S,
-    getGlobalParams(modelID).globalWeights[pointer],
+    weights,
     weightGrads,
     biasGrads,
     activated_output,
@@ -961,7 +959,6 @@ const CoreSimpleAttentionBackward = (delta, Q, K, V, S, weightGrads, biasGrads, 
     seqLen,
     dkRoot,
     useCausalMasking,
-    pointer,
     modelID,
     layerID
 );
@@ -969,28 +966,28 @@ const CoreSimpleAttentionBackward = (delta, Q, K, V, S, weightGrads, biasGrads, 
 /**
  * "✅☑️"
  * @param {Float32Array} input 
+ * @param {Float32Array} weights 
+ * @param {Float32Array} biases 
  * @param {Number} embedDim embedding dimension
  * @param {Number} seqLen sequence length value 
  * @param {Number} numHeads number of heads that process scaled dot product in parallel
  * @param {Number} headDim head dim value
  * @param {Number} dkRoot dkRoot value. Used for scaling attention scores
  * @param {Boolean} useCausalMasking causal masking state. If set to `true`, it will apply casual masking on the attention scores in order to not look up to future tokens.
- * @param {Number} pointer pointer value to reference corresponding layer parameter 
  * @param {String} modelID string value to reference model's unique parameters
  * @param {String} layerID string value to reference model's unique parameters
  * @returns {{X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, mhaOutput: Float32Array, S_perHead: Float32Array, finalOutput: Float32Array}}
  */
-const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => functions.CoreMultiHeadAttention(
+const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, modelID, layerID) => float32_Modules.CoreMultiHeadAttention(
     input,
-    getGlobalParams(modelID).globalWeights[pointer],
-    getGlobalParams(modelID).globalBiases[pointer],
+    weights,
+    biases,
     embedDim,
     seqLen, 
     numHeads,
     headDim, 
     dkRoot,
     useCausalMasking,
-    pointer,
     modelID,
     layerID
 );
@@ -998,6 +995,7 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
 /**
  * "☑️" performs the calculation of gradients for a multi-head attention layer. 
  * @param {Float32Array} delta 
+ * @param {Float32Array} weights 
  * @param {Float32Array} Q 
  * @param {Float32Array} K 
  * @param {Float32Array} V 
@@ -1012,14 +1010,13 @@ const CoreMultiHeadAttention = (input, embedDim, seqLen, numHeads, headDim, dkRo
  * @param {Number} headDim 
  * @param {Number} dkRoot 
  * @param {Boolean} useCausalMasking 
- * @param {Number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns {{delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array}}
  */
-const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, mhaOutput, activatedOutput, weightGrads, biasGrads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, pointer, modelID, layerID) => float32_Modules.CoreMultiHeadAttentionBackward(
+const CoreMultiHeadAttentionBackward = (delta, weights, Q, K, V, S, mhaOutput, activatedOutput, weightGrads, biasGrads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false,  modelID, layerID) => float32_Modules.CoreMultiHeadAttentionBackward(
     delta,
-    getGlobalParams(modelID).globalWeights[pointer],
+    weights,
     Q,
     K,
     V,
@@ -1034,7 +1031,6 @@ const CoreMultiHeadAttentionBackward = (delta, Q, K, V, S, mhaOutput, activatedO
     headDim,
     dkRoot,
     useCausalMasking,
-    pointer,
     modelID,
     layerID
 );

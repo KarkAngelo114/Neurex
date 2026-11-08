@@ -1,7 +1,7 @@
 const { createTensorBuffer, concatenateFloat32Array, ifOneHotEndcoded } = require("../../utils");
 const bindings = require('../../core/bindings');
 const errFlag = require('../../err_flags');
-const activation = require('../../core/bindings')
+const activation = require('../../core/bindings');
 const { recurrentForward, recurrentBackward, element_wise_sub, cacheOutputLayerDelta } = bindings;
 
 /**
@@ -30,9 +30,7 @@ const initParams = (size, shape, layer_data) => {
 
     const input_weights = createTensorBuffer([input_weight_count], { prefilledWith: "xavier", min: feature_size, max: units }).data;
     const recurrent_weights = createTensorBuffer([recurrent_weight_count], { prefilledWith: "xavier", min: units, max: units }).data;
-    const biases = useBias
-        ? createTensorBuffer([units], { prefilledWith: "xavier", min: feature_size, max: units }).data
-        : createTensorBuffer([units], { prefilledWith: "zeroes" }).data;
+    const biases = useBias ? createTensorBuffer([units], { prefilledWith: "xavier", min: feature_size, max: units }).data : createTensorBuffer([units], { prefilledWith: "zeroes" }).data;
 
     // Gradient buffers. recurrentBackward accumulates into these in place.
     const weightGrads = createTensorBuffer([input_weight_count + recurrent_weight_count], { prefilledWith: "zeroes" }).data;
@@ -46,6 +44,9 @@ const initParams = (size, shape, layer_data) => {
     // return_sequence: keep every timestep. Otherwise emit only the last hidden state.
     const updatedShape = return_sequence ? [1, 1, units, seqLen] : [1, 1, units, 1];
     const outputUnits = return_sequence ? units * seqLen : units;
+
+    layer_data.weights = concatenated_weights;
+    layer_data.biases = biases;
 
     return {
         updatedSize: outputUnits,
@@ -95,18 +96,21 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
  * Forward pass over the whole sequence in one native call.
  */
 const feedforward = (data) => {
-    const { layerData, pointer, modelID } = data;
+    const { layerData, modelID } = data;
     const layerID = layerData.layerID;
     const seqLen = layerData.seqLen || 1;
     const activationFuncString = layerData.activation_function.name;
+    const weights = layerData.weights;
+    const biases = layerData.biases;
 
     const { activatedOutput, z_values } = recurrentForward(
         data.input,
+        weights,
+        biases,
         layerData.weightShape,
         seqLen,
         activationFuncString,
         layerData.return_sequence,
-        pointer,
         modelID,
         layerID
     );
@@ -196,7 +200,7 @@ const projectDeltaBackward = (data) => data.delta;
 const applyDerivativeAndComputeGradients = (data) => {
     const { layerData } = data;
     const [featureSize, units] = layerData.weightShape
-
+    const weights = layerData.weights;
     const weight_grads = layerData.weightGrads || createTensorBuffer([featureSize * units + units * units], {prefilledWith:"zeroes"}).data;
     const bias_grads = layerData.biasGrads || createTensorBuffer([units], {prefilledWith:"zeroes"}).data;
 
@@ -204,6 +208,7 @@ const applyDerivativeAndComputeGradients = (data) => {
         data.delta,                                   
         data.input,          
         data.z_value,
+        weights,
         weight_grads,
         bias_grads,
         layerData.weightShape,
@@ -211,7 +216,6 @@ const applyDerivativeAndComputeGradients = (data) => {
         layerData.activation_function.name,
         layerData.return_sequence,
         data.deltaAlreadyIncludesActivationDerivative === true,
-        data.pointer,
         data.modelID,
         layerData.layerID
     );

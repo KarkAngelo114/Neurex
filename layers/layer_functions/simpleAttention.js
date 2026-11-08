@@ -23,9 +23,7 @@ const initParams = (size, shape, layer_data) => {
     const Q_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
     const K_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
     const V_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
-    const biases = useBias
-        ? createTensorBuffer([embeddingDim * 3], parameterOptions).data
-        : new Float32Array(embeddingDim * 3);
+    const biases = useBias ? createTensorBuffer([embeddingDim * 3], parameterOptions).data : createTensorBuffer([embeddingDim * 3], {prefilledWith:"zeroes"}).data;
 
     const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights]);
     const weightShape = [embeddingDim, embeddingDim * 3]; // combined QKV projection
@@ -33,6 +31,9 @@ const initParams = (size, shape, layer_data) => {
     layer_data.dkRoot = Math.sqrt(embeddingDim);
     layer_data.embedDim = embeddingDim;
     layer_data.seqLen = shape[3];
+
+    layer_data.weights = weights;
+    layer_data.biases = biases;
 
     return {
         updatedSize: embeddingDim * shape[3],
@@ -54,13 +55,14 @@ const determineInferenceType = () => {
 const feedforward = (data) => {
     const layerData = data.layerData;
     const input = data.input;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
+    const weights = layerData.weights;
+    const biases = layerData.biases;
 
     const { embedDim, dkRoot, seqLen, useCausalMasking } = layerData;
 
-    const {X, Q, K, V, S, output} = CoreSimpleAttention(input, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID);
+    const {X, Q, K, V, S, output} = CoreSimpleAttention(input, weights, biases, embedDim, seqLen, dkRoot, useCausalMasking, modelID, layerID);
 
     layerData.cache = {
         X: X,
@@ -89,10 +91,10 @@ const projectDeltaBackward = (data) => {
 
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const incoming_delta = data.delta;
-    const activatedOutput = data.activatedOutput;
+    const activatedOutput = data.input;
+    const weights = layerData.weights;
 
     const layerID = layerData.layerID;
 
@@ -102,7 +104,7 @@ const applyDerivativeAndComputeGradients = (data) => {
     const weight_grads = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
     const bias_grads = layerData.biasGrads || createTensorBuffer([embedDim * 3], {prefilledWith:"zeroes"}).data; 
 
-    const {delta, weightGrads, biasGrads} = CoreSimpleAttentionBackward(incoming_delta, Q, K, V, S, weight_grads, bias_grads, activatedOutput, embedDim, seqLen, dkRoot, useCausalMasking, pointer, modelID, layerID);
+    const {delta, weightGrads, biasGrads} = CoreSimpleAttentionBackward(incoming_delta, weights, Q, K, V, S, weight_grads, bias_grads, activatedOutput, embedDim, seqLen, dkRoot, useCausalMasking, modelID, layerID);
 
     if (delta.some(v => Number.isNaN(v))) {
         console.error("[ERROR] output array has NaNs (Simple Attention during projecting delta backward)");

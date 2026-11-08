@@ -27,7 +27,7 @@ const initParams = (size, shape, layer_data) => {
         const fanOut = kh * kw * filters;
 
         let weights = createTensorBuffer([TotalSize], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data;
-        let biases = useBias ? createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data : new Float32Array(filters);
+        let biases = useBias ? createTensorBuffer([filters], {prefilledWith:'xavier', min: fanIn, max: fanOut}).data : createTensorBuffer([filters], {prefilledWith:"zeroes"}).data;
 
         // calculate output shape
         const {OutputHeight, OutputWidth, CalculatedTensorShape} = calculateTransposedTensorShape(iH, iW, kh, kw, filters, strides, padding);
@@ -37,6 +37,9 @@ const initParams = (size, shape, layer_data) => {
         const weightShape = [filters, kh, kw, iD];
 
         layer_data.weightShape = weightShape;
+
+        layer_data.weights = weights;
+        layer_data.biases = biases;
                         
         return {
             updatedSize: CalculatedTensorShape,
@@ -76,7 +79,6 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
 const feedforward = (data) => {
     const layerData = data.layerData;
     const input = data.input;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     
@@ -86,16 +88,19 @@ const feedforward = (data) => {
     const strides = layerData.strides;
     const filters = layerData.filters;
     const activation_function_string = layerData.activation_function.name;
+    const weights = layerData.weights;
+    const biases = layerData.biases;
 
     const {z_values, activated_output} = transConvForward(
-        input, 
+        input,
+        weights, 
+        biases,
         inputShape, 
         outputShape, 
         strides, 
         filters, 
         weightShape, 
         activation_function_string, 
-        pointer, 
         modelID, 
         layerID
     );
@@ -168,7 +173,6 @@ const getOutputLayerDelta = (data) => {
 
 const projectDeltaBackward = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const delta = data.delta;
     const inputShape = layerData.inputShape;
@@ -177,8 +181,9 @@ const projectDeltaBackward = (data) => {
     const strides = layerData.strides;
     const filters = layerData.filters;
     const layerID = layerData.layerID;
+    const weights = layerData.weights;
 
-    const result = transConvBackward(delta, inputShape, outputShape, strides, filters, weightShape, pointer, modelID, layerID);
+    const result = transConvBackward(delta, weights, inputShape, outputShape, strides, filters, weightShape, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("[Trans Conv Delta Projection Error] output array has NaNs after transConvBackward() Ops");
         throw new Error(errFlags.NAN_ERR);
@@ -202,7 +207,22 @@ const applyDerivativeAndComputeGradients = (data) => {
     
     const activationString = layerData.activation_function.name;
 
-    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForTransConv(z, layerInput, layerOutput, incoming_delta, wg, bg, inputShape, outputShape, kernelShape, layerData.strides, activationString, !data.deltaAlreadyIncludesActivationDerivative, data.modelID, layerData.layerID);
+    const {delta, weightGrads, biasGrads} = fusedFinalDeltaProjector_ForTransConv(
+        z, 
+        layerInput, 
+        layerOutput, 
+        incoming_delta, 
+        wg, 
+        bg, 
+        inputShape, 
+        outputShape, 
+        kernelShape, 
+        layerData.strides, 
+        activationString, 
+        !data.deltaAlreadyIncludesActivationDerivative, 
+        data.modelID, 
+        layerData.layerID
+    );
     
     if (delta.some(v => Number.isNaN(v))) {
         console.error("NaN detected during derivative application in convolutional layer");

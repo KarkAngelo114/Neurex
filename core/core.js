@@ -1228,7 +1228,6 @@ class Neurex {
                 delta: current_delta,
                 input: activations[outputLayerIndex],
                 z_value: zs[outputLayerIndex],
-                activatedOutput: activations[outputLayerIndex],
                 pointer: outputPointer,
                 layerData: outputLayer,
                 modelID: this.modelID,
@@ -1268,7 +1267,6 @@ class Neurex {
                 delta: dLda,
                 input: activations[layer_index],
                 z_value: zs[layer_index],
-                activatedOutput: activations[layer_index],
                 pointer: currentPointer,
                 layerData: current_layer,
                 modelID: this.modelID 
@@ -1311,8 +1309,8 @@ class Neurex {
             }
 
             const optimizerData = {
-                weights: this.weights[layerPointer],
-                biases: this.biases[layerPointer],
+                weights: layer_data_obj.weights,
+                biases: layer_data_obj.biases,
                 layerData: layer_data_obj,
                 learning_rate: learning_rate,
                 previousEpochLoss: options?.previousEpochLoss || 0,

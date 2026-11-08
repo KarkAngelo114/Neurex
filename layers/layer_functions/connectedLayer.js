@@ -18,7 +18,10 @@ const initParams = (size, shape, layer_data) => {
     }    
     
     const weightShape = [inputSize, outputSize];
-    const updatedShape = [1, 1, outputSize]
+    const updatedShape = [1, 1, outputSize];
+
+    layer_data.weights = weights;
+    layer_data.biases = biases;
 
     return {
         updatedSize: outputSize,
@@ -77,15 +80,16 @@ const determineInferenceType = (layerObject, lossFunc, trainY) => {
 const feedforward = (data) => {
     const input = data.input;
     const layerData = data.layerData; // data.LayerData holds the metadata object of a layer during init params and build time
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
+    const weights = layerData.weights;
+    const biases = layerData.biases;
 
     const weightShape = layerData.weightShape;
 
     const activation_function = layerData.activation_function.name;
 
-    const {activated_output, z_values} = DenseForward(input, weightShape, activation_function, pointer, modelID, layerID);
+    const {activated_output, z_values} = DenseForward(input, weights, biases, weightShape, activation_function, modelID, layerID);
 
     if (activated_output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in connected layer");
@@ -154,14 +158,14 @@ const getOutputLayerDelta = (data) => {
 
 const projectDeltaBackward = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const delta = data.delta;
     const layerID = layerData.layerID;
+    const weights = layerData.weights;
 
     const [inputSize, outputSize] = layerData.weightShape;
 
-    const result = DeltaMatMul(delta, inputSize, outputSize, pointer, modelID, layerID);
+    const result = DeltaMatMul(delta, inputSize, outputSize, weights, modelID, layerID);
 
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in connected layer");

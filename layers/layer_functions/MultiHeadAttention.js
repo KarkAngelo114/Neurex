@@ -25,10 +25,7 @@ const initParams = (size, shape, layer_data) => {
         const K_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
         const V_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
         const O_weights = createTensorBuffer([embeddingDim, embeddingDim], parameterOptions).data;
-        const biases = useBias
-            ? createTensorBuffer([embeddingDim * 4], parameterOptions).data
-            : new Float32Array(embeddingDim * 4);
-
+        const biases = useBias ? createTensorBuffer([embeddingDim * 4], parameterOptions).data : createTensorBuffer([embeddingDim * 4], {prefilledWith:'zeroes'}).data;
         const weights = concatenateFloat32Array([Q_weights, K_weights, V_weights, O_weights]);
         const weightShape = [embeddingDim, embeddingDim * 4]; // combined QKVO projection
 
@@ -36,6 +33,9 @@ const initParams = (size, shape, layer_data) => {
         layer_data.embedDim = embeddingDim;
         layer_data.seqLen = shape[3] || 1;
         layer_data.headDim = headDim;
+
+        layer_data.weights = weights;
+        layer_data.biases = biases;
 
         return {
             updatedSize: embeddingDim * shape[3],
@@ -61,13 +61,12 @@ const feedforward = (data) => {
 
     const layerData = data.layerData;
     const modelID = data.modelID;
-    const pointer = data.pointer;
     const input = data.input;
     const layerID = layerData.layerID;
 
-    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
+    const {embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, weights, biases} = layerData;
 
-    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
+    const {Q, K, V, mhaOutput, S_perHead, finalOutput} = CoreMultiHeadAttention(input, weights, biases,  embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, modelID, layerID);
 
     layerData.cache = {
         X: input,
@@ -100,24 +99,24 @@ const projectDeltaBackward = (data) => {
 
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const incoming_delta = data.delta;
     const layerID = layerData.layerID;
-    const activatedOutput = data.activatedOutput;
+    const activatedOutput = data.input;
     
 
-    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking} = layerData;
+    const {cache, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, weights} = layerData;
     const { Q, K, V, S_perHead, mhaOutput } = cache;
     const weightShape = layerData.weightShape;
 
     const weight_grads = layerData.weightGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
     const bias_grads = layerData.biasGrads || createTensorBuffer([embedDim * 4], {prefilledWith:"zeroes"}).data; 
 
-    const {delta, weightGrads, biasGrads} = CoreMultiHeadAttentionBackward(incoming_delta, Q, K, V, S_perHead, mhaOutput, activatedOutput, weight_grads, bias_grads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, pointer, modelID, layerID);
+    const {delta, weightGrads, biasGrads} = CoreMultiHeadAttentionBackward(incoming_delta, weights, Q, K, V, S_perHead, mhaOutput, activatedOutput, weight_grads, bias_grads, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking, modelID, layerID);
     
     layerData.weightGrads = weightGrads;
     layerData.biasGrads = biasGrads;
+    
 
     return delta;
 }

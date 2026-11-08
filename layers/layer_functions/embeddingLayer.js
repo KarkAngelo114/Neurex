@@ -35,13 +35,13 @@ const initParams = (size, shape, layer_data) => {
 
     // flatten all to make it a 1D float32Array. Well index manually later on during feedforward and backprop (and gradient accumulation if it has to)
     const weights = new Float32Array(lookUp.flat(Infinity));
-
-    // it has no biases, but since the core engine index weights and biases as well its corresponding zeroed initialized gradients together (meaning, if pointer index is 3, it will get the corresponding indexed weights and biases), 
-    // we just initialize it with 0s equal to embedding size so that the weights and biases has no decrepancy when indexing and still match together
-    const biases = new Float32Array(embeddingDim).fill(0);
+    const biases = createTensorBuffer([vocabSize], {prefilledWith:"zeroes"}).data;
                 
 
     layer_data.weightShape = weightShape;
+
+    layer_data.weights = weights;
+    layer_data.biases = biases;
 
     return {
         updatedSize: updatedSize,
@@ -78,8 +78,9 @@ const feedforward = (data) => {
     const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
+    const weights = layerData.weights;
 
-    const output = getEmbeddings(input, embeddingDim, pointer, modelID, layerID);
+    const output = getEmbeddings(input, weights, embeddingDim, pointer, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in embedding layer");
@@ -102,7 +103,7 @@ const getOutputLayerDelta = () => {
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const modelID = data.modelID;
-    const activation_outputs = data.activatedOutput;
+    const activation_outputs = data.input;
     const deltas = data.delta;
     const layerID = layerData.layerID;
     const embedDim = layerData.embeddingDim;

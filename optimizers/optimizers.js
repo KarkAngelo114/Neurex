@@ -85,7 +85,7 @@ module.exports = {
                 (useBias && (!biases || !biasGrads || biases.length !== biasGrads.length))) {
                 console.error("SGD: Params and grads size mismatch");
                 throw new Error(errFlags.UNEQUAL_SIZE);
-            }
+            } 
 
             const state_M_weights = layerData.state_M_weights || createTensorBuffer([weights.length], {prefilledWith:"zeroes"}).data;
             const state_V_weights = layerData.state_V_weights || createTensorBuffer([weights.length], {prefilledWith:"zeroes"}).data;
