@@ -10,9 +10,6 @@ const initParams = (size, shape, layer_data) => {
 
     layer_data.weightShape = [size];
 
-    layer_data.weights = gamma;
-    layer_data.biases = beta;
-
     return {
         updatedSize: size,
         updatedShape: shape,
@@ -31,7 +28,6 @@ const determineInferenceType = () => {
 const feedforward = (data) => {
     const input = data.input;
     const layerData = data.layerData;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     const weights = layerData.weights;
@@ -40,7 +36,7 @@ const feedforward = (data) => {
     const eps = layerData.eps || 1e-5;
     const D = input.length;
 
-    const outputs = computeLayerNorm(input, weights, biases, D, eps, pointer, modelID, layerID);
+    const outputs = computeLayerNorm(input, weights, biases, D, eps, modelID, layerID);
 
     if (outputs.some(v => Number.isNaN(v))) {
         console.error("NaN detected after normalization operation on layerNorm");
@@ -54,7 +50,6 @@ const feedforward = (data) => {
     return { 
         outputs: outputs, 
         z_values: outputs, 
-        incrementor_value: 1 
     };
 };
 
@@ -65,7 +60,6 @@ const getOutputLayerDelta = () => {
 const applyDerivativeAndComputeGradients = (data) => {
     const layerData = data.layerData;
     const incoming_delta = data.delta;
-    const pointer = data.pointer;
     const eps = layerData.eps || 1e-5;
     const X = layerData.cache.X;
     const size = incoming_delta.length;
@@ -76,7 +70,7 @@ const applyDerivativeAndComputeGradients = (data) => {
     const bias_grads = layerData.biasGrads || createTensorBuffer(weightShape, {prefilledWith:"zeroes"}).data;
     const weights = layerData.weights;
 
-    const { delta, weightGrads, biasGrads } = computeLayerNormBackward(incoming_delta, X, weights, weight_grads, bias_grads, size, eps, pointer, modelID, layerID);
+    const { delta, weightGrads, biasGrads } = computeLayerNormBackward(incoming_delta, X, weights, weight_grads, bias_grads, size, eps, modelID, layerID);
 
     layerData.weightGrads = weightGrads;
     layerData.biasGrads = biasGrads;

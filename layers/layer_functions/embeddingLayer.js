@@ -40,9 +40,6 @@ const initParams = (size, shape, layer_data) => {
 
     layer_data.weightShape = weightShape;
 
-    layer_data.weights = weights;
-    layer_data.biases = biases;
-
     return {
         updatedSize: updatedSize,
         updatedShape: updatedShape,
@@ -75,12 +72,11 @@ const feedforward = (data) => {
     const layerData = data.layerData;
     const embeddingDim = layerData.embeddingDim;
     const input = data.input;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     const weights = layerData.weights;
 
-    const output = getEmbeddings(input, weights, embeddingDim, pointer, modelID, layerID);
+    const output = getEmbeddings(input, weights, embeddingDim, modelID, layerID);
 
     if (output.some(v => Number.isNaN(v))) {
         console.error("NaN detected during feedforward in embedding layer");
@@ -91,7 +87,6 @@ const feedforward = (data) => {
     return {
         outputs: output, 
         z_values: output,
-        incrementor_value: 1
     };
 }
 

@@ -37,9 +37,6 @@ const initParams = (size, shape, layer_data) => {
         const weightShape = [filters, kh, kw, iD];
 
         layer_data.weightShape = weightShape;
-
-        layer_data.weights = weights;
-        layer_data.biases = biases;
                         
         return {
             updatedSize: CalculatedTensorShape,
@@ -118,7 +115,6 @@ const feedforward = (data) => {
     return {
         outputs: activated_output,
         z_values: z_values,
-        incrementor_value: 1
     }
 }
 

@@ -3,30 +3,32 @@ const errFlag = require('../err_flags');
 const { globalState } = require('./modeSelector');
 const { red, reset } = require('../color-code');
 let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
-const paramStore = new Map();
 
 /**
- * 
+ * This function only applies when using a GPU. No more global parameter store here on JS side since parameters are owned by parametric layers found in their metadata.
  * @param {String} modelID use to refer to model's corresponding param structure
- * @param {Array<Float32Array>} weights array of float32array weights
- * @param {Array<Float32Array} biases array of float32array biases
+ * @param {Array<{layerID: string, weights: Float32Array, biases: Float32Array}>} layerParameters
  */
-exports.setGlobalParams = (modelID, weights, biases) => {
+exports.setGlobalParams = (modelID, layerParameters) => {
     try {
 
         if (!modelID) {
             throw new Error("[ERROR] No model ID");
         }
 
-        if (!weights || !biases) {
+        if (!Array.isArray(layerParameters) || layerParameters.length === 0) {
             console.error('[ERROR] No parameters to store....');
             throw new Error(errFlag.MODEL_PARAMETER_ERR);
         }
 
-        paramStore.set(modelID, {weights, biases});
+        for (const parameters of layerParameters) {
+            if (!parameters.layerID || !(parameters.weights instanceof Float32Array) || !(parameters.biases instanceof Float32Array)) {
+                throw new Error("[ERROR] Invalid layer parameter metadata");
+            }
+        }
 
         if (globalState().computeBackend == "opencl") {
-            addon.UploadParams(modelID, weights, biases, globalState().computeBackend);
+            addon.UploadParams(modelID, layerParameters, globalState().computeBackend);
         }
 
     }
@@ -34,35 +36,4 @@ exports.setGlobalParams = (modelID, weights, biases) => {
         console.error(`${red}[GLOBAL STORE ERROR]${reset} Failed to store model parameters:`, e);
         throw e;
     }
-}
-
-/** 
- * @function getGLobalParams Use to get paramters from the global store.
- * @param {String} modelID a generated/saved model ID to be use to refer to the global store 
- * @returns {{globalWeights:Float32Array[], globalBiases: Float32Array[], globalOutputTensorTemplate: Float32Array[]}}
-*/
-exports.getGlobalParams = (modelID) => {
-    try {
-
-        if (!modelID) {
-            throw new Error("[ERROR] No model ID");
-        }
-        
-        const entry = paramStore.get(modelID);
-
-        if (!entry || entry.weights.length == 0 || entry.biases.length == 0) {
-            console.error(`[ERROR] No parameters stored for model "${modelID}". Call "setParams()" first before your custom training loop.`);
-            throw new Error(errFlag.MODEL_PARAMETER_ERR);
-        }
-
-        return {
-            globalWeights: entry.weights,
-            globalBiases: entry.biases,
-        }
-    }
-    catch (e) {
-        console.error(`\n[GLOBAL STORE ERROR]`, e);
-        throw e;
-    }
-    
 }

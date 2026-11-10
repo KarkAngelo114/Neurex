@@ -14,7 +14,6 @@ module.exports = {
                 biases,
                 learning_rate,
                 batchSize = 1,
-                pointer,
                 modelID,
                 layerData,
                 layerID
@@ -44,7 +43,6 @@ module.exports = {
                 momentum,
                 batchSize,
                 useBias,
-                pointer,
                 modelID,
                 layerID
             );
@@ -71,7 +69,6 @@ module.exports = {
                 biases,
                 learning_rate,
                 batchSize = 1,
-                pointer,
                 modelID,
                 layerData,
                 layerID
@@ -95,7 +92,7 @@ module.exports = {
             let state_t = layerData.state_t || 0;
             state_t += 1;
 
-            const res = ApplyAdam(weights, weightGrads, biases, biasGrads, state_M_weights, state_M_bias, state_V_weights, state_V_bias, state_t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID, pointer);
+            const res = ApplyAdam(weights, weightGrads, biases, biasGrads, state_M_weights, state_M_bias, state_V_weights, state_V_bias, state_t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID);
             layerData.state_M_weights = res.m_weights;
             layerData.state_V_weights = res.v_weights;
             layerData.state_M_bias = res.m_biases;
@@ -116,7 +113,6 @@ module.exports = {
                 biases,
                 learning_rate,
                 batchSize = 1,
-                pointer,
                 modelID,
                 layerData,
                 layerID
@@ -136,7 +132,7 @@ module.exports = {
             const sqAvg_biases = layerData.sqAvg_biases || createTensorBuffer([biases.length], {prefilledWith:"zeroes"}).data;
 
 
-            const res = ApplyRMSProp(weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, learning_rate, epsilon, decayRate, batchSize, useBias, modelID, layerID, pointer);
+            const res = ApplyRMSProp(weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, learning_rate, epsilon, decayRate, batchSize, useBias, modelID, layerID);
             layerData.sqAvg_weights = res.sqAvg_weights;
             layerData.sqAvg_biases = res.sqAvg_biases;
             

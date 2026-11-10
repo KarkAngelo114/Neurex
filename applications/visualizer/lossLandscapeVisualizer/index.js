@@ -59,10 +59,18 @@ function lossLandscapeVisualizer({ renderEveryTargetEpoch = 100 } = {}) {
             }
 
             // Parse it back to an object after applying typedArrayReplacer so postMessage handles it cleanly:
+            const modelJson = {
+                ...model,
+                layers: model.layers.map(layer => ({
+                    ...layer,
+                    activation_function_name: layer.activation_function?.name || null,
+                })),
+            };
+
             const payloadObject = JSON.parse(
                 JSON.stringify({
                     type: '3D_LANDSCAPE_DATA',
-                    modelJson: model,
+                    modelJson,
                     trainX: sampleX,
                     trainY: sampleY,
                     lossFunction: data.lossFunction,

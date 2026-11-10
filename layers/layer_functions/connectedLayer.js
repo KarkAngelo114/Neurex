@@ -20,9 +20,6 @@ const initParams = (size, shape, layer_data) => {
     const weightShape = [inputSize, outputSize];
     const updatedShape = [1, 1, outputSize];
 
-    layer_data.weights = weights;
-    layer_data.biases = biases;
-
     return {
         updatedSize: outputSize,
         updatedShape: updatedShape,
@@ -103,7 +100,6 @@ const feedforward = (data) => {
     return { 
         outputs: activated_output, 
         z_values: z_values, 
-        incrementor_value: 1 
     };
 }
 

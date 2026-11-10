@@ -31,10 +31,8 @@ const toRawData = (arr) => new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLe
 /**
  * @param {String} filename output filename (without extension - .onnx is appended)
  * @param {Array<Object>} layers  Neurex's this.layers - must all be "Connected Layer"
- * @param {Array<Float32Array>} weights  Neurex's this.weights
- * @param {Array<Float32Array>} biases   Neurex's this.biases
  */
-const exportToOnnx = async (filename, layers, weights, biases, modelID) => {
+const exportToOnnx = async (filename, layers, modelID) => {
     if (!layers || layers.length === 0) {
         throw new Error('exportToOnnx: no layers to export');
     }
@@ -168,29 +166,25 @@ const exportToOnnx = async (filename, layers, weights, biases, modelID) => {
         : [1, firstInputSize];
     let currentInputName = 'input';
     
-    let pointer = 0;
     layers.forEach((layer, layerIndex) => {
         const translate = LAYER_TRANSLATORS[layer.layer_name];
 
         console.log(`${yellow}[INfo]${reset} translating ${layer.layer_name}. Input size: [${layer.inputShape}] | Output size: [${layer.outputShape}]`);
 
-        if (weights[pointer].some(n => isNaN(n))) {
+        if (layer.weights?.some(n => isNaN(n))) {
             console.log(`${red}[ERROR]${reset} Parameter of Layer ${layer.layer_name} ${layerIndex} has NaNs`);
             throw new Error("ERR_PARAM_HAS_NAN");
         }
 
         const { nodes, initializers, outputName } = layer.layer_name === 'Embedding Layer'
-            ? translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex, TensorProto_DataType.INT64)
-            : translate(layer, weights[pointer], biases[pointer], currentInputName, layerIndex);
+            ? translate(layer, layer.weights, layer.biases, currentInputName, layerIndex, TensorProto_DataType.INT64)
+            : translate(layer, layer.weights, layer.biases, currentInputName, layerIndex);
 
         nodes.forEach((n) => allNodes.push(makeNode(n)));
         initializers.forEach((t) => allInitializers.push(makeTensor(t.name, t.dims, t.data, t.dataType)));
 
         currentInputName = outputName;
 
-        if (layer.isParametric) {
-            pointer++;
-        }
     });
 
     const lastLayer = layers[layers.length - 1];

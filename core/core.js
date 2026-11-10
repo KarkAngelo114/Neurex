@@ -18,17 +18,15 @@ const optimizers = require('../optimizers')
 const lossFunctions = require('../loss_functions');
 const color = require('../color-code');
 const { calculateTensorShape, getTotalMB, formatDuration,  calculateTransposedTensorShape } = require('../utils');
-const Layers = require('../layers/layers');
 const { init, shutdown } = require('./bindings');
 const { setGlobalParams } = require('../gpu/globals');
 const exportToOnnx = require('./exporters/onnx');
 const version = require('../package.json').version;
 const errFlags = require('../err_flags');
+const { parseModel } = require('./parser');
 
 class Neurex {
     constructor () {
-        this.weights = [];
-        this.biases = [];
         this.num_layers = 0;
         this.input_size = 1;
         this.input_shape = [1, 1, 1];
@@ -58,8 +56,6 @@ class Neurex {
         this.isfailed = false;
 
         this.checkpoint = 0; // if set to N, then every N of epochs will save the model, even if it's not yet fully train. Default is 0
-        this.layerPointers = [];
-        this.parametric_layers = [];
         this.miscellaneous = null;
 
         this.lastLayerObject = {};
@@ -156,7 +152,6 @@ class Neurex {
         console.log(row(COLS.map(c => c.title)));
         console.log(hr('='));
 
-        let pointer = 0;
         let insideResidual = false;
 
         this.layers.forEach((layer) => {
@@ -165,18 +160,8 @@ class Neurex {
                 ? layer.activation_function.name
                 : 'None';
 
-            const isParametric = this.parametric_layers.includes(layerType);
-
-            let paramCount = 0;
-            if (isParametric) {
-                const w = this.weights[pointer] ? this.weights[pointer].length : 0;
-                const b = (this.biases[pointer] && layer.useBias)
-                    ? this.biases[pointer].length
-                    : 0;
-
-                paramCount = w + b;
-                pointer++;
-            }
+            const paramCount = (layer.weights?.length || 0) +
+                (layer.useBias ? (layer.biases?.length || 0) : 0);
 
             const isResidualStart = layerType === "Residual Start";
             const isResidualEnd = layerType === "Residual End";
@@ -208,9 +193,11 @@ class Neurex {
         });
 
         // 5) Footer block.
-        const totalWeights = this.weights.reduce((sum, arr) => sum + arr.length, 0);
-        const totalBiases  = this.biases.reduce((sum, arr) => sum + arr.length, 0);
-        const totalSizeMB  = getTotalMB(this.weights) + getTotalMB(this.biases);
+        const parameterLayers = this.layers.filter(layer => layer.weights instanceof Float32Array);
+        const totalWeights = parameterLayers.reduce((sum, layer) => sum + layer.weights.length, 0);
+        const totalBiases = parameterLayers.reduce((sum, layer) => sum + (layer.biases?.length || 0), 0);
+        const totalSizeMB = getTotalMB(parameterLayers.map(layer => layer.weights)) +
+            getTotalMB(parameterLayers.map(layer => layer.biases).filter(Boolean));
 
         console.log(hr('='));
         console.log(`Total learnable parameters: ${(totalWeights + totalBiases).toLocaleString()}`);
@@ -290,7 +277,6 @@ class Neurex {
                 maxSequenceLength: layer?.maxSequenceLength || layer?.seqLen || 1,
                 units: layer?.units || 1,
                 return_sequence: layer?.return_sequence || false,
-                isParametric: layer?.isParametric,
                 dkRoot: layer?.dkRoot || 0,
                 useBias: layer?.useBias ?? true,
                 headDim: layer?.headDim || 1,
@@ -302,7 +288,14 @@ class Neurex {
             "miscellaneous": miscellaneous
         };
 
-        this.#save(data, this.weights, this.biases, fileName);
+        const parameterLayers = this.layers.filter(layer => layer.weights instanceof Float32Array);
+        
+        this.#save(
+            data,
+            parameterLayers.map(layer => layer.weights),
+            parameterLayers.map(layer => layer.biases),
+            fileName
+        );
         
     }
 
@@ -316,7 +309,7 @@ class Neurex {
             fileName = `Model_${new Date().toISOString().replace(/[:.]/g, '-')}`;
         }
 
-        await exportToOnnx(fileName, this.layers, this.weights, this.biases, this.modelID);
+        await exportToOnnx(fileName, this.layers, this.modelID);
 
     }
 
@@ -413,144 +406,9 @@ class Neurex {
             this.input_size = modelData?.input_size;
             this.output_size = modelData?.output_size;
             this.num_layers = modelData?.num_layers;
-            this.weights = loadedWeights;
-            this.biases = loadedBiases;
             this.input_shape = modelData?.input_shape;
-            const layerBuilder = new Layers();
-            this.layers = modelData?.layers.map(layerData => {
 
-                if (layerData.isParametric) {
-                    this.parametric_layers.push(layerData.layer_name);
-                }
-
-                let newLayer;
-                if (layerData.layer_name === "Connected Layer") {
-                    newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Convolutional Layer") {
-                    newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                } else if (layerData.layer_name === "Max Pooling") {
-                    newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Embedding Layer") {
-                    const vocabSize = layerData.vocabSize;
-                    const embeddingDim = layerData.embeddingDim;
-                    const sequence_length = layerData.maxSequenceLength;
-                    const outputSize = sequence_length * embeddingDim;
-                    newLayer = layerBuilder.embeddingLayer(vocabSize, embeddingDim, sequence_length);
-                    newLayer.inputShape = [1, 1, sequence_length];
-                    newLayer.outputShape = [1, 1, embeddingDim, sequence_length];
-                    newLayer.weightShape = [vocabSize, embeddingDim];
-                    newLayer.outputSize = outputSize;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Recurrent Cell") {
-                    const units = layerData.units;
-                    const return_sequence = layerData.return_sequence || false;
-                    newLayer = layerBuilder.recurrentCell(units, layerData.activation_function_name, return_sequence);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.seqLen = layerData.maxSequenceLength || 1;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Trans Convolution") {
-                    const filters = layerData.filters;
-                    const strides = layerData.strides;
-                    const kernelSize = layerData.kernel_size
-                    newLayer = layerBuilder.transConvLayer(filters, strides, kernelSize, layerData.activation_function_name, layerData.padding, layerData.inputShape);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Reshape") {
-                    newLayer = layerBuilder.reshape(layerData.targetShape);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Simple Attention") {
-                    newLayer = layerBuilder.simpleAttention(layerData.useBias);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.dkRoot = layerData.dkRoot;
-                    newLayer.embedDim = layerData.embeddingDim;
-                    newLayer.seqLen = layerData.maxSequenceLength;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Multi Head Attention") {
-                    newLayer = layerBuilder.multiHeadAttention(layerData.numHeads, layerData.useCausalMasking, layerData.useBias);
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.dkRoot = layerData.dkRoot;
-                    newLayer.embedDim = layerData.embeddingDim;
-                    newLayer.seqLen = layerData.maxSequenceLength;
-                    newLayer.numHeads = layerData.numHeads;
-                    newLayer.headDim = layerData.headDim;
-                    newLayer.useCausalMasking = layerData.useCausalMasking;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Layer Normalization") {
-                    newLayer = layerBuilder.layerNorm(layerData.eps);
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.weightShape = layerData.weightShape;
-                    newLayer.freezeWeights = freezeWeights;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Residual Start") {
-                    newLayer = layerBuilder.residualStart();
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.weightShape = layerData.weightShape;
-                    this.insideResidual = true;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Residual End") {
-                    newLayer = layerBuilder.residualEnd();
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.weightShape = layerData.weightShape;
-                    this.insideResidual = false;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else if (layerData.layer_name === "Sinusoidal Encoding") {
-                    newLayer = layerBuilder.sinusoidalEncoding();
-                    newLayer.inputShape = layerData.inputShape;
-                    newLayer.outputShape = layerData.outputShape;
-                    newLayer.embeddingDim = layerData.embeddingDim;
-                    newLayer.maxSequenceLength = layerData.maxSequenceLength;
-                    newLayer.layerID = UUID.randomUUID();
-                }
-                else {
-                    console.error(`${color.red}[ERROR]${color.reset} Unknown layer type '${layerData.layer_name}' found in model. It might you've loaded a model that is not compatible to this version of Neurex yet nor has the corresponding layer type to map back. To confirm, you can check layer definitions in ${color.gray}https://neurex-documentation.vercel.app/javascript-nodejs#layers${color.reset} or update to the newest version of Neurex.`);
-                    throw new Error(errFlags.BUILD_ERR);
-                }
-                
-                return newLayer;
-            });
+            this.layers = parseModel(modelData.layers, loadedWeights, loadedBiases, freezeWeights);
             
             this.#recalculateShape();
             
@@ -642,13 +500,6 @@ class Neurex {
         this.num_layers--;
         this.#recalculateShape();
 
-        const parametric = this.parametric_layers;
-        if (parametric.includes(removedLayer.layer_name)) {
-            const weightIndex = this.layers.filter(l => parametric.includes(l.layer_name)).length;
-            this.weights.splice(weightIndex, 1);
-            this.biases.splice(weightIndex, 1);
-        }
-
         this.lastLayerObject = this.layers[this.layers.length - 1];
 
         
@@ -725,8 +576,7 @@ class Neurex {
     
         setGlobalParams(
             this.modelID,
-            this.weights, 
-            this.biases, 
+            this.#getLayerParameters()
         );
 
         if (this.layers.length == 0) {
@@ -817,9 +667,7 @@ class Neurex {
                     input_size: this.input_size,
                     input_shape: this.input_shape,
                     num_layers: this.num_layers,
-                    layers: this.layers,
-                    weights: this.weights,
-                    biases: this.biases
+                    layers: this.layers
                 }
 
                 // dispatch the data to the plugin visualizers
@@ -1003,9 +851,7 @@ class Neurex {
                         input_size: this.input_size,
                         input_shape: this.input_shape,
                         num_layers: this.num_layers,
-                        layers: this.layers,
-                        weights: this.weights,
-                        biases: this.biases
+                        layers: this.layers
                     }
 
                     // dispatch the data to the plugin visualizers
@@ -1067,9 +913,9 @@ class Neurex {
             this.hasInitializedNativeBindings = true;
         }
 
-        setGlobalParams(this.modelID, this.weights, this.biases);
+        setGlobalParams(this.modelID, this.#getLayerParameters());
 
-        if (!this.weights || !this.biases) {
+        if (this.#getLayerParameters().length === 0) {
             console.error("Parameters are missing");
             throw new Error(errFlags.MODEL_PARAMETER_ERR)
         }
@@ -1121,7 +967,7 @@ class Neurex {
         }
         console.log(`${color.yellow}[INFO]${color.reset} Parameters for model ${color.yellow}${this.modelID}${color.reset} has been uploaded to global store.`);
 
-        setGlobalParams(this.modelID, this.weights, this.biases);
+        setGlobalParams(this.modelID, this.#getLayerParameters());
     }
 
     /**
@@ -1134,12 +980,9 @@ class Neurex {
      */
     getOutputLayerDelta(predictions, actuals, zs, loss) {
         const lossOutput = lossFunctions[loss.toLowerCase()](predictions, actuals);
-        const pointer = this.layerPointers[this.num_layers - 1];
-
         const getOutputLayerDeltaObject = {
             predictions: predictions,
             actuals: actuals,
-            pointer: pointer,
             modelID: this.modelID,
             zs: zs,
             loss: loss,
@@ -1168,20 +1011,14 @@ class Neurex {
         let all_layer_outputs = [input];
         let zs = [];
 
-        this.layerPointers = this.#getLayerPointers();
-
         for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
 
             const current_layer = this.layers[layer_index];
-            const pointer = this.layerPointers[layer_index];
 
             const feedforwardData = {
                 input: current_input,
                 layerData: current_layer,
-                pointer,
                 modelID: this.modelID,
-                weights: pointer >= 0 ? this.weights[pointer] : undefined,
-                biases: pointer >= 0 ? this.biases[pointer] : undefined
             };
 
             const { outputs, z_values } = current_layer.feedforward(feedforwardData);
@@ -1209,26 +1046,17 @@ class Neurex {
     backpropagation(activations, zs, outputLayerDelta) {
         let current_delta = outputLayerDelta;
 
-        const layerPointers = [];
-        let p = 0;
-        const parametric = this.parametric_layers;
-        for (let i = 0; i < this.layers.length; i++) {
-            layerPointers.push(parametric.includes(this.layers[i].layer_name) ? p++ : -1);
-        }
-
         const deltas = new Array(this.num_layers);
         deltas[this.num_layers - 1] = current_delta;
 
         const outputLayerIndex = this.num_layers - 1;
         const outputLayer = this.layers[outputLayerIndex];
-        const outputPointer = layerPointers[outputLayerIndex];
         
-        if (outputPointer !== -1 && !outputLayer.freezeWeights) {
+        if (outputLayer.weights instanceof Float32Array && !outputLayer.freezeWeights) {
             const delta = outputLayer.applyDerivativeAndComputeGradients({
                 delta: current_delta,
                 input: activations[outputLayerIndex],
                 z_value: zs[outputLayerIndex],
-                pointer: outputPointer,
                 layerData: outputLayer,
                 modelID: this.modelID,
                 deltaAlreadyIncludesActivationDerivative: true
@@ -1243,20 +1071,15 @@ class Neurex {
             const current_layer = this.layers[layer_index];
             const next_layer    = this.layers[layer_index + 1];
 
-            const nextPointer = layerPointers[layer_index + 1];
-            const currentPointer = layerPointers[layer_index];
-
             // if freeze weights is enabled, skip trainable layers whose `.freezeWeights` attribute is true
             if (current_layer.freezeWeights || next_layer.freezeWeights) continue;
 
             // data to dispatch for delta projection
             const backpropObjectData = {
                 delta: current_delta,
-                pointer: nextPointer,
                 targetOutputShape: current_layer.output_shape,
                 layerData: next_layer,
                 modelID: this.modelID,
-                weights: this.weights[nextPointer]
             }
 
             // dispatch to all layer types in the build having `projectDeltaBackward` function
@@ -1267,7 +1090,6 @@ class Neurex {
                 delta: dLda,
                 input: activations[layer_index],
                 z_value: zs[layer_index],
-                pointer: currentPointer,
                 layerData: current_layer,
                 modelID: this.modelID 
             }
@@ -1289,14 +1111,8 @@ class Neurex {
         let optimize = options?.optimizer || this.optimizer;
         let learning_rate = options?.learning_rate ?? this.learning_rate;
 
-        let pointer = 0;
-        for (let l = 0; l < this.num_layers; l++) {
-            const layer_data_obj = this.layers[l];
-            const parametric_layers = this.parametric_layers;
-
-            if (!parametric_layers.includes(layer_data_obj.layer_name)) continue;
-
-            const layerPointer = pointer++;
+        for (const layer_data_obj of this.layers) {
+            if (!(layer_data_obj.weights instanceof Float32Array)) continue;
             if (layer_data_obj.freezeWeights) continue;
 
             const layerID = layer_data_obj.layerID;
@@ -1318,30 +1134,26 @@ class Neurex {
                 batchSize: batchSize,
                 totalEpoch: options?.totalEpoch || 1,
                 trainingFeatureSize: options?.trainingFeatureSize || 1,
-                pointer: layerPointer,
                 modelID: this.modelID,
                 layerID: layerID
             }
 
             // use the optimizer to update weights. We passed multiple data to function as optimizers accepts an object.
             const {weights, biases} = optimize(optimizerData);
-
-            // update weights and biases corresponding a parametric layer using a pointer
-            this.weights[layerPointer] = weights || [];
-            this.biases[layerPointer] = biases || [];
+            layer_data_obj.weights = weights || [];
+            layer_data_obj.biases = biases || [];
 
         }
 
         setGlobalParams(
             this.modelID,
-            this.weights, 
-            this.biases, 
+            this.#getLayerParameters()
         );
     }
 
     zeroGrads() {
         for (const layer of this.layers) {
-            if (layer.isParametric && !layer.freezeWeights) {
+            if (layer.weights instanceof Float32Array && !layer.freezeWeights) {
                 layer.weightGrads.fill(0);
 
                 if (layer.useBias) {
@@ -1392,12 +1204,10 @@ class Neurex {
 
                 this.currentSize = updatedSize;
                 this.currentShape = updatedShape;
-                const isParametric = layer_data.isParametric;
 
-                if (weights.length > 0) this.weights.push(weights);
-                if (biases.length > 0) this.biases.push(biases);
-                if (isParametric) this.parametric_layers.push(layer_data.layer_name);
-                
+                if (weights.length > 0) layer_data.weights = weights;
+                if (biases.length > 0) layer_data.biases = biases;
+
                 layer_data.weightShape = paramShape || [];
                 layer_data.inputShape = inputShape || [];
                 layer_data.outputShape = outputShape || [];
@@ -1456,15 +1266,13 @@ class Neurex {
             biases, 
             inputShape, 
             outputShape, 
-            isParametric,
             paramShape } = layer_data.initParams(this.currentSize, this.currentShape, layer_data);
 
         this.currentSize = updatedSize;
         this.currentShape = updatedShape;
 
-        if (weights.length > 0) this.weights.push(weights);
-        if (biases.length > 0) this.biases.push(biases);
-        if (isParametric) this.parametric_layers.push(layer_data.layer_name); 
+        if (weights.length > 0) layer_data.weights = weights;
+        if (biases.length > 0) layer_data.biases = biases;
         layer_data.weightShape = paramShape || [];
         layer_data.inputShape = inputShape || [];
         layer_data.outputShape = outputShape || [];
@@ -1678,21 +1486,12 @@ class Neurex {
         return indices;
     }
 
-    #getLayerPointers() {
-        const layerPointers = new Array(this.layers.length);
-
-        let pointer = 0;
-
-        for (let i = 0; i < this.layers.length; i++) {
-            if (this.parametric_layers.includes(this.layers[i].layer_name)) {
-                layerPointers[i] = pointer++;
-            } else {
-                layerPointers[i] = -1;
-            }
-        }
-
-        return layerPointers;
+    #getLayerParameters() {
+        return this.layers
+            .filter(layer => layer.weights instanceof Float32Array)
+            .map(({ layerID, weights, biases }) => ({ layerID, weights, biases }));
     }
+
 }
 
 module.exports = Neurex;

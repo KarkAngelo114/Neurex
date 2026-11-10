@@ -143,7 +143,10 @@ function normalizeDirection(direction, weights) {
 }
 
 async function computeGridLandscapeProgressive(runtime, trainX, trainY, lossFunc, resolutionSize, range, originalModelJson, zGrid, xCoord, yCoord) {
-    const origW = originalModelJson.weights.map(w => new Float32Array(w));
+    const parameterLayers = originalModelJson.layers
+        .map((layer, layerIndex) => ({ layerIndex, weights: layer.weights }))
+        .filter(({ weights }) => weights !== undefined);
+    const origW = parameterLayers.map(({ weights }) => new Float32Array(weights));
 
     // Handle direction vectors
     const shapeChanged = !deltaDirs || deltaDirs.length !== origW.length || deltaDirs.some((d, l) => d.length !== origW[l].length);
@@ -171,7 +174,7 @@ async function computeGridLandscapeProgressive(runtime, trainX, trainY, lossFunc
             // Perturb weights
             for (let l = 0; l < origW.length; l++) {
                 for (let k = 0; k < origW[l].length; k++) {
-                    runtime.weights[l][k] = origW[l][k] + alpha * deltaDirs[l][k] + beta * etaDirs[l][k];
+                    runtime.layers[parameterLayers[l].layerIndex].weights[k] = origW[l][k] + alpha * deltaDirs[l][k] + beta * etaDirs[l][k];
                 }
             }
 
@@ -203,6 +206,6 @@ async function computeGridLandscapeProgressive(runtime, trainX, trainY, lossFunc
 
     // Restore original baseline weights
     for (let l = 0; l < origW.length; l++) {
-        runtime.weights[l].set(origW[l]);
+        runtime.layers[parameterLayers[l].layerIndex].weights.set(origW[l]);
     }
 }

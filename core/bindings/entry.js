@@ -1,16 +1,7 @@
-/**
-
- These are collection of functions from the precompiled binary addon. 
- The function that has "✅" means it uses the function from the addon. Where as if the function has also a ☑️ means it uses float32array in JS.
- Having both ✅ and ☑️ means that it uses the function from the addon and operates on float32
-
- */
-
 let path = require('path');
 const float32_Modules = require('./float32Ops');
 const { globalState } = require('../../gpu/modeSelector'); 
 const { red, reset, yellow } = require('../../color-code');
-const { getGlobalParams } = require('../../gpu/globals');
 const errFlags = require('../../err_flags');
 
 let addon;
@@ -88,7 +79,7 @@ const shutdown = (modelID) => {
 
 
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} input 
  * @param {String} modelID 
  * @param {String} layerID 
@@ -96,7 +87,7 @@ const shutdown = (modelID) => {
  */
 const relu = (input, modelID, layerID) => functions.Relu(input, modelID, layerID);
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} input 
  * @param {String} modelID 
  * @param {String} layerID 
@@ -104,7 +95,7 @@ const relu = (input, modelID, layerID) => functions.Relu(input, modelID, layerID
  */
 const sigmoid = (input, modelID, layerID) => functions.Sigmoid(input, modelID, layerID);
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {String} modelID
  * @param {String} layerID 
@@ -112,7 +103,7 @@ const sigmoid = (input, modelID, layerID) => functions.Sigmoid(input, modelID, l
  */
 const tanh = (input, modelID, layerID) => functions.Tanh(input, modelID, layerID);
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} input 
  * @param {String} modelID 
  * @param {String} layerID 
@@ -120,7 +111,7 @@ const tanh = (input, modelID, layerID) => functions.Tanh(input, modelID, layerID
  */
 const softmax = (input, modelID, layerID) => functions.Softmax(input, modelID, layerID);
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} input 
  * @param {String} modelID 
  * @param {String} layerID 
@@ -128,7 +119,7 @@ const softmax = (input, modelID, layerID) => functions.Softmax(input, modelID, l
  */
 const linear = (input, modelID, layerID) => functions.Linear(input, modelID, layerID); 
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
@@ -137,7 +128,7 @@ const linear = (input, modelID, layerID) => functions.Linear(input, modelID, lay
  */
 const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, layerID);
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
@@ -146,7 +137,7 @@ const drelu = (input, _, modelID, layerID) => functions.DReLu(input, modelID, la
  */
 const dsigmoid = (input, _, modelID, layerID) => float32_Modules.DSigmoid(input, modelID, layerID);
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {Float32Array} _ - reserved float32Array argument space
  * @param {String} modelID 
@@ -156,7 +147,7 @@ const dsigmoid = (input, _, modelID, layerID) => float32_Modules.DSigmoid(input,
 const dtanh = (input, _, modelID, layerID) => functions.DTanh(input, modelID, layerID);
 
 /**
- *  "✅☑️"
+ *
  * @param {Float32Array} arr1 
  * @param {Float32Array} arr2 
  * @param {String} modelID 
@@ -175,17 +166,16 @@ const dsoftmax = (arr1, arr2, modelID, layerID) => functions.DSoftmax(arr1, arr2
 const dlinear = (input, _, modelID, layerID) => functions.DLinear(input, modelID, layerID);
 
 /**
- *  "✅☑️"
+ * 
  * @function getEmbeddings
  * @param {Array<Number>} tokenVector an array of token vector 
  * @param {Array<Number>} weights
  * @param {Number} embeddingDim embedding dim value
- * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns {Float32Array} flattened embeddings
  */
-const getEmbeddings = (tokenVector, weights, embeddingDim, modelID, layerID) => float32_Modules.getEmbeddings(
+const getEmbeddings = (tokenVector, weights, embeddingDim, modelID, layerID) => functions.getEmbeddings(
     Array.from(tokenVector), 
     embeddingDim, 
     weights, 
@@ -202,7 +192,7 @@ const sinusoidalPE = (input, embeddingDim, sequenceLength, modelID, layerID) => 
 );
 
 /**
- * "✅☑️"
+ *
  * @param {Array<Number>} activated_outputs activation outputs. During feedfoward, the activation outputs before going to the embedding layer is actually the raw token array
  * @param {Float32Array} delta float32array delta 
  * @param {Float32Array} weightGrads initialized 0s
@@ -221,7 +211,7 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, l
 );
 
 /**
- * "☑️"
+ * 
  * Performs a linear operation of a classic dense layer and applies activation directly to the output as one bulk operation. 
  * @param {Float32Array} input 
  * @param {Array<Number>} weightShape 
@@ -232,7 +222,7 @@ const returnEmbeddings = (activated_outputs, delta, weightGrads, dim, modelID, l
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const DenseForward = (input, weights, biases, weightShape, activationFunc, modelID, layerID) =>  float32_Modules.DenseForward(
+const DenseForward = (input, weights, biases, weightShape, activationFunc, modelID, layerID) =>  functions.DenseForward(
     input, 
     weightShape,
     activationFunc.toLowerCase(),
@@ -244,7 +234,7 @@ const DenseForward = (input, weights, biases, weightShape, activationFunc, model
 
 
 /**
- * "✅☑️"
+ *
  * @function DeltaMatMul
  * @param {Float32Array} deltas
  * @param {Float32Array} weights 
@@ -253,7 +243,7 @@ const DenseForward = (input, weights, biases, weightShape, activationFunc, model
  * @param {String} modelID
  * @param {String} layerID
  */
-const DeltaMatMul = (deltas, inputSize, outputSize, weights, modelID, layerID) => float32_Modules.DeltaMatMul(
+const DeltaMatMul = (deltas, inputSize, outputSize, weights, modelID, layerID) => functions.DeltaMatMul(
     deltas, 
     inputSize, 
     outputSize, 
@@ -264,7 +254,7 @@ const DeltaMatMul = (deltas, inputSize, outputSize, weights, modelID, layerID) =
 
 
 /**
- * "✅☑️" A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
+ * A utility function that performs derivative activation function, element-wise multiplication, and gradient computation internally as one fused bulk operation.
  * @param {Float32Array} zs 
  * @param {Float32Array} layerInput The activation entering this layer, used for weight gradients
  * @param {Float32Array} layerOutput This layer's activated output, used by the softmax derivative
@@ -293,21 +283,21 @@ const fusedFinalDeltaProjector_ForDense = (zs, layerInput, layerOutput, incoming
 );
 
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} p 
  * @param {Float32Array} a 
  * @returns 
  */
 const mse = (p, a) => functions.mse(new Float32Array(p), new Float32Array(a));
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} p 
  * @param {Float32Array} a 
  * @returns 
  */
 const mae = (p, a) => functions.mae(new Float32Array(p), new Float32Array(a));
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} p 
  * @param {Arrayy<Number>} a 
  * @param {Number} epsilon 
@@ -315,7 +305,7 @@ const mae = (p, a) => functions.mae(new Float32Array(p), new Float32Array(a));
  */
 const categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.categorical_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} p 
  * @param {Arrayy<Number>} a 
  * @param {Number} epsilon 
@@ -323,7 +313,7 @@ const categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.cat
  */
 const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.sparse_categorical_cross_entropy(new Float32Array(p), a, epsilon);
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} p 
  * @param {Arrayy<Number>} a 
  * @param {Number} epsilon 
@@ -332,7 +322,7 @@ const sparse_categorical_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modu
 const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_cross_entropy(new Float32Array(p), new Float32Array(a), epsilon);
 
 /**
- * "☑️" Performs the classic operation of a convolution layer and applies activation function directly to the output as one bulk operation
+ * Performs the classic operation of a convolution layer and applies activation function directly to the output as one bulk operation
  * @param {Float32Array} input 
  * @param {Float32Array} weights 
  * @param {Float32Array} biases 
@@ -344,7 +334,7 @@ const binary_cross_entropy = (p, a, epsilon = 1e-15) => float32_Modules.binary_c
  * @param {String} layerID 
  * @returns {{z_values: Float32Array,activated_output: Float32Array }}
  */
-const ConvolveForward = (input, weights, biases, inputShape, outputShape, kernelShape, activationFunc, pointer, modelID, layerID) => float32_Modules.ConvolveForward(
+const ConvolveForward = (input, weights, biases, inputShape, outputShape, kernelShape, activationFunc, modelID, layerID) => functions.ConvolveForward(
     input,
     inputShape,
     outputShape,
@@ -352,24 +342,22 @@ const ConvolveForward = (input, weights, biases, inputShape, outputShape, kernel
     activationFunc.toLowerCase(),
     weights, 
     biases,
-    pointer,
     modelID,
     layerID
 );
 
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {Float32Array} weights
  * @param {Array<Number>} OutputProjectionShape 
  * @param {Array<Number>} deltaInputShape 
  * @param {Array<Number>} kernelShape 
- * @param {Number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns 
  */
-const ConvolveBackward = (input, weights, OutputProjectionShape, deltaInputShape, kernelShape, modelID, layerID) => float32_Modules.ConvolveBackward(
+const ConvolveBackward = (input, weights, OutputProjectionShape, deltaInputShape, kernelShape, modelID, layerID) => functions.ConvolveBackward(
     input,
     OutputProjectionShape,
     deltaInputShape,
@@ -380,7 +368,7 @@ const ConvolveBackward = (input, weights, OutputProjectionShape, deltaInputShape
 );
 
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} zs 
  * @param {Float32Array} layerInput The activation entering this layer, used for weight gradients
  * @param {Float32Array} layerOutput This layer's activated output, used by the softmax derivative
@@ -412,13 +400,12 @@ const fusedFinalDeltaProjector_ForConv = (zs, layerInput, layerOutput, incomingD
     applyActivationDerivative,
     modelID,
     layerID,
-    
 );
 
 
 /**
  * 
- * "☑️"
+ *
  * @param {Float32Array} weights flattened weight parameters
  * @param {Float32Array} weightGrads flattened weight gradients
  * @param {Float32Array} weightVelocity weight momentum state
@@ -429,12 +416,11 @@ const fusedFinalDeltaProjector_ForConv = (zs, layerInput, layerOutput, incomingD
  * @param {Number} momentum momentum value
  * @param {Number} batchSize batchSize
  * @param {Boolean} useBias whether bias parameters should be updated
- * @param {Number} pointer a pointer value use to access from the global store (deprecated)
  * @param {String} modelID model identifier to fetch data using a model ID from the global store
  * @param {String} layeerID layer type identifier to fetch data using a layer ID from the global store
  * @returns {{weights: Float32Array, weightVelocity: Float32Array, biases: Float32Array, biasVelocity: Float32Array}}
  */
-const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true,  pointer, modelID, layerID) => float32_Modules.SGD(
+const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true, modelID, layerID) => float32_Modules.SGD(
     weights,
     weightGrads,
     weightVelocity,
@@ -445,13 +431,11 @@ const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasV
     momentum,
     batchSize,
     useBias,
-    pointer,
     modelID,
     layerID
 );
 
 /**
- * "☑️"
  * @param {Float32Array} weights 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biases 
@@ -469,10 +453,9 @@ const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasV
  * @param {Boolean} useBias 
  * @param {String} modelID 
  * @param {String} layerID 
- * @param {Number} pointer 
  * @returns {{weights: Float32Array, biases: Float32Array, m_weights: Float32Array, m_biases: Float32Array, v_weights: Float32Array, v_biases: Float32Array}}
  */
-const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID, pointer) => float32_Modules.Adam(
+const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID) => float32_Modules.Adam(
     weights,
     weightGrads, 
     biases,
@@ -489,12 +472,11 @@ const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases,
     batchSize,
     useBias,
     modelID, 
-    layerID,
-    pointer  
+    layerID
 );
  
 /**
- * "☑️"
+ *
  * @param {Float32Array} weights 
  * @param {Float32Array} weightGrads 
  * @param {Float32Array} biases 
@@ -508,10 +490,9 @@ const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases,
  * @param {Boolean} useBias 
  * @param {String} modelID 
  * @param {String} layerID 
- * @param {Number} pointer 
  * @returns {{weights: Float32Array, biases: Float32Array, sqAvg_weights: Float32Array, sqAvg_biases: Float32Array}}
  */
-const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias, modelID, layerID, pointer) => float32_Modules.RMSProp(
+const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias, modelID, layerID) => float32_Modules.RMSProp(
     weights,
     weightGrads,
     biases,
@@ -524,12 +505,11 @@ const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sq
     batchSize,
     useBias,
     modelID,
-    layerID,
-    pointer
+    layerID
 );
 
 /**
- * "✅☑️" performs X[i] /= scaling_value
+ * 
  * @param {Float32Array} input - float32Array input
  * @param {Number} scalingValue - scaling value
  * @param {String} modelID model ID
@@ -539,10 +519,9 @@ const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sq
 const scale = (input, scalingValue, modelID, layerID) => functions.scale(input, scalingValue, modelID, layerID);
 
 /**
- * "✅☑️"
+ * 
  * @param {*} flat_arr_1 
  * @param {*} flat_arr_2 
- * @param {*} pointer 
  * @param {*} modelID 
  * @returns 
  */
@@ -558,7 +537,7 @@ const element_wise_mul = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 
 /**
  * 
- * "✅☑️"
+ *
  * @function
  * @param {Array<Number>} flat_arr_1 - a flat array input
  * @param {Array<Number>} flat_arr_2 - a flat array input
@@ -577,9 +556,6 @@ const element_wise_sub = (flat_arr_1, flat_arr_2, modelID, layerID) => {
 }
 
 /**
- * 
- * "✅☑️"
- * @function
  * @param {Array<Number>} arr1 - a flat array input
  * @param {Array<Number>} arr2- a flat array input
  * @param {String} modelID model ID
@@ -597,7 +573,6 @@ const element_wise_add = (arr1, arr2, modelID, layerID) => {
 }
 
 /**
- * "✅☑️"
  * @param {Foat32Array} arr1 a flat array input
  * @param {Foat32Array} arr2 a flat array input
  * @param {Foat32Array} arr3 a flat array input
@@ -616,7 +591,6 @@ const scaleDiff = (arr1, arr2, arr3, modelID, layerID) => {
 }
 
 /**
- * "✅☑️"
  * @function MaxPool
  * @param {Float32Array} input - current input passed down to this layer 
  * @param {Array<Number>} poolSize - pool size of the sliding window
@@ -637,12 +611,11 @@ const MaxPool = (input, poolSize, inputShape, outputShape, strides, modelID, lay
 );
 
 /**
- * "✅☑️"
  * @param {Float32Array} delta incoming 
  * @param {Int32Array} indices an array containing the index corresponding to the max pooled value
  * @param {Number} h height of the input tensor
- * @param {*} w width of the input tensor
- * @param {*} d depth of the input tensor
+ * @param {Number} w width of the input tensor
+ * @param {Number} d depth of the input tensor
  * @param {String} modelID model ID
  * @param {String} layerID layerID
  * @returns 
@@ -658,7 +631,6 @@ const MaxPoolDelta = (delta, indices, h, w, d, modelID, layerID) => functions.Ma
 );
 
 /**
- * "☑️"
  * @param {Float32Array} input 
  * @param {Float32Array} weights 
  * @param {Float32Array} biases 
@@ -684,7 +656,6 @@ const recurrentForward = (input, weights, biases, weightShape, seqLen, activatio
 );
 
 /**
- * "☑️"
  * @param {Float32Array} delta 
  * @param {Float32Array} input 
  * @param {Float32Array} zValues 
@@ -731,7 +702,6 @@ const recurrentBackward = (
 );
 
 /**
- * "✅☑️"
  * @param {Float32Array} grads 
  * @param {Number} threshold 
  * @param {String} modelID model ID
@@ -746,7 +716,7 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
 );
 
 /**
- * "✅☑️" Performs the transpose convolution operation and applies activation output directly as one bulk operation
+ * Performs the transpose convolution operation and applies activation output directly as one bulk operation
  * @param {Float32Array} input 
  * @param {Float32Array} weights 
  * @param {Float32Array} biases 
@@ -760,7 +730,7 @@ const gradientClipping = (grads, threshold, modelID, layerID) => functions.gradi
  * @param {String} layerID 
  * @returns {{z_values: Float32Array, activated_output: Float32Array}}
  */
-const transConvForward = (input, weights, biases, inputShape, outputShape, strides, filters, weightShape, activationType, modelID, layerID) => float32_Modules.transConvForward(
+const transConvForward = (input, weights, biases, inputShape, outputShape, strides, filters, weightShape, activationType, modelID, layerID) => functions.transConvForward(
     input, 
     inputShape, 
     outputShape, 
@@ -775,7 +745,7 @@ const transConvForward = (input, weights, biases, inputShape, outputShape, strid
 );
 
 /**
- * "✅☑️"
+ * 
  * @param {Float32Array} input 
  * @param {Float32Array} weights
  * @param {Array<Number>} inputShape 
@@ -787,7 +757,7 @@ const transConvForward = (input, weights, biases, inputShape, outputShape, strid
  * @param {String} layerID
  * @returns {Float32Array}
  */
-const transConvBackward = (input, weights, inputShape, outputShape, strides, filters, weightShape,  modelID, layerID) => float32_Modules.transConvBackward(
+const transConvBackward = (input, weights, inputShape, outputShape, strides, filters, weightShape,  modelID, layerID) => functions.transConvBackward(
     input,
     inputShape,
     outputShape,
@@ -835,18 +805,16 @@ const fusedFinalDeltaProjector_ForTransConv = (zs, layerInput, layerOutput, inco
 );
 
 /**
- * "✅☑️"
  * @param {Float32Array} input 
  * @param {Float32Array} weights 
  * @param {Float32Array} biases 
  * @param {number} size 
  * @param {number} eps
- * @param {number} pointer 
  * @param {String} modelID 
  * @param {String} layerID 
  * @returns 
  */
-const computeLayerNorm = (input, weights, biases, size, eps, modelID, layerID) => float32_Modules.computelayerNorm(
+const computeLayerNorm = (input, weights, biases, size, eps, modelID, layerID) => functions.computelayerNorm(
     input, 
     size, 
     weights, 
@@ -857,7 +825,6 @@ const computeLayerNorm = (input, weights, biases, size, eps, modelID, layerID) =
 );
 
 /**
- * "✅☑️"
  * @param {Float32Array} dY incoming delta 
  * @param {Float32Array} X cached input during forward pass 
  * @param {Float32Array} weights
@@ -868,7 +835,7 @@ const computeLayerNorm = (input, weights, biases, size, eps, modelID, layerID) =
  * @param {String} layerID 
  * @returns {{ delta: Float32Array, weightGrads: Float32Array, biasGrads: Float32Array }}
  */
-const computeLayerNormBackward = (dY, X, weights, weightGrads, biasGrads , size, eps, modelID, layerID) => float32_Modules.computeLayerNormBackward(
+const computeLayerNormBackward = (dY, X, weights, weightGrads, biasGrads , size, eps, modelID, layerID) => functions.computeLayerNormBackward(
     dY,
     X,
     weights,
@@ -885,11 +852,10 @@ const computeLayerNormBackward = (dY, X, weights, weightGrads, biasGrads , size,
  * @param {*} flat_arr_1 
  * @param {*} flat_arr_2 
  * @param {*} flat_arr_3 
- * @param {*} pointer 
  * @param {*} modelID 
  * @returns 
  */
-const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer, modelID) => {
+const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3) => {
 
     if (!flat_arr_1 || !flat_arr_2 || !flat_arr_3) throw new Error("[ERROR]------- requires '3' input arrays for this operation."); 
 
@@ -898,11 +864,10 @@ const accumulate_element_wise_mul = (flat_arr_1, flat_arr_2, flat_arr_3, pointer
         throw new Error(errFlags.UNEQUAL_SIZE);
     }
 
-    return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3, pointer, modelID);
+    return functions.accumulate_element_wise_mul(flat_arr_1, flat_arr_2, flat_arr_3);
 };
 
 /**
- * "☑️"
  * @param {Float32Array} input the input tensor
  * @param {Float32Array} weights 
  * @param {Float32Array} biases
@@ -927,7 +892,6 @@ const CoreSimpleAttention = (input, weights, biases, embedDim, seqLen, dkRoot, u
 );
 
 /**
- * "☑️"
  * @param {Float32Array} delta incoming delta
  * @param {Float32Array} weights
  * @param {Float32Array} Q cached Q
@@ -964,7 +928,7 @@ const CoreSimpleAttentionBackward = (delta, weights, Q, K, V, S, weightGrads, bi
 );
 
 /**
- * "✅☑️"
+ *
  * @param {Float32Array} input 
  * @param {Float32Array} weights 
  * @param {Float32Array} biases 
@@ -978,7 +942,7 @@ const CoreSimpleAttentionBackward = (delta, weights, Q, K, V, S, weightGrads, bi
  * @param {String} layerID string value to reference model's unique parameters
  * @returns {{X: Float32Array, Q: Float32Array, K: Float32Array, V: Float32Array, mhaOutput: Float32Array, S_perHead: Float32Array, finalOutput: Float32Array}}
  */
-const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, modelID, layerID) => float32_Modules.CoreMultiHeadAttention(
+const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHeads, headDim, dkRoot, useCausalMasking = false, modelID, layerID) => functions.CoreMultiHeadAttention(
     input,
     weights,
     biases,
@@ -993,7 +957,7 @@ const CoreMultiHeadAttention = (input, weights, biases, embedDim, seqLen, numHea
 );
 
 /**
- * "☑️" performs the calculation of gradients for a multi-head attention layer. 
+ * performs the calculation of gradients for a multi-head attention layer. 
  * @param {Float32Array} delta 
  * @param {Float32Array} weights 
  * @param {Float32Array} Q 
@@ -1036,7 +1000,6 @@ const CoreMultiHeadAttentionBackward = (delta, weights, Q, K, V, S, mhaOutput, a
 );
 
 /**
- * "✅☑️"
  * @param {Float32Array} delta 
  * @param {String} modelID  
  * @param {String} layerID 

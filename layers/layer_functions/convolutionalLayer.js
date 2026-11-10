@@ -43,9 +43,6 @@ const initParams = (size, shape, layer_data) => {
     const outputShape = [OutputHeight, OutputWidth, filters];
 
     const weightShape = [filters, kH, kW, inputDepth];
-
-    layer_data.weights = kernels;
-    layer_data.biases = biases;
                     
     return {
         updatedSize: CalculatedTensorShape,
@@ -69,7 +66,6 @@ const feedforward = (data) => {
     const inputShape= layerData.inputShape;
     const outputShape = layerData.outputShape;
     const input = data.input;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     const weights = layerData.weights;
@@ -89,7 +85,7 @@ const feedforward = (data) => {
     }
 
     const activationFuncString = layerData.activation_function.name;
-    const {z_values, activated_output} = ConvolveForward(input, weights, biases, inputShape, outputShape, kernelShape, activationFuncString, pointer, modelID, layerID);
+    const {z_values, activated_output} = ConvolveForward(input, weights, biases, inputShape, outputShape, kernelShape, activationFuncString, modelID, layerID);
 
     if (activated_output.some(v => Number.isNaN(v))) {
         console.error("NaN detected after activation function during feedforward in convolutional layer");
@@ -103,7 +99,6 @@ const feedforward = (data) => {
     return {
         outputs: activated_output,
         z_values: z_values,
-        incrementor_value: 1
     };
 }
 
@@ -118,7 +113,6 @@ const projectDeltaBackward = (data) => {
     const targetShape = layerData.inputShape;
     const deltaShape = layerData.outputShape;
     const kernelShape = layerData.weightShape;
-    const pointer = data.pointer;
     const modelID = data.modelID;
     const layerID = layerData.layerID;
     const weights = layerData.weights;
@@ -130,7 +124,7 @@ const projectDeltaBackward = (data) => {
 
     
     // 4. Cross-correlate with flipped kernels to get dL/da for the previous layer
-    const result = ConvolveBackward(delta, weights, targetShape, deltaShape, kernelShape, pointer, modelID, layerID);
+    const result = ConvolveBackward(delta, weights, targetShape, deltaShape, kernelShape, modelID, layerID);
     if (result.some(v => Number.isNaN(v))) {
         console.error("NaN detected during delta projection in convolutional layer");
         throw new Error(errFlags.NAN_ERR);

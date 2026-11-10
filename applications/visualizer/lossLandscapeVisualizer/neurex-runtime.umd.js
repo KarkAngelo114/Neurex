@@ -4,39 +4,6 @@
     (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.NeurexRuntime = {}));
 })(this, (function (exports) { 'use strict';
 
-    var globals;
-    var hasRequiredGlobals;
-
-    function requireGlobals () {
-    	if (hasRequiredGlobals) return globals;
-    	hasRequiredGlobals = 1;
-    	let globalWeights = []; // global array of weights
-    	let globalBiases = []; // global array of biases
-
-
-    	const setGlobalParams = (weights, biases) => {
-    	    globalWeights = weights;
-    	    globalBiases = biases;
-    	};
-
-    	/** 
-    	 * Use to get paramters from the global store. 
-    	 * @returns {{globalWeights: Array<Float32Array>, globalBiases: Array<Float32Array>}}
-    	*/
-    	const getGlobalParams = () => {
-    	    return {
-    	        globalWeights: globalWeights,
-    	        globalBiases: globalBiases,
-    	    }
-    	};
-
-    	globals = {
-    	    setGlobalParams,
-    	    getGlobalParams
-    	};
-    	return globals;
-    }
-
     var float32Ops;
     var hasRequiredFloat32Ops;
 
@@ -280,7 +247,6 @@
     	};
 
     	const MaxPooling = (arr, pool_size, inputShape, outputShape, strides) => {
-    	    getGlobalParams();
     	    const [poolH, poolW] = pool_size;
     	    const [inputH, inputW, inputD] = inputShape;
     	    const [outputH, outputW, outputD] = outputShape;
@@ -327,7 +293,6 @@
     	};
 
     	const recurrentMatMul = (input, prevHiddenState,  inputWeightShape, recurrentWeightShape, weights, biases) => {
-    	    getGlobalParams();
     	    // The weights were concatenated during initialization as:
     	    // [input_weights..., recurrent_weights...]
     	    const inputSize = inputWeightShape[0];
@@ -475,7 +440,6 @@
     function requireEntry () {
     	if (hasRequiredEntry) return entry;
     	hasRequiredEntry = 1;
-    	const { getGlobalParams } = requireGlobals();
 
     	/**
     	  * this runtime version only needs feedforward related functions.
@@ -489,13 +453,13 @@
     	 * @function getEmbeddings
     	 * @param {Array<Number>} tokenVector an array of token vector 
     	 * @param {Number} embeddingDim embedding dim value
-    	 * @param {Number} pointer pointer value corresponding to the global parameter of weights and biases 
+	 * @param {Float32Array} weights layer weights
     	 * @returns {Float32Array} flattened embeddings
     	 */
-    	const getEmbeddings = (tokenVector, embeddingDim, pointer) => functions.getEmbeddings(
+	const getEmbeddings = (tokenVector, embeddingDim, weights) => functions.getEmbeddings(
     	    Array.from(tokenVector), 
     	    embeddingDim, 
-    	    getGlobalParams().globalWeights[pointer],
+	    weights,
     	);
 
     	/**
@@ -504,15 +468,16 @@
     	 * @param {Float32Array} inputs - 1D float32array of input features
     	 * @param {Number} inputSize - the output size of the previous layer is the input size of this layer
     	 * @param {Number} outputSize - the layer size of this layer
-    	 * @param {Number} pointer - a pointer that will be use to index the corresponding parameter from global params
+	 * @param {Float32Array} weights layer weights
+	 * @param {Float32Array} biases layer biases
     	 * @returns 1D array of output
     	 */
-    	const MatMul = (inputs, inputSize, outputSize, pointer) => functions.MatMul(
+	const MatMul = (inputs, inputSize, outputSize, weights, biases) => functions.MatMul(
     	    inputs, 
     	    inputSize, 
     	    outputSize, 
-    	    getGlobalParams().globalWeights[pointer], 
-    	    getGlobalParams().globalBiases[pointer], 
+	    weights,
+	    biases,
     	);
 
     	/**
@@ -616,17 +581,18 @@
     	 * @param {Array<Number>} outputShape [oH, oW]
     	 * @param {Array<Number>} kernelShape [num_filters, Kh, Kw, channels]
     	 * @param {Array<Number>} inputShape [iH, iW] 
-    	 * @param {Number} pointer pointer value to fetch corresponding parameters of the layer from the global store
+	 * @param {Float32Array} weights layer weights
+	 * @param {Float32Array} biases layer biases
     	 * @returns {Float32Array} convolution result
     	 */
-    	const Convolve = (input, strides, outputShape, kernelShape, inputShape, pointer) => functions.Convolve(
+	const Convolve = (input, strides, outputShape, kernelShape, inputShape, weights, biases) => functions.Convolve(
     	    input, 
     	    strides, 
     	    outputShape, 
     	    kernelShape, 
     	    inputShape, 
-    	    getGlobalParams().globalWeights[pointer], 
-    	    getGlobalParams().globalBiases[pointer], 
+	    weights,
+	    biases,
     	);
 
     	/**
@@ -655,16 +621,17 @@
     	 * @param {Float32Array} prevHiddenState hidden temporal state
     	 * @param {Array<Number>} inputWeightShape input weight shape
     	 * @param {Array<Number>} recurrentWeightShape recurrent weight shape
-    	 * @param {Number} pointer value to reference the weights and biases 
+	 * @param {Float32Array} weights layer weights
+	 * @param {Float32Array} biases layer biases
     	 * @returns 
     	 */
-    	const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, pointer) => functions.recurrentMatMul(
+	const recurrentMatMul = (input, prevHiddenState, inputWeightShape, recurrentWeightShape, weights, biases) => functions.recurrentMatMul(
     	    input, 
     	    prevHiddenState,
     	    inputWeightShape, 
     	    recurrentWeightShape, 
-    	    getGlobalParams().globalWeights[pointer], 
-    	    getGlobalParams().globalBiases[pointer],
+	    weights,
+	    biases,
     	);
 
     	/**
@@ -675,18 +642,19 @@
     	 * @param {Number} strides 
     	 * @param {Number} filters 
     	 * @param {Array<Number>} weightShape 
-    	 * @param {Number} pointer 
+	 * @param {Float32Array} weights layer weights
+	 * @param {Float32Array} biases layer biases
     	 * @returns {Float32Array} trans conv output.
     	 */
-    	const transConv = (input, inputShape, outputShape, strides, filters, weightShape, pointer) => functions.transConv(
+	const transConv = (input, inputShape, outputShape, strides, filters, weightShape, weights, biases) => functions.transConv(
     	    input, 
     	    inputShape, 
     	    outputShape, 
     	    strides, 
     	    filters, 
     	    weightShape, 
-    	    getGlobalParams().globalWeights[pointer], 
-    	    getGlobalParams().globalBiases[pointer],
+	    weights,
+	    biases,
     	);
 
     	entry = {
@@ -778,13 +746,11 @@
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} input input features 
     	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (input, current_layer, pointer) => {
+	const feedforward = (input, current_layer) => {
     	    const [inputSize, outputSize] = current_layer.weightShape; // weight shape [input, output]
-    	    const z_values = MatMul(input, inputSize, outputSize, pointer); // perform the MatMul() operation
+	    const z_values = MatMul(input, inputSize, outputSize, current_layer.weights, current_layer.biases); // perform the MatMul() operation
 
     	    const activation_function = activation[current_layer.activation_function.name]; // activation function
     	    let outputs = activation_function(z_values); // use the activation function       
@@ -793,7 +759,6 @@
     	    return {
     	        outputs, 
     	        z_values,
-    	        incrementor_value: 1
     	    };
     	};
 
@@ -900,11 +865,9 @@
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} input input features 
     	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (input, current_layer, pointer) => {
+	const feedforward = (input, current_layer) => {
     	    let [f, kh, kw, kd] = current_layer.weightShape;
     	    let [input_H, input_W, input_D] = current_layer.inputShape; 
     	    let padding = current_layer.padding;
@@ -920,7 +883,7 @@
     	    const {data, shape} = applyPadding(input, input_H, input_W, input_D, top, bottom, left, right);
 
     	    // 4. Perform the convolve operation using the shapes calculated in step 1
-    	    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], pointer);
+	    const convolve_result = Convolve(data, current_layer.strides, [OutputHeight, OutputWidth], [f, kh, kw, kd], [shape[0], shape[1]], current_layer.weights, current_layer.biases);
 
     	    if (convolve_result.some(Number.isNaN)) throw new Error('NaN detected on convolve result');
 
@@ -933,7 +896,6 @@
     	    return {
     	        outputs: outputs,
     	        z_values: convolve_result,
-    	        incrementor_value: 1
     	    };
     	};
 
@@ -954,12 +916,10 @@
     	/**
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} input input features 
-    	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @param {Object} current_layer current layer object configuration
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (input, current_layer, pointer) => {
+	const feedforward = (input, current_layer) => {
     	    const [inputh, inputw, inputd] = current_layer.inputShape;
     	    const [outputh, outputw, outputd] = current_layer.outputShape;
     	    const [poolHeight, poolWidth] = current_layer.poolSize;
@@ -974,7 +934,6 @@
     	    return {
     	        outputs: output,
     	        z_values: output,
-    	        incrementor_value:0
     	    }
     	};
 
@@ -997,21 +956,18 @@
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} input input features 
     	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (input, current_layer, pointer) => {
+	const feedforward = (input, current_layer) => {
     	    const embeddingDim = current_layer.embeddingDim;
 
-    	    const output = getEmbeddings(input, embeddingDim, pointer);
+	    const output = getEmbeddings(input, embeddingDim, current_layer.weights);
 
     	    if (output.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Embedding layer (feedforward)");
     	    
     	    return {
     	        outputs: output, 
     	        z_values: output,
-    	        incrementor_value: 1
     	    };
     	};
 
@@ -1035,11 +991,9 @@
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} inputSequence input sequence data 
     	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (inputSequence, current_layer, pointer) => {
+	const feedforward = (inputSequence, current_layer) => {
 
     	    const units = current_layer.units;
     	    // Assume inputSequence is flat: [units * sequence_length]
@@ -1067,7 +1021,8 @@
     	            current_hidden, 
     	            [current_layer.weightShape[0], current_layer.weightShape[1]], 
     	            [current_layer.weightShape[2], current_layer.weightShape[3]], 
-    	            pointer,
+	            current_layer.weights,
+	            current_layer.biases,
     	        );
 
     	        if (z_t.some(v => Number.isNaN(v))) throw new Error("Error - output array has NaNs on Recurrent layer (feedforward)");
@@ -1098,7 +1053,6 @@
     	    return {
     	        outputs: final_output, 
     	        z_values: all_z_values, // Pass the array of z_values back to Neurex
-    	        incrementor_value: 1
     	    };
     	};
 
@@ -1123,11 +1077,9 @@
     	 * The feedforward logic of this layer
     	 * @param {Float32Array} input input features 
     	 * @param {Object} current_layer current layer object coonfiguration
-    	 * @param {Number} pointer a pointer to be used for getting the corresponding weights and biases
-    	 * @param {Number} outputTemplatePointer a pointer to be used for getting the corresponding output tensor template
-    	 * @returns {{ outputs: Float32Array, z_values: Float32Array, incrementor_value: Number }}
+	 * @returns {{ outputs: Float32Array, z_values: Float32Array }}
     	 */
-    	const feedforward = (input, current_layer, pointer) => {
+	const feedforward = (input, current_layer) => {
     	    
     	    const inputShape = current_layer.inputShape; // [iH, iW, iD]
     	    const outputShape = current_layer.outputShape; // [oH, oW, oD]
@@ -1136,7 +1088,7 @@
     	    const filters = current_layer.filters;
     	    const activation_function = activation[current_layer.activation_function.name];
 
-    	    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, pointer);
+	    const transConvOutput = transConv(input, inputShape, outputShape, strides, filters, weightShape, current_layer.weights, current_layer.biases);
     	    if (transConvOutput.some(v => Number.isNaN(v))) throw new Error("[Trans Conv Error] output array has NaNs after trans conv Ops");
 
     	    const output = activation_function(transConvOutput);
@@ -1145,7 +1097,6 @@
     	    return {
     	        outputs: output,
     	        z_values: transConvOutput,
-    	        incrementor_value: 1
     	    }
     	};
 
@@ -1165,7 +1116,6 @@
     	    return {
     	        outputs: input,
     	        z_values: input,
-    	        incrementor_value:0
     	    }
     	};
 
@@ -1207,13 +1157,6 @@
 
 
     	class Layers {
-    	    constructor () {
-    	        this.weights = [];
-    	        this.biases = [];
-    	        this.weightGrads = [];
-    	        this.biaeGrads = [];
-    	    }
-
     	    /**
     	     * @method inputShape
     	     * @param {object} shapeConfig - specify the number of features
@@ -1240,7 +1183,6 @@
     	        return {
     	            layer_name: 'Reshape',
     	            targetShape: targetShape,
-    	            isParametric: false,
     	            feedforward: (input) => reshaper.feedforward(input),
     	        }
     	    }
@@ -1261,7 +1203,7 @@
     	            vocabSize: vocabSize,
     	            embeddingDim: embeddingDim,
     	            maxSequenceLength: maxSequenceLength,
-    	            feedforward: (input, current_layer, pointer) => embedding.feedforward(input, current_layer, pointer),
+	            feedforward: (input, current_layer) => embedding.feedforward(input, current_layer),
     	        }
     	    }
 
@@ -1293,7 +1235,7 @@
     	                activation_function: activation[function_name], 
     	                derivative_activation_function: activation.derivatives[function_name],
     	                layer_size: layer_size,
-    	                feedforward: (input, current_layer, pointer) => ann.feedforward(input, current_layer, pointer),
+	                feedforward: (input, current_layer) => ann.feedforward(input, current_layer),
     	            };
     	        }
     	        catch (error) {
@@ -1343,7 +1285,7 @@
     	                filters: filters,
     	                padding: padding.toLowerCase(),
     	                strides: strides,
-    	                feedforward: (input, current_layer, pointer) => cnn.feedforward(input, current_layer, pointer),
+	                feedforward: (input, current_layer) => cnn.feedforward(input, current_layer),
     	            }
     	        }
     	        catch (error) {
@@ -1380,7 +1322,7 @@
     	                poolSize: poolSize,
     	                padding: padding,
     	                strides: strides,
-    	                feedforward: (input, current_layer, pointer) => maxpool.feedforward(input, current_layer, pointer),
+	                feedforward: (input, current_layer) => maxpool.feedforward(input, current_layer),
     	            }
     	        }
     	        catch (error) {
@@ -1410,7 +1352,7 @@
     	                units: units,
     	                return_sequence: return_sequence,
     	                return_state: return_state,
-    	                feedforward: (input, current_layer, pointer) => rnn.feedforward(input, current_layer, pointer),
+	                feedforward: (input, current_layer) => rnn.feedforward(input, current_layer),
     	            }
     	        }
     	        catch (error) {
@@ -1463,9 +1405,8 @@
     	                padding: padding.toLowerCase(),
     	                strides: strides,
     	                inputShape: inputShape,
-    	                isParametric: true,
     	                useBias: useBias,
-    	                feedforward: (input, current_layer, pointer) => transConv.feedforward(input, current_layer, pointer),
+	                feedforward: (input, current_layer) => transConv.feedforward(input, current_layer),
     	            }
     	        }
     	        catch (error) {
@@ -1491,12 +1432,9 @@
 
     	// import necessary modules
     	const Layers = requireLayers();
-    	const { setGlobalParams } = requireGlobals();
 
     	class Runtime {
     	    constructor () {
-    	        this.weights = [];
-    	        this.biases = [];
     	        this.num_layers = 0;
     	        this.input_size = 1;
     	        this.input_shape = [1, 1, 1];
@@ -1513,7 +1451,6 @@
     	        this.filters = 1;
     	        this.layers = []; // layers (except input type layers) and their details will store here
 
-    	        this.parametric_layers = [];
     	        this.miscellaneous = null;
     	    }
 
@@ -1543,37 +1480,26 @@
     	            this.input_size = modelData.input_size;
     	            this.output_size = modelData.output_size;
     	            this.num_layers = modelData.num_layers;
-    	            this.weights = modelData.weights.map(w => new Float32Array(w));
-    	            this.biases = modelData.biases.map(b => new Float32Array(b));
     	            this.input_shape = modelData.input_shape;
     	            const layerBuilder = new Layers();
     	            this.layers = modelData.layers.map(layerData => {
     	                let newLayer;
-    	                if (layerData.layer_name === "connected_layer") {
+	                if (layerData.layer_name === "Connected Layer") {
     	                    // Recreate the connected layer with the correct activation and size
     	                    newLayer = layerBuilder.connectedLayer(layerData.layer_size, layerData.activation_function_name);
     	                    newLayer.weightShape = layerData.weightShape;
-    	                    this.parametric_layers.push(layerData.layer_name);
-    	                } else if (layerData.layer_name === "input_layer") {
-    	                    // Recreate the input layer. Note: The input layer doesn't have methods, so this is just for consistency
-    	                    newLayer = layerBuilder.inputShape({ features: layerData.layer_size });
-    	                } else if (layerData.layer_name === "convolutionalLayer") {
+	                } else if (layerData.layer_name === "Convolutional Layer") {
     	                    // recreate Convolutional layer
     	                    newLayer = layerBuilder.convolutionalLayer(layerData.filters, layerData.strides, layerData.kernel_size, layerData.activation_function_name, layerData.padding);
     	                    newLayer.weightShape = layerData.weightShape;
     	                    newLayer.inputShape = layerData.inputShape;
     	                    newLayer.outputShape = layerData.outputShape;
-    	                    const [H, W, D] = layerData.outputShape;
-    	                    const totalSize = H * W * D;
-    	                    this.parametric_layers.push(layerData.layer_name);
-    	                } else if (layerData.layer_name === "maxPooling") {
+	                } else if (layerData.layer_name === "Max Pooling") {
     	                    newLayer = layerBuilder.maxPooling(layerData.poolSize, layerData.strides, layerData.padding);
     	                    newLayer.inputShape = layerData.inputShape;
     	                    newLayer.outputShape = layerData.outputShape;
-    	                    const [H, W, D] = layerData.outputShape;
-    	                    const totalSize = H * W * D;
     	                }
-    	                else if (layerData.layer_name === "EmbeddingLayer") {
+	                else if (layerData.layer_name === "Embedding Layer") {
     	                    const vocabSize = layerData.vocabSize;
     	                    const embeddingDim = layerData.embeddingDim;
     	                    const sequence_length = layerData.maxSequenceLength;
@@ -1583,9 +1509,8 @@
     	                    newLayer.outputShape = [1, 1, outputSize];
     	                    newLayer.weightShape = [vocabSize, embeddingDim];
     	                    newLayer.outputSize = outputSize;
-    	                    this.parametric_layers.push(layerData.layer_name);
     	                }
-    	                else if (layerData.layer_name === "recurrent_cell") {
+	                else if (layerData.layer_name === "Recurrent Cell") {
     	                    const units = layerData.units;
     	                    const return_sequence = layerData.return_sequence || false;
     	                    const return_state = layerData.return_state || false;
@@ -1594,17 +1519,15 @@
     	                    newLayer.inputShape = layerData.inputShape;
     	                    newLayer.outputShape = layerData.outputShape;
     	                    newLayer.maxSequenceLength = layerData.maxSequenceLength || 1;
-    	                    this.parametric_layers.push(layerData.layer_name);
     	                }
-    	                else if (layerData.layer_name === "transConvLayer") {
+	                else if (layerData.layer_name === "Trans Convolution") {
     	                    const filters = layerData.filters;
     	                    const strides = layerData.strides;
     	                    const kernelSize = layerData.kernel_size;
-    	                    newLayer = layerBuilder.transConvLayer(filters, strides, kernelSize, layerData.activation_function_name, layerData.padding, layerData.inputShape);
+	                    newLayer = layerBuilder.transConvLayer(filters, strides, kernelSize, layerData.activation_function_name, layerData.padding, layerData.inputShape, layerData.useBias);
     	                    newLayer.weightShape = layerData.weightShape;
     	                    newLayer.inputShape = layerData.inputShape;
     	                    newLayer.outputShape = layerData.outputShape;
-    	                    this.parametric_layers.push(layerData.layer_name);
     	                }
     	                else if (layerData.layer_name === "Reshape") {
     	                    newLayer = layerBuilder.reshape(layerData.targetShape);
@@ -1615,7 +1538,13 @@
     	                else {
     	                    throw new Error(`[ERROR] Unknown layer type '${layerData.layer_name}' found in model.`);
     	                }
-    	                
+	                if (layerData.weights !== undefined) {
+	                    newLayer.weights = new Float32Array(layerData.weights);
+	                }
+	                if (layerData.biases !== undefined) {
+	                    newLayer.biases = new Float32Array(layerData.biases);
+	                }
+
     	                return newLayer;
     	            });
 
@@ -1646,13 +1575,10 @@
     	     produces predictions based on the input data
     	    */
     	    async predict(input) {
-    	        setGlobalParams(this.weights, this.biases);
-
-    	        if (!this.weights || !this.biases || !this.output_layers_templates) {
-    	            throw new Error("Parameters are missing");
-    	        }
-
     	        try {
+	            if (this.layers.length === 0) {
+	                throw new Error("Model layers are missing");
+	            }
     	            if (!input) {
     	                throw new Error("\n[ERROR]-------No inputs")
     	            }
@@ -1689,12 +1615,10 @@
     	        let all_layer_outputs = [input];
     	        let zs = [];
     	        
-    	        let pointer = 0;
     	        for (let layer_index = 0; layer_index < this.num_layers; layer_index++) {
     	            const current_layer = this.layers[layer_index];
 
-    	            const { outputs, z_values, incrementor_value } = current_layer.feedforward(current_input, current_layer, pointer);
-    	            pointer+=incrementor_value;
+	            const { outputs, z_values } = current_layer.feedforward(current_input, current_layer);
 
     	            zs.push(z_values);
     	            current_input = outputs;

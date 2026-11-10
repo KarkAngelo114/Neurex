@@ -32,7 +32,6 @@ const feedforward = (data) => {
     return {
         outputs: data.input,
         z_values: data.input,
-        incrementor_value:0
     }
 }
 

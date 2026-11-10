@@ -46,8 +46,6 @@ ws.onmessage = async (event) => {
 
     let data = null;
     let layers = [];
-    let weights = [];
-    let biases = [];
 
     if (wsData.type === "HISTORICAL_DATA") {
         data = wsData.payload.at(-1);
@@ -56,25 +54,29 @@ ws.onmessage = async (event) => {
     }
 
     layers = data.layers;
-    weights = data.weights;
-    biases = data.biases;
 
     document.getElementById('inputShape').innerText = `[${data.inputShape}]`;
     document.getElementById('numLayers').innerText = layers.length;
 
-    renderModel(layers, weights, biases);
+    renderModel(layers);
 
     listLayers(layers);
 
 
 }
 
-function renderModel(layer_data, weights, biases) {
+function addParameterStats(layer, layerData) {
+    if (!layer.weights?.length) return;
+
+    layerData.weight_L1 = L1_Mean(layer.weights);
+    layerData.bias_L1 = L1_Mean(layer.biases);
+}
+
+function renderModel(layer_data) {
 
     modelGroup.clear();
     animatedLayers = []; // Reset tracked layers
     
-    let pointer = 0; // if isParametric ? pointer++ : pointer;
     let currentZ = 0; 
     const baseGap = 15;
 
@@ -155,11 +157,7 @@ function renderModel(layer_data, weights, biases) {
                 outputShape: layer.outputShape,
             };
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
             cube.userData = layerData;
         }
@@ -247,11 +245,7 @@ function renderModel(layer_data, weights, biases) {
                 desc: "Allows you to build a layer with number of neurons and the <br>activation function to use in a layer. Stacking more layers <br> will build connected layers or multilayer perceptron",
             };
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
             cube.userData = layerData;
         }
@@ -283,11 +277,7 @@ function renderModel(layer_data, weights, biases) {
                 desc: "Maps discrete token IDs into dense continuous vector representations using a trainable lookup table.",
             };
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
             cube.userData = layerData;
 
@@ -350,11 +340,7 @@ function renderModel(layer_data, weights, biases) {
                 desc: "is the fundamental building block of a Recurrent Neural Network (RNN) <br/> designed to process sequential data. It maintains an internal `memory` by <br/> taking its output from the previous time step and feeding <br/> it back into itself alongside the new input.",
             };
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
 
             cube.userData = layerData;
@@ -418,11 +404,7 @@ function renderModel(layer_data, weights, biases) {
 
             animatedLayers.push(animationData);
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
             modelGroup.add(cube);
         }
@@ -458,11 +440,7 @@ function renderModel(layer_data, weights, biases) {
                 desc: "Normalizes features across the hidden dimensions for each individual sample, maintaining shape without spatial downsampling.",
             };
 
-            if (layer.isParametric) {
-                layerData.weight_L1 = L1_Mean(weights[pointer]);
-                layerData.bias_L1 = L1_Mean(biases[pointer]);
-                pointer++;
-            }
+            addParameterStats(layer, layerData);
 
             cube.userData = layerData;
 

@@ -34,9 +34,11 @@ const modelVisualizer = () => {
         visualize: (visualizerData, modelData) => {
 
             const data = {
-                layers: JSON.parse(JSON.stringify(modelData.layers)),
-                weights: modelData.weights.map((w) => Array.from(w)),
-                biases: modelData.biases.map((b) => Array.from(b)),
+                layers: modelData.layers.map((layer) => ({
+                    ...JSON.parse(JSON.stringify(layer)),
+                    weights: layer.weights ? Array.from(layer.weights) : undefined,
+                    biases: layer.biases ? Array.from(layer.biases) : undefined,
+                })),
                 version: visualizerData.version,
                 inputShape: modelData.input_shape,
             };

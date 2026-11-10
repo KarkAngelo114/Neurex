@@ -45,9 +45,6 @@ const initParams = (size, shape, layer_data) => {
     const updatedShape = return_sequence ? [1, 1, units, seqLen] : [1, 1, units, 1];
     const outputUnits = return_sequence ? units * seqLen : units;
 
-    layer_data.weights = concatenated_weights;
-    layer_data.biases = biases;
-
     return {
         updatedSize: outputUnits,
         updatedShape,
@@ -131,7 +128,6 @@ const feedforward = (data) => {
     return {
         outputs: activatedOutput,
         z_values: z_values,
-        incrementor_value: 1
     };
 };
 

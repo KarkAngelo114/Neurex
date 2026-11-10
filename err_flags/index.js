@@ -21,6 +21,7 @@ const COMPUTE_BACKEND_ERR = "ERR_COMPUTE_BACKEND_SETTING"; // error flag for set
 const LABEL_MODE_ERR = "ERR_LABEL_MODE_ERR"; // error flag used when error triggered during data preprocessing
 const ERR_UNRESOLVED_DIR_PATH = "ERR_UNRESOLVED_PATH_TO_DIR"; // error flag used if an error triggered navigating to a filesystem path
 const ERR_TENSOR_SHAPE_INCOMPATIBLE = "ERR_TENSOR_SHAPE_INCOMPATIBLE"; // error flag for incompatible tensor shape
+const PARSE_ERROR = "ERR_MODEL_PARSING"; // error flag to use when model parsing has an error
 
 module.exports = {
     NAN_ERR,
@@ -43,6 +44,7 @@ module.exports = {
     COMPUTE_BACKEND_ERR,
     LABEL_MODE_ERR,
     ERR_UNRESOLVED_DIR_PATH,
+    PARSE_ERROR,
     ERR_TENSOR_SHAPE_INCOMPATIBLE
 }
 

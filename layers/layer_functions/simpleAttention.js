@@ -32,9 +32,6 @@ const initParams = (size, shape, layer_data) => {
     layer_data.embedDim = embeddingDim;
     layer_data.seqLen = shape[3];
 
-    layer_data.weights = weights;
-    layer_data.biases = biases;
-
     return {
         updatedSize: embeddingDim * shape[3],
         updatedShape: [1, 1, embeddingDim, shape[3]], // seqLen unchanged, embedDim unchanged
@@ -77,7 +74,6 @@ const feedforward = (data) => {
     return {
         outputs: output,
         z_values: output,
-        incrementor_value: 1
     };
 }
 

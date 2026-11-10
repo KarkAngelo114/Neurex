@@ -59,7 +59,6 @@ class Layers {
         return {
             layer_name: 'Reshape',
             targetShape: targetShape,
-            isParametric: false,
             layerID: UUID.randomUUID(),
             initParams: (size, shape, layer_data) => reshaper.initParams(size, shape, layer_data),
             feedforward: (data) => reshaper.feedforward(data),
@@ -88,7 +87,6 @@ class Layers {
             vocabSize: vocabSize,
             embeddingDim: embeddingDim,
             maxSequenceLength: maxSequenceLength,
-            isParametric: true,
             useBias: false, // Embedding layer doesn't have a bias
             shapeType: "sequential",
             initParams: (size, shape, layer_data) => embedding.initParams(size, shape, layer_data),
@@ -106,7 +104,6 @@ class Layers {
     sinusoidalEncoding() {
         return {
             layer_name:"Sinusoidal Encoding",
-            isParametric: false,
             shapeType: "sequential",
             useBias: false,
             initParams: (size, shape, layer_data) => spe.initParams(size, shape, layer_data),
@@ -145,7 +142,6 @@ class Layers {
                 activation_function: activation[function_name], 
                 derivative_activation_function: activation.derivatives[function_name],
                 layer_size: layer_size,
-                isParametric: true,
                 useBias: useBias,
                 shapeType: "flat",
                 initParams: (size, shape, layer_data) => ann.initParams(size, shape, layer_data),
@@ -204,7 +200,6 @@ class Layers {
                 filters: filters,
                 padding: padding.toLowerCase(),
                 strides: strides,
-                isParametric: true,
                 useBias: useBias,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => cnn.initParams(size, shape, layer_data),
@@ -251,7 +246,6 @@ class Layers {
                 poolSize: poolSize,
                 padding: padding,
                 strides: strides,
-                isParametric: false,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => maxpool.initParams(size, shape, layer_data),
                 feedforward: (data) => maxpool.feedforward(data),
@@ -286,7 +280,6 @@ class Layers {
                 derivative_activation_function: activation.derivatives[function_name],
                 units: units,
                 return_sequence: return_sequence,
-                isParametric: true,
                 useBias: useBias,
                 shapeType: "sequential",
                 initParams: (size, shape, layer_data) => rnn.initParams(size, shape, layer_data),
@@ -344,7 +337,6 @@ class Layers {
                 filters: filters,
                 padding: padding.toLowerCase(),
                 strides: strides,
-                isParametric: true,
                 useBias: useBias,
                 shapeType: "spatial",
                 initParams: (size, shape, layer_data) => trans.initParams(size, shape, layer_data),
@@ -375,7 +367,6 @@ class Layers {
             useBias: useBias,
             activation_function: activation[function_name], 
             derivative_activation_function: activation.derivatives[function_name],
-            isParametric: true,
             useBias: useBias,
             useCausalMasking: useCausalMasking,
             shapeType: "sequential",
@@ -407,7 +398,6 @@ class Layers {
                 useBias: useBias,
                 activation_function: activation[function_name], 
                 derivative_activation_function: activation.derivatives[function_name],
-                isParametric: true,
                 useBias: useBias,
                 numHeads: numHeads,
                 useCausalMasking: useCausalMasking,
@@ -437,7 +427,6 @@ class Layers {
             eps: epsilon,
             shapeType: "flat",
             useBias: true, // true by default
-            isParametric: true,
             initParams: (size, shape, layer_data) => normModule.initParams(size, shape, layer_data),
             feedforward: (data) => normModule.feedforward(data),
             getOutputLayerDelta: () => normModule.getOutputLayerDelta(),
@@ -453,7 +442,6 @@ class Layers {
     residualStart() {
         return {
             layer_name: "Residual Start",
-            isParametric: false,
             shapeType: null,
             endConnection: false,
             useBias: false,
@@ -470,7 +458,6 @@ class Layers {
     residualEnd() {
         return {
             layer_name: "Residual End",
-            isParametric: false,
             shapeType: null,
             endConnection: true,
             useBias: false,
