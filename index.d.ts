@@ -1,6 +1,6 @@
 
 /**
- * `Neurex` a Trainable Neural Network Library for NodeJS | Author: Kark Angelo V. Pada
+ * `Neurex` a Trainable Neural Network Framework for NodeJS | Author: Kark Angelo V. Pada
  * 
  * Copyright (c) all rights reserved
  * 
@@ -288,7 +288,8 @@ declare module 'neurex' {
 
     /**
      *
-     * The core class of the library.
+     * The core class of the framework. This class streamlines and orchestrates all operations of moving data from one layer to another,
+     * model saving and loading. This is essentially the central controller of the Neurex neural network library.
      *
      *
      * @class Neurex
@@ -942,7 +943,7 @@ declare module 'neurex' {
 
         /**
          *  A vanilla recurrent neural network with 3 recurrent cells.
-         * @param {Number} units_per_cell number of units per recurrent cells. Default is `128` 
+         * @param {Number} units_per_cell number of units per recurrent cells. Default is `32` 
          * @param {String} activation_function activation function to be used by recurrent cells. Default is `tanh`
          * 
          *

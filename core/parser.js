@@ -2,6 +2,7 @@ const Layers = require('../layers');
 const color = require('../color-code');
 const errFlags = require('../err_flags');
 const UUID = require('crypto');
+const { createTensorBuffer } = require('../utils/utils');
 
 /**
  * Use to parse the model adn restructure it back
@@ -14,8 +15,7 @@ const UUID = require('crypto');
 const parseModel= (model_layers, weights, biases, freezeWeights) => {
 
     const layerBuilder = new Layers();
-    const weightIterator = weights[Symbol.iterator]();
-    const biasIterator = biases[Symbol.iterator]();
+    let paramPointer = 0;
 
     const layers = model_layers.map(layerData => {
 
@@ -137,11 +137,13 @@ const parseModel= (model_layers, weights, biases, freezeWeights) => {
             throw new Error(errFlags.PARSE_ERROR);
         }
 
-        if (layerData.isParametric) {
-            newLayer.weights = weightIterator.next().value;
-            newLayer.biases = biasIterator.next().value || new Float32Array(0);
+        if (layerData.isParametric) {  
+            newLayer.weights = weights[paramPointer];
+            newLayer.biases = biases[paramPointer] || createTensorBuffer([1], {prefilledWith:"zeroes"}); // dummy bias buffer because the optimizers needs boht buffers, but won't get updated.
             newLayer.freezeWeights = freezeWeights;
+            paramPointer++;
         }
+        
         return newLayer;
     });
 

@@ -261,8 +261,6 @@ class Neurex {
                 activation_function_name: layer?.activation_function ? layer?.activation_function?.name : null,
                 derivative_activation_function_name: layer?.derivative_activation_function ? layer?.derivative_activation_function?.name : null,
                 layer_size: layer?.layer_size || null,
-                feedforward: layer?.feedforward,
-                backpropagate: layer?.backpropagate,
                 padding: layer?.padding || '',
                 filters: layer?.filters || 0,
                 strides: layer?.strides || 0,
@@ -284,6 +282,7 @@ class Neurex {
                 shapeType: layer?.shapeType || null,
                 eps: layer?.eps || 0,
                 useCausalMasking: layer?.useCausalMasking || false,
+                isParametric: layer?.isParametric
             })),
             "miscellaneous": miscellaneous
         };
@@ -407,8 +406,10 @@ class Neurex {
             this.output_size = modelData?.output_size;
             this.num_layers = modelData?.num_layers;
             this.input_shape = modelData?.input_shape;
+            
+            const layers = parseModel(modelData.layers, loadedWeights, loadedBiases, freezeWeights);
 
-            this.layers = parseModel(modelData.layers, loadedWeights, loadedBiases, freezeWeights);
+            this.layers = layers;
             
             this.#recalculateShape();
             
@@ -573,10 +574,12 @@ class Neurex {
         }
 
         this.shuffle = shuffle;
-    
+
+        const parameters = this.#getLayerParameters();
+
         setGlobalParams(
             this.modelID,
-            this.#getLayerParameters()
+            parameters
         );
 
         if (this.layers.length == 0) {
