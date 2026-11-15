@@ -3,8 +3,7 @@ const errFlags = require('../err_flags');
 const { OpenCL_detectGPU } = require('../gpu/gpu_init');
 
 let selectedDevice = null;
-let computeBackend = null;
-let isBackendSet = false;
+let computeBackend = "cpu"; // CPU by default
 
 // Vendors whose GPUs are shared-memory / integrated by design
 const INTEGRATED_NAME_HINTS = /\b(UHD|Iris|HD Graphics|Radeon\(TM\) Graphics|Vega \d+ Graphics)\b/i;
@@ -99,11 +98,6 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
     // environment compute setter where users can set a device rather than configuring them on the configure, and this will affect all training instances since
     // it uses global shared internal state ("cpu",  "opencl", "pure-js", and possibly in the future, "cuda")
 
-    if (isBackendSet) {
-        console.error(`${red}[ERROR]${reset} Compute backend is already set. You can only set one time across training instances.`);
-        throw new Error(errFlags.COMPUTE_BACKEND_ERR);
-    }
-
     if (stringValue.toLowerCase() === "cpu" || stringValue.toLowerCase() === "pure-js") {
         computeBackend = stringValue;
         selectedDevice = null;
@@ -117,7 +111,6 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
         throw new Error(errFlags.COMPUTE_BACKEND_ERR);
     }
 
-    isBackendSet = true;
 }
 
 /**
@@ -125,11 +118,6 @@ const setComputeBackend = (stringValue = "cpu", findBestDevice = true) => {
  * @returns {{computeBackend: string, devices: any}}
  */
 const globalState = () => {
-
-    if (!isBackendSet) {
-        console.error(`${red}[ERROR]${reset} Compute backend is not yet initialized. Call "setComputeBackend()" first. Read: ${gray}https://neurex-documentation.vercel.app/javascript-nodejs${reset} for info.`);
-        throw new Error(errFlags.COMPUTE_BACKEND_ERR);
-    }
 
     return {
         computeBackend: computeBackend,

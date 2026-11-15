@@ -146,25 +146,36 @@ layer.residualEnd()
 For more info about layers, check the official [documentation](https://neurex-documentation.vercel.app/javascript-nodejs#layers).
 
 ### Setting compute backend
-Neurex uses global-scoped backend computation. Meaning, no matter how many model training instances you make, it'll use the same backend compute across trainings. Say if you train using `cpu`, all training instances will be executed on CPU functions.
-
-To set compute backend, you can use `setComputeBackend` function under `backend` namespace.
+Choose the compute backend before running model computations. Backend selection is global to the Neurex module in the current Node.js process: it is shared by every model and training run, rather than configured separately on each model. Changing it affects subsequent computations across those models.
 
 ```JavaScript
 const nrx = require('neurex');
 
-nrx.backend.setComputeBackend("cpu"); // cpu by default
+nrx.backend.setComputeBackend("opencl");
 
 ```
 
-| <p style = "text-align: center">Type</p> | <p style = "text-align: center">Is Supported</p> |
-| :--- | :--- |
-| `cpu` | Yes (by default) |
-|`pure-js`| Yes (by default) |
-|`opencl`| Yes |
-|`cuda`| Not yet |
+If you do not call `setComputeBackend`, Neurex uses `cpu`. The available backends are:
 
-Setting up the backend compute is a must before running any operations as it let's you decide where to run the computations for every operators. If you haven't set yet, an error will trigger before you even start the training loop.
+| Backend | What it uses |
+| :--- | :--- |
+| `cpu` | Native C++ CPU implementation. This is the default and is a good general-purpose choice. |
+| `pure-js` | JavaScript implementation. Use it when you specifically want to run without the native compute implementation; it may be slower. |
+| `opencl` | OpenCL GPU compute. Requires a compatible OpenCL runtime and device. By default, Neurex looks for a dedicated GPU; selecting this backend fails if one cannot be found. OpenCL kernel initialization may fall back to native CPU computation if compilation fails. |
+| `cuda` | Not supported yet. |
+
+For example, select the backend once near application startup, before training or inference:
+
+```JavaScript
+const nrx = require('neurex');
+
+nrx.backend.setComputeBackend('cpu'); // Optional: cpu is already the default.
+
+const model = new nrx.Neurex();
+// Configure and run your model...
+```
+
+Use the backend names exactly as shown in the table. Calling `setComputeBackend` with an unsupported value throws an error. Because the setting is shared, avoid selecting different backends for separate models in the same process when their computations may overlap.
 
 
 ## Sample usage - training a XOR 
@@ -175,8 +186,6 @@ import * as nrx from 'neurex';
 
 const model = new nrx.Neurex();
 const layer = new nrx.Layers();
-
-nrx.backend.setComputeBackend("cpu");
 
 (async () => {
     const trainX = [
@@ -234,7 +243,7 @@ nrx.backend.setComputeBackend("cpu");
 ```
 
 ## Write your own training loop (For Advance Users)
-While `train()` existed as a high-level API for convenience, `Neurex` exposes low-level primitive APIs that you can be use for writing custom training loops, offering full control of how you will train your model. By using `feedforward()`, `getOutputlayerDelta()`, `backpropagation()`, and `updateParams()`, you can create your own training loop and own training rules.
+While `train()` existed as a high-level API for convenience, `Neurex` exposes low-level primitive APIs that you can be use for writing custom training loops, offering full control of how you will train your model.
 
 ```JavaScript
 
@@ -299,9 +308,7 @@ nrx.backend.setComputeBackend("cpu");
 })();
 ```
 
-Having those exposed APis and writing custom training loops could theoretically allows you to train multiple model architecture at once or train a GAN-like network model.
-
-One thing to note though - when writing custom training loop, expect that the features that the `train()` method uses, like using of visualizer tools and learning rate schedulers, etc. will not take effect (yet). The core training APIs only does the process of forwarding the input where even lower-level internals does the processing of data when calling them, traversing the error, and updating the model parameters.
+_Note: When writing custom training loops, certain plugins like visualizer plugins won't work yet._
 
 ## Saving, loading, popping and adding new layers for transfer learning
 
@@ -333,7 +340,9 @@ const { Neurex, Layers } = require('neurex');
     const nrx = new Neurex();
     const layer = new Layers();
 
-    await nrx.loadSavedModel("model.nrx");
+    await nrx.loadSavedModel("model.nrx", {
+        freezeWeights: true // freeze all trained parameters on all trainable layers
+    });
 
     nrx.modelSummary(); // prints the model summary
 })();
@@ -349,7 +358,10 @@ const { Neurex, Layers } = require('neurex');
     const nrx = new Neurex();
     const layer = new Layers();
 
-    await nrx.loadSavedModel("model.nrx");
+    await nrx.loadSavedModel("model.nrx", {
+        freezeWeights: true // freeze all trained parameters on all trainable layers
+    });
+    
     nrx.pop(); 
 
     // calling more pop() will remove every last layer
