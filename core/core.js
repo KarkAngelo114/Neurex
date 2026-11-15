@@ -282,7 +282,8 @@ class Neurex {
                 shapeType: layer?.shapeType || null,
                 eps: layer?.eps || 0,
                 useCausalMasking: layer?.useCausalMasking || false,
-                isParametric: layer?.isParametric
+                isParametric: layer?.isParametric,
+                layerID: layer?.layerID || UUID.randomUUID()
             })),
             "miscellaneous": miscellaneous
         };
@@ -1044,7 +1045,6 @@ class Neurex {
      * @param {Array<Float32Array>} activations these are the activation outputs every layer during feedfoward (returned by `feedforward()`) 
      * @param {Array<Float32Array>} zs these are pre-activated outputs (no activation function applied yet) during feedforward. These are used by derivative activation function to get the final delta to be projected backward.
      * @param {Float32Array} outputLayerDelta is the local error gradient calculated at the final layer, representing how much each output values is far from the actual values.
-     * @returns {{accumulatedWeightGrads: [], accumulatedBiasGrads: Float32Array[]}}
      */
     backpropagation(activations, zs, outputLayerDelta) {
         let current_delta = outputLayerDelta;
