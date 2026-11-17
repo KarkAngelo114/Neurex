@@ -420,7 +420,7 @@ const fusedFinalDeltaProjector_ForConv = (zs, layerInput, layerOutput, incomingD
  * @param {String} layeerID layer type identifier to fetch data using a layer ID from the global store
  * @returns {{weights: Float32Array, weightVelocity: Float32Array, biases: Float32Array, biasVelocity: Float32Array}}
  */
-const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true, modelID, layerID) => float32_Modules.SGD(
+const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasVelocity, lr, momentum = 0.9, batchSize = 1, useBias = true, modelID, layerID) => functions.SGD(
     weights,
     weightGrads,
     weightVelocity,
@@ -455,7 +455,7 @@ const ApplySGD = (weights, weightGrads, weightVelocity, biases, biasGrads, biasV
  * @param {String} layerID 
  * @returns {{weights: Float32Array, biases: Float32Array, m_weights: Float32Array, m_biases: Float32Array, v_weights: Float32Array, v_biases: Float32Array}}
  */
-const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID) => float32_Modules.Adam(
+const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases, v_weights, v_biases, t, learning_rate, beta1, beta2, epsilon, batchSize, useBias, modelID, layerID) => functions.Adam(
     weights,
     weightGrads, 
     biases,
@@ -492,7 +492,7 @@ const ApplyAdam = (weights, weightGrads, biases, biasGrads, m_weights, m_biases,
  * @param {String} layerID 
  * @returns {{weights: Float32Array, biases: Float32Array, sqAvg_weights: Float32Array, sqAvg_biases: Float32Array}}
  */
-const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias, modelID, layerID) => float32_Modules.RMSProp(
+const ApplyRMSProp = (weights, weightGrads, biases, biasGrads, sqAvg_weights, sqAvg_biases, lr, epsilon, decayRate, batchSize, useBias, modelID, layerID) => functions.RMSProp(
     weights,
     weightGrads,
     biases,
