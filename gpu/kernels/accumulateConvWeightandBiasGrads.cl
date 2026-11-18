@@ -18,67 +18,50 @@ __kernel void accumulateConvWeightandBiasGrads(
 ) {
 
     int f = get_global_id(0);
-    
-    if (f >= numFilters || f >= Cout) {
+    int kh = get_global_id(1);
+    int z = get_global_id(2);
+    int kw = z / Cin;
+    int c = z % Cin;
+
+    if (f >= numFilters || f >= Cout ||
+        kh >= Kh ||
+        kw >= Kw ||
+        c >= Cin) {
         return;
     }
 
-    for (int kh = 0; kh < Kh; kh++) {
-        for (int kw = 0; kw < Kw; kw++) {
-            int kernelRowOffset = (f * Kh + kh) * Kw + kw;
+    float sum = 0.0f;
+    for (int h = 0; h < H; h++) {
+        int inH = (h * stride) + kh - padH;
+        if (inH < 0 || inH >= inputH) {
+            continue;
+        }
 
-            for (int c = 0; c < Cin; c += 4) {
-                float sum0 = 0.0f;
-                float sum1 = 0.0f;
-                float sum2 = 0.0f;
-                float sum3 = 0.0f;
+        for (int w = 0; w < W; w++) {
+            int inW = (w * stride) + kw - padW;
+            if (inW < 0 || inW >= inputW) {
+                continue;
+            }
 
-                for (int h = 0; h < H; h++) {
-                    for (int w = 0; w < W; w++) {
-                        int inH = (h * stride) + kh - padH;
-                        int inW = (w * stride) + kw - padW;
-                        if (inH < 0 || inH >= inputH || inW < 0 || inW >= inputW) {
-                            continue;
-                        }
+            int inputIndex = (inH * inputW + inW) * Cin + c;
+            int deltaIndex = (h * W + w) * Cout + f;
+            sum += input_Data[inputIndex] * d[deltaIndex];
+        }
+    }
 
-                        int baseInputIndex = (inH * inputW + inW) * Cin;
-                        int deltaIndex = (h * W + w) * Cout + f;
-                        float deltaVal = d[deltaIndex];
-                        sum0 += input_Data[baseInputIndex + c] * deltaVal;
-                        if (c + 1 < Cin) {
-                            sum1 += input_Data[baseInputIndex + c + 1] * deltaVal;
-                        }
-                        if (c + 2 < Cin) {
-                            sum2 += input_Data[baseInputIndex + c + 2] * deltaVal;
-                        }
-                        if (c + 3 < Cin) {
-                            sum3 += input_Data[baseInputIndex + c + 3] * deltaVal;
-                        }
-                    }
-                }
+    int gradIndex = ((f * Kh + kh) * Kw + kw) * Cin + c;
+    wg[gradIndex] += sum;
 
-                wg[kernelRowOffset * Cin + c] += sum0;
-                if (c + 1 < Cin) {
-                    wg[kernelRowOffset * Cin + c + 1] += sum1;
-                }
-                if (c + 2 < Cin) {
-                    wg[kernelRowOffset * Cin + c + 2] += sum2;
-                }
-                if (c + 3 < Cin) {
-                    wg[kernelRowOffset * Cin + c + 3] += sum3;
-                }
+    if (kh == 0 && z == 0) {
+        float biasSum = 0.0f;
+        for (int h = 0; h < H; h++) {
+            for (int w = 0; w < W; w++) {
+                int deltaIndex = (h * W + w) * Cout + f;
+                biasSum += d[deltaIndex];
             }
         }
+        bg[f] += biasSum;
     }
-
-    float biasSum = 0.0f;
-    for (int h = 0; h < H; h++) {
-        for (int w = 0; w < W; w++) {
-            int deltaIndex = (h * W + w) * numFilters + f;
-            biasSum += d[deltaIndex];
-        }
-    }
-    bg[f] += biasSum;
 }
 
 __kernel void accumulateTransConvWeightAndBiasGrads(
