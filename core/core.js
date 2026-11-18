@@ -108,11 +108,7 @@ class Neurex {
         this.hasInitializedNativeBindings = true;
     }
 
-    /**
-     * @method modelSummary()
 
-    Shows the model architecture
-     */
     /**
      * @method modelSummary()
      * Shows the model architecture
@@ -562,7 +558,6 @@ class Neurex {
         * model.train(X_train, Y_train, 'categorical_cross_entropy', 2000, 12);
     * * After training, you can use the network for predictions
     */
-
     async train(inputs, trainY, loss, epoch, batch_size = 1, shuffle = true) {
 
         if (!this.losses.includes(loss.toLowerCase())) {

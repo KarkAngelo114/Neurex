@@ -3,6 +3,7 @@ const errFlag = require('../err_flags');
 const { globalState } = require('./modeSelector');
 const { red, reset } = require('../color-code');
 let addon = require(path.join(__dirname, "..", "core", "bindings", "prebuilds", `${process.platform}-${process.arch}`, 'neurex-core-native.node'));
+let isUploaded = false;
 
 /**
  * This function only applies when using a GPU. No more global parameter store here on JS side since parameters are owned by parametric layers found in their metadata.
@@ -27,8 +28,9 @@ exports.setGlobalParams = (modelID, layerParameters) => {
             }
         }
 
-        if (globalState().computeBackend == "opencl") {
+        if (globalState().computeBackend == "opencl" && !isUploaded) {
             addon.UploadParams(modelID, layerParameters, globalState().computeBackend);
+            isUploaded = true;
         }
 
     }
