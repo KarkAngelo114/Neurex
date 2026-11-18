@@ -120,6 +120,8 @@ function render(data) {
     myLineChart.data.labels.push(data.epoch);
     myLineChart.data.datasets[0].data.push(data.loss);
 
+    console.log(data.accuracy);
+
     if (data.accuracy !== undefined && data.accuracy !== null) {
         if (accuracy) {
             accuracy.style.display = 'block';

@@ -842,7 +842,7 @@ class Neurex {
                     }
 
                     if (loss === "categorical_cross_entropy" || loss === "sparse_categorcial_cross_entropy") {
-                        visualizerData.accuracy = 0;
+                        visualizerData.accuracy = accuracy;
                     }
 
                     const modelData = {
